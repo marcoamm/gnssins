@@ -29,6 +29,10 @@ void Tightly_coupled_INS_GNSS(in_profile,no_epochs,initialization_errors,
   //OUTPUT TOGETHER
 out_profile,out_errors,out_IMU_bias_est,out_clock,out_KF_SD);
 
+void TC_KF (){
+
+}
+
 
 
 
