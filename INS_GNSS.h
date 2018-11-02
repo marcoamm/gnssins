@@ -29,9 +29,11 @@ extern "C" {
 /* constants -----------------------------------------------------------------*/
 
 /* Earth parameters */
-#define e_2	((2*FE_WGS84)-(FE_WGS84*FE_WGS84)) 				/* second eccentricity */
-#define RN(lat) (RE_WGS84/sqrt(1-e_2*(sin(lat)*sin(lat)))) 			/* Prime vertical radii */
-#define RM(lat) ( RE_WGS84*(1-e_2) / pow( 1-e_2*( sin(lat)*sin(lat) ),(3/2) ) ) /* Merdidian radius of curvature */
+#define RE_GRS80    6378137.0           /* earth semimajor axis (GRS80) (m) */
+#define FE_GRS80    (1.0/298.257222101) /* earth flattening (GRS80) */
+#define e_2	((2*FE_GRS80)-(FE_GRS80*FE_GRS80)) 				/* second eccentricity */
+#define RN(lat) (RE_GRS80/sqrt(1-e_2*(sin(lat)*sin(lat)))) 			/* Prime vertical radii */
+#define RM(lat) ( RE_GRS80*(1-e_2) / pow( 1-e_2*( sin(lat)*sin(lat) ),(3/2) ) ) /* Merdidian radius of curvature */
 #define reeS(lat) (RN(lat)*sqrt(cos(lat)*cos(lat)+(1-e_2)*(1-e_2)*sin(lat)*sin(lat))) /* Geocentric radius at the surface*/
 /* Normal gravity by Schwars and Wei (2000), p.30 from Shin (2001) */
 #define	a1gn	9.7803267715
@@ -41,6 +43,8 @@ extern "C" {
 #define	a5gn	0.0000000043977311
 #define	a6gn	0.0000000000007211
 #define gn(lat,h) ( a1gn*(1+a2gn*(sin(lat)*sin(lat))+a3gn*(sin(lat)*sin(lat)*sin(lat)*sin(lat))) + h*(a4gn+a5gn*(sin(lat)*sin(lat))) + a6gn*h*h   ) /* Normal gravity on the ellipsoidal surface WGS84 - Defense Mapping Agency */
+
+
 
 /* Coordinate rotation matrices (Jekeli, 2001; Shin, 2001) */
 
