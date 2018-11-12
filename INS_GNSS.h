@@ -8,6 +8,7 @@
 *-----------------------------------------------------------------------------*/
 #ifndef INS_GNSS_H
 #define INS_GNSS_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -16,12 +17,14 @@
 #include <time.h>
 #include <ctype.h>
 #include "rtklib.h"
+
 #ifdef WIN32
 #include <winsock2.h>
 #include <windows.h>
 #else
 #include <pthread.h>
 #endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,8 +47,6 @@ extern "C" {
 #define	a6gn	0.0000000000007211
 #define gn(lat,h) ( a1gn*(1+a2gn*(sin(lat)*sin(lat))+a3gn*(sin(lat)*sin(lat)*sin(lat)*sin(lat))) + h*(a4gn+a5gn*(sin(lat)*sin(lat))) + a6gn*h*h   ) /* Normal gravity on the ellipsoidal surface WGS84 - Defense Mapping Agency */
 
-
-
 /* Coordinate rotation matrices (Jekeli, 2001; Shin, 2001) */
 
 /* Earth-Centered Inertial to Earth-Centered Fixed (i to e-frame)
@@ -53,7 +54,7 @@ extern "C" {
 #define Ci2e(t,X) do { \
  (X)[0]=cos(t); (X)[1]=sin(t); (X)[3]=-sin(t);(X)[4]=cos(t);\
  (X)[2]=(X)[5]=(X)[6]=(X)[7]=0;\
- (X)[8]=1;
+ (X)[8]=1;\
 } while (0) //In this case t=wie*t, earth rotation and the time since start of navigation
 
 /* Earth-Centered Fixed to navigation frame (NED) (e to n-frame)	*/
@@ -111,26 +112,26 @@ typedef struct {        /* initialization of pos., vel. and attitude rrors */
 
 typedef struct {        /* IMU errors */
   double  delta_r_eb_n[3];     /* position error resolved along NED (m) */
-  float   b_a[3];              /* Accelerometer biases (m/s^2) */
-  float   b_g[3];              /* Gyro biases (rad/s) */
+  double   b_a[3];              /* Accelerometer biases (m/s^2) */
+  double   b_g[3];              /* Gyro biases (rad/s) */
   double  M_a[9];              /* Accelerometer scale factor and cross coupling errors */
   double  M_g[9];              /* Gyro scale factor and cross coupling errors */
   double  G_g[9];              /* Gyro g-dependent biases (rad-sec/m) */
-  float   accel_noise_root_PSD; /* Accelerometer noise root PSD (m s^-1.5) */
-  float   gyro_noise_root_PSD; /* Gyro noise root PSD (rad s^-0.5) */
+  double   accel_noise_root_PSD; /* Accelerometer noise root PSD (m s^-1.5) */
+  double   gyro_noise_root_PSD; /* Gyro noise root PSD (rad s^-0.5) */
   float   accel_quant_level;   /* Accelerometer quantization level (m/s^2) */
   float   gyro_quant_level;    /* Gyro quantization level (rad/s) */
 } IMU_errors;
 
 typedef struct {      /* GNSS configuration */
-  int epoch_interval;      /* Interval between GNSS epochs (s) */
-  int init_est_r_ea_e;     /* Initial estimated position (m; ECEF) */
+  float epoch_interval;      /* Interval between GNSS epochs (s) */
+  double init_est_r_ea_e[3];     /* Initial estimated position (m; ECEF) */
   int no_sat;              /* Number of satellites in constellation */
-  float r_os;              /* Orbital radius of satellites (m) */
+  double r_os;              /* Orbital radius of satellites (m) */
   float inclination;       /* Inclination angle of satellites (deg) */
-  double const_delta_lambda; /* Longitude offset of constellation (deg) */
+  float const_delta_lambda; /* Longitude offset of constellation (deg) */
   float const_delta_t;     /* Timing offset of constellation (s) */
-  int mask_angle;          /* Mask angle (deg) */
+  float mask_angle;          /* Mask angle (deg) */
   float SIS_err_SD;        /* Signal in space error SD (m) */
   float zenith_iono_err_SD; /* Zenith ionosphere error SD (m) */
   float zenith_trop_err_SD; /* Zenith troposphere error SD (m) */
@@ -141,21 +142,21 @@ typedef struct {      /* GNSS configuration */
 } GNSS_config;
 
 typedef struct {      /* Tighlty coupled Kalman Filter configuration */
- init_att_unc           Initial attitude uncertainty per axis (rad)
- init_vel_unc           Initial velocity uncertainty per axis (m/s)
- init_pos_unc           Initial position uncertainty per axis (m)
- init_b_a_unc           Initial accel. bias uncertainty (m/s^2)
- init_b_g_unc           Initial gyro. bias uncertainty (rad/s)
- init_clock_offset_unc  Initial clock offset uncertainty per axis (m)
- init_clock_drift_unc   Initial clock drift uncertainty per axis (m/s)
- gyro_noise_PSD         Gyro noise PSD (rad^2/s)
- accel_noise_PSD        Accelerometer noise PSD (m^2 s^-3)
- accel_bias_PSD         Accelerometer bias random walk PSD (m^2 s^-5)
- gyro_bias_PSD          Gyro bias random walk PSD (rad^2 s^-3)
- clock_freq_PSD         Receiver clock frequency-drift PSD (m^2/s^3)
- clock_phase_PSD        Receiver clock phase-drift PSD (m^2/s)
- pseudo_range_SD        Pseudo-range measurement noise SD (m)
- range_rate_SD          Pseudo-range rate measurement noise SD (m/s)
+ float init_att_unc;           /* Initial attitude uncertainty per axis (rad) */
+ float init_vel_unc;           /* Initial velocity uncertainty per axis (m/s) */
+ float init_pos_unc;           /* Initial position uncertainty per axis (m) */
+ double init_b_a_unc;           /* Initial accel. bias uncertainty (m/s^2) */
+ double init_b_g_unc;           /* Initial gyro. bias uncertainty (rad/s) */
+ float init_clock_offset_unc;  /* Initial clock offset uncertainty per axis (m) */
+ float init_clock_drift_unc;   /* Initial clock drift uncertainty per axis (m/s) */
+ double gyro_noise_PSD;         /* Gyro noise PSD (rad^2/s) */
+ double accel_noise_PSD;        /* Accelerometer noise PSD (m^2 s^-3) */
+ double accel_bias_PSD;         /* Accelerometer bias random walk PSD (m^2 s^-5) */
+ double gyro_bias_PSD;          /* Gyro bias random walk PSD (rad^2 s^-3) */
+ float clock_freq_PSD;         /* Receiver clock frequency-drift PSD (m^2/s^3) */
+ float clock_phase_PSD;        /* Receiver clock phase-drift PSD (m^2/s) */
+ float pseudo_range_SD;        /* Pseudo-range measurement noise SD (m) */
+ float range_rate_SD;          /* Pseudo-range rate measurement noise SD (m/s) */
 } TC_KF_config;
 
 
@@ -164,3 +165,8 @@ typedef struct {      /* Tighlty coupled Kalman Filter configuration */
 /* function declaration ------------------------------------------------------*/
 
 /* utilities functions */
+
+#ifdef __cplusplus
+}
+#endif
+#endif /* INS_GNSS_H */
