@@ -15,11 +15,11 @@
 # In this case, changes in one file does not require re-compilation
 # of the other files.
 
-SRC     = /home/emerson/Desktop/Connected_folders/SatInsMap/lib/RTKLIB/src
-SRC1     = /home/emerson/Desktop/Connected_folders/SatInsMap/lib/gnssins
-LIB	= /home/emerson/Desktop/Connected_folders/SatInsMap/lib
+SRC     = ../lib/RTKLIB/src
+SRC1     = ../lib/gnssins
+LIB	= ../lib
 
 all:	satinsmap
 
 satinsmap:	satinsmap.c
-	gcc -Wall -g -w -o satinsmap satinsmap.c mapmatch.c plots.c ins.c $(SRC1)/INS_GNSS.c $(LIB)/eispack.c $(SRC)/stream.c $(SRC)/rtkcmn.c $(SRC)/rinex.c $(SRC)/streamsvr.c $(SRC)/solution.c $(SRC)/options.c $(SRC)/geoid.c $(SRC)/postpos.c $(SRC)/rtkpos.c $(SRC)/ppp.c $(SRC)/ephemeris.c $(SRC)/sbas.c $(SRC)/qzslex.c $(SRC)/preceph.c $(SRC)/pntpos.c $(SRC)/ionex.c $(SRC)/ppp_ar.c $(SRC)/lambda.c $(SRC)/rtcm.c $(SRC)/rtcm2.c $(SRC)/rtcm3.c $(SRC)/rtcm3e.c $(SRC)/rcvraw.c $(SRC)/rcv/ublox.c $(SRC)/rcv/ss2.c $(SRC)/rcv/skytraq.c $(SRC)/rcv/rt17.c $(SRC)/rcv/rcvlex.c $(SRC)/rcv/septentrio.c $(SRC)/rcv/nvs.c $(SRC)/rcv/novatel.c $(SRC)/rcv/javad.c $(SRC)/rcv/gw10.c $(SRC)/rcv/crescent.c $(SRC)/rcv/binex.c -I$(SRC) -lm -lpthread
+	gcc -Wall -g -w -o satinsmap satinsmap.c mapmatch.c plots.c ins.c $(SRC1)/INS_GNSS.c $(SRC)/stream.c $(SRC)/rtkcmn.c $(SRC)/rinex.c $(SRC)/streamsvr.c $(SRC)/solution.c $(SRC)/options.c $(SRC)/geoid.c $(SRC)/postpos.c $(SRC)/rtkpos.c $(SRC)/ppp.c $(SRC)/ephemeris.c $(SRC)/sbas.c $(SRC)/qzslex.c $(SRC)/preceph.c $(SRC)/pntpos.c $(SRC)/ionex.c $(SRC)/ppp_ar.c $(SRC)/lambda.c $(SRC)/rtcm.c $(SRC)/rtcm2.c $(SRC)/rtcm3.c $(SRC)/rtcm3e.c $(SRC)/rcvraw.c $(SRC)/rcv/ublox.c $(SRC)/rcv/ss2.c $(SRC)/rcv/skytraq.c $(SRC)/rcv/rt17.c $(SRC)/rcv/rcvlex.c $(SRC)/rcv/septentrio.c $(SRC)/rcv/nvs.c $(SRC)/rcv/novatel.c $(SRC)/rcv/javad.c $(SRC)/rcv/gw10.c $(SRC)/rcv/crescent.c $(SRC)/rcv/binex.c -I$(SRC) -lm -lpthread

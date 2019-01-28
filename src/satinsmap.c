@@ -10,7 +10,6 @@
 
 #include "rtklib.h"
 #include "satinsmap.h"
-#include "/home/emerson/Desktop/Connected_folders/SatInsMap/lib/eispack.h"
 
 /* global variables ----------------------------------------------------------*/
 
@@ -22,7 +21,7 @@ imuraw_t imu_obs_global={{0}};
 pva_t pva_global={{0}};
 pva_t pvagnss={{0}};
 
-char *outpath1[] = {"/home/emerson/Desktop/Connected_folders/SatInsMap/out/"};
+char *outpath1[] = {"../out/"};
 FILE *out_PVA;
 FILE *out_clock_file;
 FILE *out_IMU_bias_file;
@@ -245,7 +244,7 @@ void lineInterp(FILE *fp, double d, int n)
 
   strcat(fileout,outpath1[0]);
   strcat(fileout,"LineInterp.txt");
-  fpout=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/LineInterp_rtklib5_static_height_rtkplot.txt","w");
+  fpout=fopen("../out/LineInterp_rtklib5_static_height_rtkplot.txt","w");
 
   for (i = 0; i < n; i++) {
     fgets(str, 50, fp);
@@ -981,11 +980,11 @@ extern void insmap (){
 
   //FILE* facc, *fgyr;
   FILE* fp, *fv, *fatt;
-  //facc = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/insmap_test_acceleration.txt","a");
-  //fgyr = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/insmap_test_gyro.txt","a");
-  fatt = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/insmap_test_attitude.txt","a");
-  fp = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/insmap_test_pos.txt","a");
-  fv = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/insmap_test_vel.txt","a");
+  //facc = fopen("../out/insmap_test_acceleration.txt","a");
+  //fgyr = fopen("../out/insmap_test_gyro.txt","a");
+  fatt = fopen("../out/insmap_test_attitude.txt","a");
+  fp = fopen("../out/insmap_test_pos.txt","a");
+  fv = fopen("../out/insmap_test_vel.txt","a");
 
 
     /* Update the with previous solution determined in the navigation solution */
@@ -1403,72 +1402,72 @@ gtime_t ts={0},te={0};
 double tint=0.0,es[]={2000,1,1,0,0,0},ee[]={2000,12,31,23,59,59},pos[3];
 int i,j,k,n,ret;
 char *infile[MAXFILE],*outfile="";
-//char file[] = "/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes_XYZ_rtklib";//_corr";
-//char file[] = "/home/emerson/Desktop/Connected_folders/SatInsMap/out/LineInterp_rtklib3.txt";//_corr";
-char file[] = "/home/emerson/Desktop/Connected_folders/SatInsMap/out/LineInterp_rtklib5_kin_static_heights_using_corners_exp4.txt";//leverarm accounted
+//char file[] = "../data/Lanes_XYZ_rtklib";//_corr";
+//char file[] = "../out/LineInterp_rtklib3.txt";//_corr";
+char file[] = "../out/LineInterp_rtklib5_kin_static_heights_using_corners_exp4.txt";//leverarm accounted
 fp_lane=fopen(file,"r");//lane_t lane;
-//char imufilename[]="/home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__010.SBF_SBF_ASCIIIn.txt"; //MEM-IMU file path exp1
-//char imufilename[]="/home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__033.SBF_SBF_ASCIIIn.txt"; //MEM-IMU file path exp2
-//char imufilename[]="/home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__038.SBF_SBF_ASCIIIn.txt"; //IMU file path exp3
-char imufilename[]="/home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__040.SBF_SBF_ASCIIIn.txt"; //IMU file path exp4
+//char imufilename[]="../data/LOG__010.SBF_SBF_ASCIIIn.txt"; //MEM-IMU file path exp1
+//char imufilename[]="../data/LOG__033.SBF_SBF_ASCIIIn.txt"; //MEM-IMU file path exp2
+//char imufilename[]="../data/LOG__038.SBF_SBF_ASCIIIn.txt"; //IMU file path exp3
+char imufilename[]="../data/LOG__040.SBF_SBF_ASCIIIn.txt"; //IMU file path exp4
 //char imufilename[]="/home/emerson/Desktop/Connected_folders/data/imu_ascii_new.txt";
 fimu=fopen(imufilename,"r");
 FILE *res;
-//  char residualsfname[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/exp1_PPP.stat"; //Residuals file
-char residualsfname[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_car_back.stat"; //Residuals file
+//  char residualsfname[]="../out/exp1_PPP.stat"; //Residuals file
+char residualsfname[]="../out/PPP_car_back.stat"; //Residuals file
 int l=0,c;
 int argc; // Size of file or options?
 
 /* Global TC_KF_INS_GNSS output files*/
-out_PVA=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_PVA.txt","w");
-out_clock_file=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_clock_file.txt","w");
-out_IMU_bias_file=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_IMU_bias.txt","w");
-out_KF_SD_file=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_KF_SD.txt","w");
-out_raw_fimu=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_raw_imu.txt","w");
-imu_tactical=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/imu_ascii_new.txt", "r");
+out_PVA=fopen("../out/out_PVA.txt","w");
+out_clock_file=fopen("../out/out_clock_file.txt","w");
+out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
+out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
+out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
+imu_tactical=fopen("../data/imu_ascii_new.txt", "r");
 
 /* Declarations from rnx2rtkp source code program */
 //clk93stream.rtcm3  CLK930600.rtcm3
 // Base station: /home/emerson/Desktop/rtk_simul/PNW2_140448.16o
 
 /* PPP-Kinematic  1st experimet
-char *argv[] = {"./rnx2rtkp", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/SEPT2640.17O", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/igs19674.*", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/SEPT2640.17N", "-o", "/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_phs2_exp1.pos", "-k", "/home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf"};
+char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/igs19674.*", "../data/SEPT2640.17N", "-o", "../out/PPP_phs2_exp1.pos", "-k", "../config/opts3.conf"};
 
-char *comlin = "./rnx2rtkp /home/emerson/Desktop/Connected_folders/SatInsMap/data/SEPT2640.17O /home/emerson/Desktop/Connected_folders/SatInsMap/data/igs19674.*  /home/emerson/Desktop/Connected_folders/SatInsMap/data/SEPT2640.17N -o /home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_phs2_exp1.pos -k /home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf";
+char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/igs19674.*  ../data/SEPT2640.17N -o ../out/PPP_phs2_exp1.pos -k ../config/opts3.conf";
   */ // Command line
 
 /* PPP-Kinematic  2nd experimet
-  char *argv[] = {"./rnx2rtkp", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__033.18O", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/igs20012.sp3", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/brdc1350.18n", "-o", "/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_test2.pos", "-k", "/home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf"};
+  char *argv[] = {"./rnx2rtkp", "../data/LOG__033.18O", "../data/igs20012.sp3", "../data/brdc1350.18n", "-o", "../out/PPP_test2.pos", "-k", "../config/opts3.conf"};
 
-  char *comlin = "./rnx2rtkp /home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__033.18O /home/emerson/Desktop/Connected_folders/SatInsMap/data/igs20012.sp3  /home/emerson/Desktop/Connected_folders/SatInsMap/data/brdc1350.18n -o /home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_test2.pos -k /home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf";
+  char *comlin = "./rnx2rtkp ../data/LOG__033.18O ../data/igs20012.sp3  ../data/brdc1350.18n -o ../out/PPP_test2.pos -k ../config/opts3.conf";
      */// Command line
 
 /* PPP-Kinematic  3rd experimet
-  char *argv[] = {"./rnx2rtkp", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__038.18O", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__038_gps.nav", "-o", "/home/emerson/Desktop/Connected_folders/SatInsMap/out/SPP_test3.pos", "-k", "/home/emerson/Desktop/Connected_folders/SatInsMap/config/opts4.conf"};
-  char *comlin = "./rnx2rtkp /home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__038.18O /home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__038_gps.nav -o /home/emerson/Desktop/Connected_folders/SatInsMap/out/SPP_test3.pos -k /home/emerson/Desktop/Connected_folders/SatInsMap/config/opts4.conf";
+  char *argv[] = {"./rnx2rtkp", "../data/LOG__038.18O", "../data/LOG__038_gps.nav", "-o", "../out/SPP_test3.pos", "-k", "../config/opts4.conf"};
+  char *comlin = "./rnx2rtkp ../data/LOG__038.18O ../data/LOG__038_gps.nav -o ../out/SPP_test3.pos -k ../config/opts4.conf";
          // Command line */
 
 /* PPP-Kinematic  4th experimet
- char *argv[] = {"./rnx2rtkp", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__040.18o", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__040_gps.18n", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/igs20094.*", "-o", "/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_mod_exp4.pos", "-k", "/home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf"};
- char *comlin = "./rnx2rtkp /home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__040.18o /home/emerson/Desktop/Connected_folders/SatInsMap/data/LOG__040_gps.18n /home/emerson/Desktop/Connected_folders/SatInsMap/data/igs20094.* -o /home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_mod_exp4.pos -k /home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf";
+ char *argv[] = {"./rnx2rtkp", "../data/LOG__040.18o", "../data/LOG__040_gps.18n", "../data/igs20094.*", "-o", "../out/PPP_mod_exp4.pos", "-k", "../config/opts3.conf"};
+ char *comlin = "./rnx2rtkp ../data/LOG__040.18o ../data/LOG__040_gps.18n ../data/igs20094.* -o ../out/PPP_mod_exp4.pos -k ../config/opts3.conf";
 // Command line
 */
 
 /* PPP-Kinematic  Kinematic Positioning dataset */
- char *argv[] = {"./rnx2rtkp", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/CAR_2890.18O", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/CAR_2890.18N", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/igs20232.*", "-o", "/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_car_back.pos", "-k", "/home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf"};
- char *comlin = "./rnx2rtkp /home/emerson/Desktop/Connected_folders/SatInsMap/data/CAR_2890.18O /home/emerson/Desktop/Connected_folders/SatInsMap/data/CAR_2890.18N /home/emerson/Desktop/Connected_folders/SatInsMap/data/igs20232.* -o /home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_car_back.pos -k /home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf";
+ char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/CAR_2890.18N", "../data/igs20232.*", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf"};
+ char *comlin = "./rnx2rtkp ../data/CAR_2890.18O ../data/CAR_2890.18N ../data/igs20232.* -o ../out/PPP_car_back.pos -k ../config/opts3.conf";
       // Command line
 
 /* PPP-AR Kinematic
-char *argv[] = {"./rnx2rtkp", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/SEPT2640.17O", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/grg19674.*", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/SEPT2640.17N", "-o", "/home/emerson/Desktop/Connected_folders/SatInsMap/out/exp1_PPP_amb_mod_constr.pos", "-k", "/home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf"};
+char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};
 
-char *comlin = "./rnx2rtkp /home/emerson/Desktop/Connected_folders/SatInsMap/data/SEPT2640.17O /home/emerson/Desktop/Connected_folders/SatInsMap/data/grg19674.*  /home/emerson/Desktop/Connected_folders/SatInsMap/data/SEPT2640.17N -o /home/emerson/Desktop/Connected_folders/SatInsMap/out/exp1_PPP_amb_mod_constr.pos -k /home/emerson/Desktop/Connected_folders/SatInsMap/config/opts3.conf";
+char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT2640.17N -o ../out/exp1_PPP_amb_mod_constr.pos -k ../config/opts3.conf";
   */  // Command line
 
 /* PPK - Post Processed Kinematic
-   char *argv[] = {"./rnx2rtkp", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/2_APS_2644.17O", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/UNB3264.17o", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/1_APS_2640.17N", "/home/emerson/Desktop/Connected_folders/SatInsMap/data/igs19674.sp3", "-o", "/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPK_exp1.pos", "-k", "/home/emerson/Desktop/Connected_folders/SatInsMap/config/relative.conf"};
+   char *argv[] = {"./rnx2rtkp", "../data/2_APS_2644.17O", "../data/UNB3264.17o", "../data/1_APS_2640.17N", "../data/igs19674.sp3", "-o", "../out/PPK_exp1.pos", "-k", "../config/relative.conf"};
 
-   char *comlin = "./rnx2rtkp /home/emerson/Desktop/Connected_folders/SatInsMap/data/2_APS_2644.17O /home/emerson/Desktop/Connected_folders/SatInsMap/data/UNB3264.17o /home/emerson/Desktop/Connected_folders/SatInsMap/data/1_APS_2640.17N /home/emerson/Desktop/Connected_folders/SatInsMap/data/igs19674.sp3 -o /home/emerson/Desktop/Connected_folders/SatInsMap/out/PPK_exp1.pos -k /home/emerson/Desktop/Connected_folders/SatInsMap/config/relative.conf";
+   char *comlin = "./rnx2rtkp ../data/2_APS_2644.17O ../data/UNB3264.17o ../data/1_APS_2640.17N ../data/igs19674.sp3 -o ../out/PPK_exp1.pos -k ../config/relative.conf";
 // Command line*/
 
 /* Static data
@@ -1606,20 +1605,20 @@ while ( fgets(str, 100, imu_tactical)!= NULL ){
 //imugyroplot("/home/emerson/Desktop/Connected_folders/data/imu_ascii.txt");
 //imu_tactical_navigation(imu_tactical);
 /**/
-char gyrofile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_PVA.txt";
+char gyrofile[]="../out/out_PVA.txt";
 imueulerplot(gyrofile);
-char velfile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_PVA.txt";
+char velfile[]="../out/out_PVA.txt";
 imuvelplot(velfile);
-char posfile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_PVA.txt";
+char posfile[]="../out/out_PVA.txt";
 imuposplot(posfile);
-char imu_bias[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_IMU_bias.txt";
+char imu_bias[]="../out/out_IMU_bias.txt";
 imuaccbiasplot(imu_bias);
 imugyrobiasplot(imu_bias);
-char imu_KF_stds[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_KF_SD.txt";
+char imu_KF_stds[]="../out/out_KF_SD.txt";
 KF_att_stds_plot(imu_KF_stds);
 KF_vel_stds_plot(imu_KF_stds);
 KF_pos_stds_plot(imu_KF_stds);
-char imu_KF_clk[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_clock_file.txt";
+char imu_KF_clk[]="../out/out_clock_file.txt";
 KF_clock_plot(imu_KF_clk);
 
 
@@ -1631,24 +1630,24 @@ KF_clock_plot(imu_KF_clk);
   }*/
 
 /* IMU PLOTS
-char accfile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/ins_acceleration.txt";
-char gyrofile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/ins_gyro.txt";
-char posfile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/insmap_test_pos.txt";
-char velfile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/insmap_test_vel.txt";
+char accfile[]="../out/ins_acceleration.txt";
+char gyrofile[]="../out/ins_gyro.txt";
+char posfile[]="../out/insmap_test_pos.txt";
+char velfile[]="../out/insmap_test_vel.txt";
    imuaccplot(accfile);
    imugyroplot(gyrofile);
 //   imueulerplot();
    imuUpplot(posfile);
    imuvelplot(velfile);*/
 /*
-   char raw_imu[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_raw_imu.txt";
+   char raw_imu[]="../out/out_raw_imu.txt";
    imuaccplot(raw_imu);
    imugyroplot(raw_imu);
-   char gyrofile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_PVA.txt";
+   char gyrofile[]="../out/out_PVA.txt";
    imueulerplot(gyrofile);
-   char velfile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_PVA.txt";
+   char velfile[]="../out/out_PVA.txt";
    imuvelplot(velfile);
-   char posfile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_PVA.txt";
+   char posfile[]="../out/out_PVA.txt";
    imuposplot(posfile);
 /**/
 
@@ -1664,9 +1663,9 @@ char velfile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/insmap_tes
 
   //return ret;
   /* Calling interpolation function
-  FILE *fp=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Bmo_corners_static_from_rtkplot","r"); // static (Antenna centered) exp5
-  //FILE *fp=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Bmo_corners_xyz_rtklib","r"); // Corner centered
-//  FILE *fp=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Bmo_cartesian_corners_derived_with_height","r"); // Kinematic (antenna centered) exp5
+  FILE *fp=fopen("../data/Bmo_corners_static_from_rtkplot","r"); // static (Antenna centered) exp5
+  //FILE *fp=fopen("../data/Bmo_corners_xyz_rtklib","r"); // Corner centered
+//  FILE *fp=fopen("../data/Bmo_cartesian_corners_derived_with_height","r"); // Kinematic (antenna centered) exp5
   lineInterp(fp,0.1,4);
   fclose(fp);
 */
@@ -1678,8 +1677,8 @@ char velfile[]="/home/emerson/Desktop/Connected_folders/SatInsMap/out/insmap_tes
  double x,y,z;
  char str[150];
 
- //FILE *flaenu=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes_enu_rtklib_corr.txt","w");
- FILE *flaenu=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes_enu_rtklib3.txt","w");
+ //FILE *flaenu=fopen("../data/Lanes_enu_rtklib_corr.txt","w");
+ FILE *flaenu=fopen("../data/Lanes_enu_rtklib3.txt","w");
 
  pos0[0]=lat0;pos0[1]=lon0;pos0[2]=h0; // datum
  pos2ecef(pos0, r0);
@@ -1739,18 +1738,18 @@ pos0[2]=54.360;
 int ww,hh,m;
 gtime_t taux;
 
-//f1=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/Relative_ALLOFF_ANTENNASON_AMB_ON_wirthout_height.pos","r");
-//f2=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPPonly2Ddist.txt","r");
-//f3=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_only_exp1 (copy).pos","r");
-//f3=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_cand_enu.txt","r");
-//f4=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPK_enu.txt","r");
-//f1out=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Magnet_kin_height.txt","w");
-f2out=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes_5_llh.csv","w");
-//f2out=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPK2Ddist.txt","w");
-//f3out=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/NrCan_kin_height1.txt","w");
-//f3out=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/GAPS_kin_height.txt","w");
-//f3out=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/exp1_PPP_back_height.pos","w");
-//f3out=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/exp1_PPP_back_height.pos","w");
+//f1=fopen("../out/Relative_ALLOFF_ANTENNASON_AMB_ON_wirthout_height.pos","r");
+//f2=fopen("../out/PPPonly2Ddist.txt","r");
+//f3=fopen("../out/PPP_only_exp1 (copy).pos","r");
+//f3=fopen("../out/PPP_cand_enu.txt","r");
+//f4=fopen("../out/PPK_enu.txt","r");
+//f1out=fopen("../data/Magnet_kin_height.txt","w");
+f2out=fopen("../data/Lanes_5_llh.csv","w");
+//f2out=fopen("../out/PPK2Ddist.txt","w");
+//f3out=fopen("../data/NrCan_kin_height1.txt","w");
+//f3out=fopen("../data/GAPS_kin_height.txt","w");
+//f3out=fopen("../data/exp1_PPP_back_height.pos","w");
+//f3out=fopen("../data/exp1_PPP_back_height.pos","w");
 pos2ecef(pos0, r0);
 //printf("%lf,%lf,%lf\n",r0[0],r0[1],r0[2]);
 double avge=0.0,avgn=0.0,avgup=0.0;
@@ -1774,7 +1773,7 @@ while ( fgets(str, 200, fp_lane)!= NULL ){
 
 /*
 i=0;
-f2=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPPonly2Ddist.txt","r");
+f2=fopen("../out/PPPonly2Ddist.txt","r");
 while ( fgets(str, 200, f2)!= NULL ){
   //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,%lf", &hh, &m,&s, &ht);
   sscanf(str, "%*lf %lf %lf %lf", &enup[0], &enup[1], &enup[2]);
@@ -1791,7 +1790,7 @@ fclose(f2);
 
 i=0;
 avge=0.0,avgn=0.0,avgup=0.0;
-f2=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPPmod2Ddist.txt","r");
+f2=fopen("../out/PPPmod2Ddist.txt","r");
 while ( fgets(str, 200, f2)!= NULL ){
   //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,%lf", &hh, &m,&s, &ht);
   sscanf(str, "%*lf %lf %lf %lf", &enup[0], &enup[1], &enup[2]);
@@ -1809,7 +1808,7 @@ fclose(f2);
 
 i=0;
 avge=0.0,avgn=0.0,avgup=0.0;
-f2=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPK2Ddist.txt","r");
+f2=fopen("../out/PPK2Ddist.txt","r");
 while ( fgets(str, 200, f2)!= NULL ){
   //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,%lf", &hh, &m,&s, &ht);
   sscanf(str, "%*lf %lf %lf %lf", &enup[0], &enup[1], &enup[2]);

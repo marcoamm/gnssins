@@ -2,7 +2,7 @@
 #include "rtklib.h"
 #include "satinsmap.h"
 
-char *outpath[] = {"/home/emerson/Desktop/Connected_folders/SatInsMap/out/"};
+char *outpath[] = {"../out/"};
 
 /* struct declaration -------------------------------------------------------*/
   typedef struct {	/* Satellite residuos states structure	*/
@@ -139,12 +139,12 @@ extern void imuposplot(char* filename){
         // Obstructions: 396546.04 < $1 < , Off-road: 396838.72 - end
        // With points: w points pointtype 1.4
 /**/
-  fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_car_back(copy).pos' u ($4):($3) with points pointsize 0.4 lt 3 title \" SPP \", \
+  fprintf(gp,"plot '../out/PPP_car_back(copy).pos' u ($4):($3) with points pointsize 0.4 lt 3 title \" SPP \", \
    '%s' u ($3):($2) w lp lt 2 pt 1 ps 0.2 title \" ins/gnss position \"", filename);
 /*
-  fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes_5_llh.csv' u ($2):($1) with points pointtype 1.4 ps 0.3 lc rgb \"red\" title \" Ground-truth \" ,\
+  fprintf(gp,"plot '../data/Lanes_5_llh.csv' u ($2):($1) with points pointtype 1.4 ps 0.3 lc rgb \"red\" title \" Ground-truth \" ,\
   '%s' u ($3): ( $1>396546.04 && $1<396838.72 ? ($2) : 1/0 ) w lp lt 2 pt 1 ps 0.2 title \" ins/gnss position \" ,\
-  '/home/emerson/Desktop/Connected_folders/SatInsMap/out/out_ppp_tllh.txt' u ($3): ( $1>396546.04 && $1<396838.72 ? ($2) : 1/0 ) with points pointsize 0.4 lt 3 title \" SPP \" ", filename);
+  '../out/out_ppp_tllh.txt' u ($3): ( $1>396546.04 && $1<396838.72 ? ($2) : 1/0 ) with points pointsize 0.4 lt 3 title \" SPP \" ", filename);
 */
 
 /*
@@ -329,10 +329,10 @@ extern void mapmatchplot (){//double t, obsd_t *obs, int n
 	int i=0, j=0, k=0, sizef;
   FILE * gp = popen ("gnuplot -persistent", "w");
 	FILE *f1, *f2, *f3,*f4;
-	f4 = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/exp1_Lanes_enu.txt", "r");
-  f1 = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/3dcand.txt", "r");
-	f2 = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/spp.txt", "r");
-	f3 = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/finalpos.txt", "r");
+	f4 = fopen("../data/exp1_Lanes_enu.txt", "r");
+  f1 = fopen("../out/3dcand.txt", "r");
+	f2 = fopen("../out/spp.txt", "r");
+	f3 = fopen("../out/finalpos.txt", "r");
 
 	double lat, lon,h, x, y, z, pos[3], pos1[3], r[3], pos0[3], enu[3],t;
 	char str[150];
@@ -354,7 +354,7 @@ extern void mapmatchplot (){//double t, obsd_t *obs, int n
   //  "set autoscale \n"
 		"set grid \n",outpath[0]);
 
-  fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/gnssins_pos.txt' u ($3):($2) with points pointtype 1 ps 0.3 lc rgb \"red\" title \" GNSS/INS \" \n");
+  fprintf(gp,"plot '../out/gnssins_pos.txt' u ($3):($2) with points pointtype 1 ps 0.3 lc rgb \"red\" title \" GNSS/INS \" \n");
 
 /*
 	fprintf(gp,"plot '-' with points pt 2 ps 0.1 lc rgb \"red \" title \"Ref. Trajectory \", \
@@ -467,25 +467,25 @@ extern void mapmatchplot1 (){//double t, obsd_t *obs, int n
     static  $1<16.57
     1s conv. 16.783<$1 &&  $1<16.8 / 2 conv $1>16.80 / 3rd conv 16.850<$1<16.866  */
      fprintf(gp,"plot 1/0 with points pointtype 1.4 ps 1.1 lc rgb \"red\" title \" Ground-truth \" ,\
-    '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Lanes_enu1.txt' u ($1):($2) with points pointtype 1.4 ps 0.3 lc rgb \"red\" notitle ,\
-    '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPK_enu.txt' u ($2):( $1>16.8  ? ($3) : 1/0 ) with points pointsize 1.1 lt 2 title \" RTK \" ,\
-    '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_enu.txt' u ($2):( $1>16.8 ? ($3) : 1/0 ) with points pointsize 1.1 lt 3 title \" PPP-only \" ,\
-    '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_cand_enu.txt' u ($2):( $1>16.8 ? ($3) : 1/0 ) with points pointsize 1.1 lt 4 title \" PPP-mod \" \n");
+    '../out/Lanes_enu1.txt' u ($1):($2) with points pointtype 1.4 ps 0.3 lc rgb \"red\" notitle ,\
+    '../out/PPK_enu.txt' u ($2):( $1>16.8  ? ($3) : 1/0 ) with points pointsize 1.1 lt 2 title \" RTK \" ,\
+    '../out/PPP_enu.txt' u ($2):( $1>16.8 ? ($3) : 1/0 ) with points pointsize 1.1 lt 3 title \" PPP-only \" ,\
+    '../out/PPP_cand_enu.txt' u ($2):( $1>16.8 ? ($3) : 1/0 ) with points pointsize 1.1 lt 4 title \" PPP-mod \" \n");
 
 	//fprintf(gp,"plot '/home/emerson/Desktop/rtk_simul/Lanes1_XYZ_2016_ITRF08.txt' u 3:4 with points pt 2 ps 0.2 lc rgb \"red\" title \" Ref. Trajectory \" \n ");
 
-/*  fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/data/kin_Rtklib_enu.txt' using 1:2 w lp ls 8 ps 0.5 lc \"blue \" title \" PPK position \" ,\
-                  '/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes_enu_rtklib1.txt' u 1:2 with lines lt rgb \"black \" title \" Lanes \",\
-                   '/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes_enu_rtklib3.txt' u 1:2 with lines lt rgb \"red \" title \" Lanes corrected \" \n");  */
+/*  fprintf(gp,"plot '../data/kin_Rtklib_enu.txt' using 1:2 w lp ls 8 ps 0.5 lc \"blue \" title \" PPK position \" ,\
+                  '../data/Lanes_enu_rtklib1.txt' u 1:2 with lines lt rgb \"black \" title \" Lanes \",\
+                   '../data/Lanes_enu_rtklib3.txt' u 1:2 with lines lt rgb \"red \" title \" Lanes corrected \" \n");  */
 
 	//fprintf(gp,"plot '-' with points pt 2 ps 0.1 lc rgb \"red \" title \"Ref. Trajectory \", \n");
-/*  fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/exp1_enh_space_qntts.txt' using 1:2 w lp ls 8 ps 0.5 lc \"blue \" title \" SPP position \" , \
-                  '/home/emerson/Desktop/Connected_folders/SatInsMap/data/exp1_Lanes_enu.txt' u 1:2 with lines lt rgb \"red \" title \" Reference trajectory \",\
-                  '/home/emerson/Desktop/Connected_folders/SatInsMap/out/exp1_enhancedspace.txt' u 1:2 with lines lt rgb \"green \" title \" Search space \",\
-                  '/home/emerson/Desktop/Connected_folders/SatInsMap/out/exp1_mmpoint.txt' using 1:2 w p ps 0.15 lc \"black \" title \" Closest point \"  \n");
-                //  '/home/emerson/Desktop/Connected_folders/SatInsMap/out/exp1_curvecorrep.txt' u 1:2 with lines lt rgb \"blue\" title \" Curve respective points \" \n");
-                  //'/home/emerson/Desktop/Connected_folders/SatInsMap/out/mmpoint (copy).txt' using 1:2 w p ps 0.15 lc \"black \" title \" Closest point \"  \n");*/
- //'/home/emerson/Desktop/Connected_folders/SatInsMap/out/enh_space_qntts3.txt' u 1:2:3:4:5 with ellipses lc \"blue \" title \" 95 conf. ellipse \",  with points pointsize 0.1
+/*  fprintf(gp,"plot '../out/exp1_enh_space_qntts.txt' using 1:2 w lp ls 8 ps 0.5 lc \"blue \" title \" SPP position \" , \
+                  '../data/exp1_Lanes_enu.txt' u 1:2 with lines lt rgb \"red \" title \" Reference trajectory \",\
+                  '../out/exp1_enhancedspace.txt' u 1:2 with lines lt rgb \"green \" title \" Search space \",\
+                  '../out/exp1_mmpoint.txt' using 1:2 w p ps 0.15 lc \"black \" title \" Closest point \"  \n");
+                //  '../out/exp1_curvecorrep.txt' u 1:2 with lines lt rgb \"blue\" title \" Curve respective points \" \n");
+                  //'../out/mmpoint (copy).txt' using 1:2 w p ps 0.15 lc \"black \" title \" Closest point \"  \n");*/
+ //'../out/enh_space_qntts3.txt' u 1:2:3:4:5 with ellipses lc \"blue \" title \" 95 conf. ellipse \",  with points pointsize 0.1
   fflush(gp);
  	fclose(gp);
   }
@@ -522,38 +522,38 @@ extern void mapmatchplot1 (){//double t, obsd_t *obs, int n
 
       /* Height convergence plots             // Time management COnv: $1<16.516 ($1):( $1<16.516? ($4): 1/0 )
        fprintf(gp,"plot 1/0 with points pointsize 1.1 lt 2 title \" RTK \" ,\
-                        '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPK_enu.txt' u ($1):( $1<16.79? ($4): 1/0 ) with points pointsize 0.5 lt 2 notitle,\
+                        '../out/PPK_enu.txt' u ($1):( $1<16.79? ($4): 1/0 ) with points pointsize 0.5 lt 2 notitle,\
                         1/0 with points pointsize 1.1 lt 3 title \" PPP-only \" ,\
-                        '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_enu.txt' u ($1):( $1<16.79? ($4): 1/0 ) with points pointsize 0.5 lt 3 notitle ,\
+                        '../out/PPP_enu.txt' u ($1):( $1<16.79? ($4): 1/0 ) with points pointsize 0.5 lt 3 notitle ,\
                         1/0 with points pointsize 1.1 lt 4 title \" PPP-mod \" ,\
-                        '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_cand_enu.txt' u ($1):( $1<16.79? ($4): 1/0 ) with points pointsize 0.5 lt 4 notitle \n");
+                        '../out/PPP_cand_enu.txt' u ($1):( $1<16.79? ($4): 1/0 ) with points pointsize 0.5 lt 4 notitle \n");
 */
 
       /* 2D distances to the Ground-truth
       fprintf(gp,"plot 1/0 with points pointsize 1.1 lt 4 title \" PPP-mod \" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPPmod2Ddist.txt' u 1:3 with points pointsize 0.7 lt 4 notitle,\
+                 '../out/PPPmod2Ddist.txt' u 1:3 with points pointsize 0.7 lt 4 notitle,\
                  1/0 with points pointsize 1.1 lt 2 title \" RTK \" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPK2Ddist.txt' u 1:3 with points pointsize 0.7 lt 2 notitle,\
+                 '../out/PPK2Ddist.txt' u 1:3 with points pointsize 0.7 lt 2 notitle,\
                  1/0 with points pointsize 1.1 lt 3 title \" PPP-only \" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPPonly2Ddist.txt' u 1:3 with points pointsize 0.7 lt 3 notitle \n");
+                 '../out/PPPonly2Ddist.txt' u 1:3 with points pointsize 0.7 lt 3 notitle \n");
    */
 
-  // fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/data/PPK_CLST_enu_diff2.txt' u 1:(sqrt( ($2)*($2)+($3)*($3)+($4)*($4) ) ) with points pointsize 0.5 lt 2 title \" 3D dist \" \n");
+  // fprintf(gp,"plot '../data/PPK_CLST_enu_diff2.txt' u 1:(sqrt( ($2)*($2)+($3)*($3)+($4)*($4) ) ) with points pointsize 0.5 lt 2 title \" 3D dist \" \n");
 
 
-  /* fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/data/PPK_CLST_enu_diff5.txt' u 1:2 with points pointsize 0.5 lt 2 title \" E \" ,\
-                    '/home/emerson/Desktop/Connected_folders/SatInsMap/data/PPK_CLST_enu_diff5.txt' u 1:3 with points pointsize 0.5 lt 3 title \" N \" ,\
-                    '/home/emerson/Desktop/Connected_folders/SatInsMap/data/PPK_CLST_enu_diff5.txt' u 1:4 with points pointsize 0.5 lt 4 title \" UP \" \n");*/
+  /* fprintf(gp,"plot '../data/PPK_CLST_enu_diff5.txt' u 1:2 with points pointsize 0.5 lt 2 title \" E \" ,\
+                    '../data/PPK_CLST_enu_diff5.txt' u 1:3 with points pointsize 0.5 lt 3 title \" N \" ,\
+                    '../data/PPK_CLST_enu_diff5.txt' u 1:4 with points pointsize 0.5 lt 4 title \" UP \" \n");*/
 
-/*   fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/clst_lane_heights_rtklib1.txt' u 1:($2) with lines ls 0.3 lt rgb 'blue' title \"Ground truth (at rover's height)\" ,\
-    '/home/emerson/Desktop/Connected_folders/SatInsMap/out/clst_lane_heights_rtklib4.txt' u 1:($2) with lines ls 0.3 lt rgb 'red' title \"Ground truth (on the ground) \" ,\
-                     '/home/emerson/Desktop/Connected_folders/SatInsMap/data/Rtklib_kin_heightcorr.txt' u 1:($2) with points pointsize 0.6 lt 4 title \"RTK - Rtklib \",\
-                     '/home/emerson/Desktop/Connected_folders/SatInsMap/data/Rtklib_PPP_estTrop_kin_height.txt' with points pointsize 0.6 lt 2 title \"PPP (Trop est.) - Rtklib \" ,\
-                     '/home/emerson/Desktop/Connected_folders/SatInsMap/data/Rtklib_PPP_kin_height.txt' u 1:($2) with points pointsize 0.6 lt 3 title \"PPP (Trop. model Saast.)- Rtklib \" ,\
-                     '/home/emerson/Desktop/Connected_folders/SatInsMap/data/NrCan_kin_height1.txt' u 1:($2) with points pointsize 0.6 lt 5 title \"PPP - NRCan \" ,\
-                     '/home/emerson/Desktop/Connected_folders/SatInsMap/data/Rtklib_PPP_kin_height.txt' u 1:($2) with points pointsize 0.6 lt 1 title \"PPP (Trop. est.) - GAPS \" ,\
-                     '/home/emerson/Desktop/Connected_folders/SatInsMap/data/MgT_kin_height.txt' u 1:($2) with points pointsize 0.6 lt 6 title \"RTK (on the ground) - Magnet Tools \" ,\
-                     '/home/emerson/Desktop/Connected_folders/SatInsMap/data/exp1_PPP_back_height.pos' u 1:($2) with points pointsize 0.6 lt 7 title \"PPP (backward) - Rtklib \" \n"); */
+/*   fprintf(gp,"plot '../out/clst_lane_heights_rtklib1.txt' u 1:($2) with lines ls 0.3 lt rgb 'blue' title \"Ground truth (at rover's height)\" ,\
+    '../out/clst_lane_heights_rtklib4.txt' u 1:($2) with lines ls 0.3 lt rgb 'red' title \"Ground truth (on the ground) \" ,\
+                     '../data/Rtklib_kin_heightcorr.txt' u 1:($2) with points pointsize 0.6 lt 4 title \"RTK - Rtklib \",\
+                     '../data/Rtklib_PPP_estTrop_kin_height.txt' with points pointsize 0.6 lt 2 title \"PPP (Trop est.) - Rtklib \" ,\
+                     '../data/Rtklib_PPP_kin_height.txt' u 1:($2) with points pointsize 0.6 lt 3 title \"PPP (Trop. model Saast.)- Rtklib \" ,\
+                     '../data/NrCan_kin_height1.txt' u 1:($2) with points pointsize 0.6 lt 5 title \"PPP - NRCan \" ,\
+                     '../data/Rtklib_PPP_kin_height.txt' u 1:($2) with points pointsize 0.6 lt 1 title \"PPP (Trop. est.) - GAPS \" ,\
+                     '../data/MgT_kin_height.txt' u 1:($2) with points pointsize 0.6 lt 6 title \"RTK (on the ground) - Magnet Tools \" ,\
+                     '../data/exp1_PPP_back_height.pos' u 1:($2) with points pointsize 0.6 lt 7 title \"PPP (backward) - Rtklib \" \n"); */
 
 
     fflush(gp);
@@ -574,23 +574,23 @@ extern void mapmatchplot1 (){//double t, obsd_t *obs, int n
       fprintf(gp, "set xrange [16.55:16.883] \n");
       fprintf(gp, "set yrange [1761520:1761650] \n");
     fprintf(gp,
-      "plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/3dcand.txt' u 1:2 with lines title \" map-match cand.\" ,\
-      '/home/emerson/Desktop/Connected_folders/SatInsMap/out/spp.txt' u 1:2 with lines title \" SPP \",\
-      '/home/emerson/Desktop/Connected_folders/SatInsMap/out/finalpos.txt' u 1:2 with lines title \" PPP \" \n");
+      "plot '../out/3dcand.txt' u 1:2 with lines title \" map-match cand.\" ,\
+      '../out/spp.txt' u 1:2 with lines title \" SPP \",\
+      '../out/finalpos.txt' u 1:2 with lines title \" PPP \" \n");
 
     //  fflush(gp);
 fprintf(gp, "set yrange [-4078850:-4078730] \n");
       fprintf(gp,
-        "plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/3dcand.txt' u 1:3 with lines title \" map-match cand.\" ,\
-        '/home/emerson/Desktop/Connected_folders/SatInsMap/out/spp.txt' u 1:3 with lines title \" SPP \",\
-        '/home/emerson/Desktop/Connected_folders/SatInsMap/out/finalpos.txt' u 1:3 with lines title \" PPP \" \n");
+        "plot '../out/3dcand.txt' u 1:3 with lines title \" map-match cand.\" ,\
+        '../out/spp.txt' u 1:3 with lines title \" SPP \",\
+        '../out/finalpos.txt' u 1:3 with lines title \" PPP \" \n");
 
       //  fflush(gp);
 fprintf(gp, "set yrange [4560800:4560900] \n");
         fprintf(gp,
-          "plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/3dcand.txt' u 1:4 with lines title \" map-match cand.\" ,\
-          '/home/emerson/Desktop/Connected_folders/SatInsMap/out/spp.txt' u 1:4 with lines title \" SPP \",\
-          '/home/emerson/Desktop/Connected_folders/SatInsMap/out/finalpos.txt' u 1:4 with lines title \" PPP \" \n");
+          "plot '../out/3dcand.txt' u 1:4 with lines title \" map-match cand.\" ,\
+          '../out/spp.txt' u 1:4 with lines title \" SPP \",\
+          '../out/finalpos.txt' u 1:4 with lines title \" PPP \" \n");
 
           fprintf(gp, "unset multiplot\n");
           fprintf(gp, "set term postscript eps enhanced color \n"
@@ -605,9 +605,9 @@ extern void coordcompcalcplot (){//double t, obsd_t *obs, int n
 	int i=0, j=0, k=0, sizef;
   FILE * gp = popen ("gnuplot -persistent", "w");
 	FILE *f1, *f2, *f3;
-  f1 = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/3dcand.txt", "r");
-	f2 = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/spp.txt", "r");
-	f3 = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/ppk_llh.txt", "r");
+  f1 = fopen("../out/3dcand.txt", "r");
+	f2 = fopen("../out/spp.txt", "r");
+	f3 = fopen("../out/ppk_llh.txt", "r");
 
 	double lat, lon,h, x, y, z, pos[3], pos1[3], pos2[3], r[3], pos0[3], enu[3];
   double t,t1,t2,r1[3],r2[3],enu1[3],enu2[3];
@@ -971,7 +971,7 @@ extern void resprint1(){
               fflush(gp1);
               fclose(gp1);*/
 
-  fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_kine.pos.stat' using 3:( strcol(1) eq '$SAT' &&strcol(4) eq 'G10' ? $8 : 1/0 ) with lines title strcol(4) \n");
+  fprintf(gp,"plot '../out/PPP_kine.pos.stat' using 3:( strcol(1) eq '$SAT' &&strcol(4) eq 'G10' ? $8 : 1/0 ) with lines title strcol(4) \n");
 //( 'stringcolumn(1)' eq '$SAT' ? 8 : 1/0 )
   fflush(gp);
    fclose(gp);
@@ -980,7 +980,7 @@ extern void resprint1(){
 
 extern void resprint2 (){
  FILE *fp;
- fp = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/Rescomp_nrcan.txt","r");
+ fp = fopen("../out/Rescomp_nrcan.txt","r");
  char str[150];
  double ti,tf,t,taux=0.0,vl1,vl2,vp1,vp2;
  int i,j,sat=0,aux=0,count=0,eq,dif;
@@ -1040,13 +1040,13 @@ for (i = 0; i < count; i++) {
  	            //"set output 'Carrier_res.ps'\n"
  	            "set grid \n", prn[i],ti, tf);
 
-fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Rescomp_nrcan.txt'using 1:( $2==(%d)? $4 : 1/0 ) with points ps 0.3 title \" SPP miscl. \" , \
-'/home/emerson/Desktop/Connected_folders/SatInsMap/out/Rescomp_nrcan.txt' using 1:( $2==(%d)? $6 : 1/0 ) with points ps 0.3 title \" Candidate miscl.\" \n",prn[i],prn[i]);
+fprintf(gp,"plot '../out/Rescomp_nrcan.txt'using 1:( $2==(%d)? $4 : 1/0 ) with points ps 0.3 title \" SPP miscl. \" , \
+'../out/Rescomp_nrcan.txt' using 1:( $2==(%d)? $6 : 1/0 ) with points ps 0.3 title \" Candidate miscl.\" \n",prn[i],prn[i]);
 
-//fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Rescomp.txt' using 1:( $2==(%d)? $6 : 1/0 ) with points ps 0.3 title \" Candidate miscl.\" \n",prn[i]);
+//fprintf(gp,"plot '../out/Rescomp.txt' using 1:( $2==(%d)? $6 : 1/0 ) with points ps 0.3 title \" Candidate miscl.\" \n",prn[i]);
 
-fprintf(gp1,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Rescomp_nrcan.txt' using 1:( $2==(%d)? $3 : 1/0 ) with points ps 0.3 title \" SPP miscl. \" , \
- '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Rescomp_nrcan.txt' using 1:( $2==(%d)? $5 : 1/0 ) with points ps 0.3 title \" Candidate miscl.\" \n",prn[i],prn[i]);
+fprintf(gp1,"plot '../out/Rescomp_nrcan.txt' using 1:( $2==(%d)? $3 : 1/0 ) with points ps 0.3 title \" SPP miscl. \" , \
+ '../out/Rescomp_nrcan.txt' using 1:( $2==(%d)? $5 : 1/0 ) with points ps 0.3 title \" Candidate miscl.\" \n",prn[i],prn[i]);
 
   fflush(gp);
   fclose(gp);
@@ -1059,7 +1059,7 @@ fprintf(gp1,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Rescomp
 
 extern void resprint3 (){
  FILE *fp;
- fp = fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos_2iter.txt","r");
+ fp = fopen("../out/Resppos_2iter.txt","r");
  char str[150];
  double ti,tf,t,taux=0.0,vl1,vl2,vp1,vp2;
  int i,j,sat=0,aux=0,count=0,countcand=0,eq,dif,cdd;
@@ -1155,11 +1155,11 @@ t=16.803500;
 
     //while (t==ti){
 
-      fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos_2iter.txt' \
+      fprintf(gp,"plot '../out/Resppos_2iter.txt' \
       using ($2):( $1==(%g)&&$3==(%d) ? $4 : 1/0 ) with points pointsize 1.3 lt rgb 'blue' \
       title \" Candidates residuals \" \n",t,prn[i]);
 
-      fprintf(gp1,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos_2iter.txt' \
+      fprintf(gp1,"plot '../out/Resppos_2iter.txt' \
       using ($2):( $1==(%g)&&$3==(%d)? $5 : 1/0 ) with points pointsize 1.3 lt rgb 'red' \
       title \" Candidates residuals \"  \n",t,prn[i]);
 
@@ -1194,7 +1194,7 @@ ti=16.39;tf=16.866;
             //   "set yrange [-0.005:0.07] \n"
                "set yrange [-0.001:2] \n"
                "set term postscript eps enhanced color\n"
- 	             "set output '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Pseudorange4_normres_ppp_cand_comp.ps'\n"
+ 	             "set output '../out/Pseudorange4_normres_ppp_cand_comp.ps'\n"
  	            "set grid \n", ti, tf);
    /* Gnuplot plot commands   - Carrier phase */
   fprintf(gp1, "set xlabel 'Hours' \n"
@@ -1208,20 +1208,20 @@ ti=16.39;tf=16.866;
             //  "set yrange [-0.001:0.03] \n"
                "set yrange [-0.001:0.2] \n"
                "set term postscript eps enhanced color\n"
- 	            "set output '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Carrier_normres_ppp_cand_comp.ps'\n"
+ 	            "set output '../out/Carrier_normres_ppp_cand_comp.ps'\n"
  	            "set grid \n", ti, tf);
 
 
-fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos3_vtpv_ppp.txt' using 1:3 with lines ls 0.3 lt 5 title \"PPP-only \" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos3_vtpv.txt' using 1:3 with points pointsize 0.3 lt 2 title \"PPP-mod\" \n");
+fprintf(gp,"plot '../out/Resppos3_vtpv_ppp.txt' using 1:3 with lines ls 0.3 lt 5 title \"PPP-only \" ,\
+                 '../out/Resppos3_vtpv.txt' using 1:3 with points pointsize 0.3 lt 2 title \"PPP-mod\" \n");
 
-fprintf(gp1,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos3_vtpv_ppp.txt' using 1:2 with lines ls 0.3 lt 5 title \"PPP-only \" ,\
-                  '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos3_vtpv.txt' using 1:2 with points pointsize 0.3 lt 2 title \"PPP-mod\" \n");
+fprintf(gp1,"plot '../out/Resppos3_vtpv_ppp.txt' using 1:2 with lines ls 0.3 lt 5 title \"PPP-only \" ,\
+                  '../out/Resppos3_vtpv.txt' using 1:2 with points pointsize 0.3 lt 2 title \"PPP-mod\" \n");
 
 /*
-      fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos3_vtpv_ppp.txt' using 1:3 with lines pointsize 0.3 lt 4 title \"PPP \"  \n");
+      fprintf(gp,"plot '../out/Resppos3_vtpv_ppp.txt' using 1:3 with lines pointsize 0.3 lt 4 title \"PPP \"  \n");
 
-      fprintf(gp1,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos3_vtpv_ppp.txt' using 1:2 with lines pointsize 0.3 lt 2 title \"PPP \"  \n");
+      fprintf(gp1,"plot '../out/Resppos3_vtpv_ppp.txt' using 1:2 with lines pointsize 0.3 lt 2 title \"PPP \"  \n");
 */
   fflush(gp);
   fclose(gp);
@@ -1249,7 +1249,7 @@ extern void nsat (){//double t, obsd_t *obs, int n
   		"set grid \n");
 
 
-      fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/PPP_cand_exp1 (copy).pos' u 3:8 with linespoints ls 0.8 lt -1 title \"Number of satellites \" \n");
+      fprintf(gp,"plot '../out/PPP_cand_exp1 (copy).pos' u 3:8 with linespoints ls 0.8 lt -1 title \"Number of satellites \" \n");
 
     fflush(gp);
    	fclose(gp);
@@ -1285,10 +1285,10 @@ extern void nsat (){//double t, obsd_t *obs, int n
   		"set grid \n",outpath[0]);
 
 
-      fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/sppstd_nsat.txt' u 1:2 with lines ls 0.5 lt 1 title \" X-std \", \
-                        '/home/emerson/Desktop/Connected_folders/SatInsMap/out/sppstd_nsat.txt' u 1:3 with lines ls 0.5 lt 2 title \" Y-std \", \
-                        '/home/emerson/Desktop/Connected_folders/SatInsMap/out/sppstd_nsat.txt' u 1:4 with lines ls 0.5 lt 3 title \" Z-std \", \
-                        '/home/emerson/Desktop/Connected_folders/SatInsMap/out/sppstd_nsat.txt' u 1:5 with lines ls 0.5 lt 4 title \" # SAT \" axes x2y2 \n");
+      fprintf(gp,"plot '../out/sppstd_nsat.txt' u 1:2 with lines ls 0.5 lt 1 title \" X-std \", \
+                        '../out/sppstd_nsat.txt' u 1:3 with lines ls 0.5 lt 2 title \" Y-std \", \
+                        '../out/sppstd_nsat.txt' u 1:4 with lines ls 0.5 lt 3 title \" Z-std \", \
+                        '../out/sppstd_nsat.txt' u 1:5 with lines ls 0.5 lt 4 title \" # SAT \" axes x2y2 \n");
 
     fflush(gp);
    	fclose(gp);
@@ -1318,7 +1318,7 @@ ti=16.39;tf=16.866;
                "set yrange [-20:20] \n"
                "set xtics 16.45,0.1,16.85 \n"
                //"set term postscript eps enhanced color\n"
- 	             //"set output '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Pseudorange_v.ps'\n"
+ 	             //"set output '../out/Pseudorange_v.ps'\n"
  	            "set grid \n", ti, tf);
    /* Gnuplot plot commands   - Carrier phase */
   fprintf(gp1, "set xlabel 'Time[UTC]' offset 0,-1,0 font 'Arial,19' \n"
@@ -1341,28 +1341,28 @@ ti=16.39;tf=16.866;
              // "set yrange [-0.001:0.03] \n"
               "set yrange [-0.1:0.1] \n"
               //"set term postscript eps enhanced color\n"
- 	            //"set output '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Carrier_vs.ps'\n"
+ 	            //"set output '../out/Carrier_vs.ps'\n"
  	            "set grid \n", ti, tf);
 /*
-fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_pseud_inov_ppp.txt' using 1:2 with lines ls 0.1 lt 3 title \" v_{k} PPP \" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_pseud_inov.txt' using 1:2 with points pointsize 0.1 lt 4 title \" v_{k} candidates \" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_pseud_inov.txt' using 1:($3/2) with lines ls 0.001 dt 3 title \" +/- 1 {/Symbol s} \", \
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_pseud_inov.txt' using 1:($4/2) with lines ls 0.001 dt 3 notitle \n");
+fprintf(gp,"plot '../out/Res_pseud_inov_ppp.txt' using 1:2 with lines ls 0.1 lt 3 title \" v_{k} PPP \" ,\
+                 '../out/Res_pseud_inov.txt' using 1:2 with points pointsize 0.1 lt 4 title \" v_{k} candidates \" ,\
+                 '../out/Res_pseud_inov.txt' using 1:($3/2) with lines ls 0.001 dt 3 title \" +/- 1 {/Symbol s} \", \
+                 '../out/Res_pseud_inov.txt' using 1:($4/2) with lines ls 0.001 dt 3 notitle \n");
 
- fprintf(gp1,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_phase_inov_ppp.txt' using 1:2 with lines ls 0.1 lt 5 title \" v_{k} PPP \" ,\
-                   '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_phase_inov.txt' using 1:2 with points pointsize 0.1 lt 2 title \" v_{k} candidates \" ,\
-                   '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_phase_inov.txt' using 1:($3/2) with lines ls 0.001 dt 3 title \" +/- 1 {/Symbol s} \", \
-                   '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_phase_inov.txt' using 1:($4/2) with lines ls 0.001 dt 3 notitle \n");           */
+ fprintf(gp1,"plot '../out/Res_phase_inov_ppp.txt' using 1:2 with lines ls 0.1 lt 5 title \" v_{k} PPP \" ,\
+                   '../out/Res_phase_inov.txt' using 1:2 with points pointsize 0.1 lt 2 title \" v_{k} candidates \" ,\
+                   '../out/Res_phase_inov.txt' using 1:($3/2) with lines ls 0.001 dt 3 title \" +/- 1 {/Symbol s} \", \
+                   '../out/Res_phase_inov.txt' using 1:($4/2) with lines ls 0.001 dt 3 notitle \n");           */
 
                    fprintf(gp,"plot 1/0 with lines ls 0.5 lt 5 title \"PPP-only \" ,\
-                  '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_pseud_inov_ppp.txt' using 1:2 with lines ls 0.1 lt 5 notitle ,\
+                  '../out/Res_pseud_inov_ppp.txt' using 1:2 with lines ls 0.1 lt 5 notitle ,\
                   1/0 with points pointsize 1.1 lt 2 title \"PPP-mod \" ,\
-                  '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_pseud_inov.txt' using 1:2 with points pointsize 0.5 lt 2 notitle \n");
+                  '../out/Res_pseud_inov.txt' using 1:2 with points pointsize 0.5 lt 2 notitle \n");
 
                   fprintf(gp1,"plot 1/0 with lines ls 0.5 lt 5 title \"PPP-only \" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_phase_inov_ppp.txt' using 1:2 with lines ls 0.1 lt 5 notitle ,\
+                 '../out/Res_phase_inov_ppp.txt' using 1:2 with lines ls 0.1 lt 5 notitle ,\
                  1/0 with points pointsize 1.1 lt 2 title \"PPP-mod \" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Res_phase_inov.txt' using 1:2 with points pointsize 0.5 lt 2 notitle \n");
+                 '../out/Res_phase_inov.txt' using 1:2 with points pointsize 0.5 lt 2 notitle \n");
 
   fflush(gp);
   fclose(gp);
@@ -1390,7 +1390,7 @@ ti=16.39;tf=16.883;
               // "set yrange [-0.005:0.07] \n"
                "set yrange [-50:50] \n"
                "set term postscript eps enhanced color\n"
- 	             "set output '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Pseudorange_inov_chisqr.ps'\n"
+ 	             "set output '../out/Pseudorange_inov_chisqr.ps'\n"
  	            "set grid \n", ti, tf);
    /* Gnuplot plot commands   - Carrier phase */
   fprintf(gp1, "set xlabel 'Epoch_{k} [hours]' \n"
@@ -1404,14 +1404,14 @@ ti=16.39;tf=16.883;
             //  "set yrange [-0.001:0.03] \n"
                "set yrange [-3:10] \n"
               "set term postscript eps enhanced color\n"
- 	            "set output '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Carrier_inov_chisqr.ps'\n"
+ 	            "set output '../out/Carrier_inov_chisqr.ps'\n"
  	            "set grid \n", ti, tf);
 
-fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos_vtpv_chisq.txt' using 1:3 with lines ls 0.1 lt 3 title \" v^{T}.R^{-1}.v / (n-u)\" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos_vtpv_chisq.txt' using 1:($4) with lines ls 0.001 dt 3 title \" {/Symbol c}^2_{(n-u,0.05)} \" \n");
+fprintf(gp,"plot '../out/Resppos_vtpv_chisq.txt' using 1:3 with lines ls 0.1 lt 3 title \" v^{T}.R^{-1}.v / (n-u)\" ,\
+                 '../out/Resppos_vtpv_chisq.txt' using 1:($4) with lines ls 0.001 dt 3 title \" {/Symbol c}^2_{(n-u,0.05)} \" \n");
 
- fprintf(gp1,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos_vtpv_chisq.txt' using 1:2 with lines ls 0.1 lt 5 title \" v^{T}.R^{-1}.v / (n-u)  \" ,\
-                   '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos_vtpv_chisq.txt' using 1:($4) with lines ls 0.001 dt 3 title \" {/Symbol c}^2_{(n-u,0.05)} \" \n");
+ fprintf(gp1,"plot '../out/Resppos_vtpv_chisq.txt' using 1:2 with lines ls 0.1 lt 5 title \" v^{T}.R^{-1}.v / (n-u)  \" ,\
+                   '../out/Resppos_vtpv_chisq.txt' using 1:($4) with lines ls 0.001 dt 3 title \" {/Symbol c}^2_{(n-u,0.05)} \" \n");
 
   fflush(gp);
   fclose(gp);
@@ -1439,12 +1439,12 @@ ti=16.39;tf=16.883;
               // "set yrange [-0.005:0.07] \n"
                "set yrange [-50:50] \n"
                "set term postscript eps enhanced color\n"
- 	             "set output '/home/emerson/Desktop/Connected_folders/SatInsMap/out/P3L3_inov_chisqr.ps'\n"
+ 	             "set output '../out/P3L3_inov_chisqr.ps'\n"
  	            "set grid \n", ti, tf);
 
 
-fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos_vtpv_chisq_tger.txt' using 1:2 with lines ls 0.1 lt 3 title \" v^{T}.R^{-1}.v / (n-u)\" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/Resppos_vtpv_chisq_tger.txt' using 1:3 with lines ls 0.001 dt 3 title \" {/Symbol c}^2_{(n-u,0.05)} \" \n");
+fprintf(gp,"plot '../out/Resppos_vtpv_chisq_tger.txt' using 1:2 with lines ls 0.1 lt 3 title \" v^{T}.R^{-1}.v / (n-u)\" ,\
+                 '../out/Resppos_vtpv_chisq_tger.txt' using 1:3 with lines ls 0.001 dt 3 title \" {/Symbol c}^2_{(n-u,0.05)} \" \n");
 
   fflush(gp);
   fclose(gp);
@@ -1468,16 +1468,16 @@ extern void amb_and_var_plot (){
               // "set yrange [-0.005:0.030] \n"
                "set yrange [0:5] \n"
                "set term postscript eps enhanced color\n"
- 	             "set output '/home/emerson/Desktop/Connected_folders/SatInsMap/out/prn30_ambstd_comp.ps'\n"
+ 	             "set output '../out/prn30_ambstd_comp.ps'\n"
  	            "set grid \n");
 
 /*
-fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/amb_sol_ppp_only.txt' using 1:( ($2)==30 ? ($3):1/0) with points ps 0.3 title \" PPP-only \" ,\
-                 '/home/emerson/Desktop/Connected_folders/SatInsMap/out/amb_sol.txt' using 1:( ($2)==30 ? ($3):1/0) with points ps 0.3 title \" PPP-mod \" \n");
+fprintf(gp,"plot '../out/amb_sol_ppp_only.txt' using 1:( ($2)==30 ? ($3):1/0) with points ps 0.3 title \" PPP-only \" ,\
+                 '../out/amb_sol.txt' using 1:( ($2)==30 ? ($3):1/0) with points ps 0.3 title \" PPP-mod \" \n");
 */
 
-fprintf(gp,"plot '/home/emerson/Desktop/Connected_folders/SatInsMap/out/amb_sol_ppp_only.txt' using 1:( ($2)==30 ? ($4):1/0) with points pointsize 1 lt 3 title \" PPP-only \" ,\
-                   '/home/emerson/Desktop/Connected_folders/SatInsMap/out/amb_sol.txt' using 1:( ($2)==30 ? ($4):1/0) with points pointsize 0.7 lt 1 lc rgb \"goldenrod\" title \" PPP-mod \" \n");
+fprintf(gp,"plot '../out/amb_sol_ppp_only.txt' using 1:( ($2)==30 ? ($4):1/0) with points pointsize 1 lt 3 title \" PPP-only \" ,\
+                   '../out/amb_sol.txt' using 1:( ($2)==30 ? ($4):1/0) with points pointsize 0.7 lt 1 lc rgb \"goldenrod\" title \" PPP-mod \" \n");
   fflush(gp);
   fclose(gp);
 

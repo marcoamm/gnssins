@@ -1,7 +1,6 @@
 /**/
 #include "rtklib.h"
 #include "satinsmap.h"
-#include "/home/emerson/Desktop/Connected_folders/SatInsMap/lib/eispack.h"
 
 /* ppp.c functions  */
 #define SQR(x)      ((x)*(x))
