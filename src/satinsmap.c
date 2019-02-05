@@ -1411,10 +1411,10 @@ char file[] = "../out/LineInterp_rtklib5_kin_static_heights_using_corners_exp4.t
 //char imufilename[]="../data/LOG__038.SBF_SBF_ASCIIIn.txt"; //IMU file path exp3
 char imufilename[]="../data/LOG__040.SBF_SBF_ASCIIIn.txt"; //IMU file path exp4
 //char imufilename[]="/home/emerson/Desktop/Connected_folders/data/imu_ascii_new.txt";
-fimu=fopen(imufilename,"r");
+//fimu=fopen(imufilename,"r");
 FILE *res;
 //  char residualsfname[]="../out/exp1_PPP.stat"; //Residuals file
-char residualsfname[]="../out/PPP_car_back.stat"; //Residuals file
+char residualsfname[]="../out/PPP_car_back.pos.stat"; //Residuals file
 int l=0,c;
 int argc; // Size of file or options?
 
@@ -1568,9 +1568,18 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   if (!ret) fprintf(stderr,"%40s\r","");
 
  /* Closing global files */
+<<<<<<< HEAD
   //fclose(fp_lane);
   //fclose (fimu);
+=======
+printf("HERE 1");
+  fclose(fp_lane);
+printf("HERE 2");
+  fclose (fimu);
+printf("HERE 3");
+>>>>>>> b5cb1c276c435663222702b89ca4514ff4e9bd7b
   fclose(imu_tactical);
+printf("HERE 4");
   fclose(out_PVA);
   fclose(out_clock_file);
   fclose(out_IMU_bias_file);
