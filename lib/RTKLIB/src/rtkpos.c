@@ -1837,9 +1837,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
        //insgnssLC(rtk->sol.rr, rtk->sol.qr, vel, time2gpst(rtk->sol.time,NULL));
 
         //undiffppp(rtk,obs,nu, nav);
-printf("RTKlib HERE\n");
         pppoutsolstat(rtk,statlevel,fp_stat);
-printf("RTKlib HERE 1\n");
         //fclose(f1);
         return 1;
     }

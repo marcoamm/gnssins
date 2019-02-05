@@ -1124,11 +1124,12 @@ void IMU_meas_interpolation(float t_imu_prev, float t_imu_curr, float t_gps, \
 * obs.: this function is ran inside rtkpos function of RTKlib
 ------------------------------------------------------------------------------*/
 extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
-  double xyz_ini_pos[3], xyz_ini_cov[3], ned_ini_vel[3], gnss_vel_cov[6];
+  double xyz_ini_pos[3], xyz_ini_cov[3], gnss_vel_cov[6];
   double pos[3], head_angle=0.0, vxyz[3];
   double xyz_prev_clst_pos[3], llh_pos[3], aux, gan[3], wiee[3];
   double gnss_xyz_ini_cov[6];
   double Qenu[9]={0};
+  double ned_ini_vel[3]={0};
   float ini_pos_time;
   char datastring[150];
   imuraw_t imu_obs_prev={0};
