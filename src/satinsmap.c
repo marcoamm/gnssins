@@ -1000,7 +1000,7 @@ extern void insmap (){
     }
     ini_pos_time=imu_curr_meas.sec;
       /* Fetching data to the first buffer structure (lane.buffer)	*/
-    inibuff();
+    //inibuff();
 
     /* First position solution     */
     if (norm(pva_global.r,3)==0.0) {
@@ -1021,7 +1021,7 @@ extern void insmap (){
     for (j=0;j<3;j++) xyz_ini_cov[j]=0.01; //Use some value
 
     /* Closest point computation  			*/
-    clstpt(&xyz_ini_pos);
+    //clstpt(&xyz_ini_pos);
 
     /* Closest point position in the lane is the initial INS position    */
     for (j=0;j<3;j++) xyz_ini_pos[j]=lane.buffer[lane.currsearch*3+j];
@@ -1137,7 +1137,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   int j;
   int TC_or_LC=1; /* TC:1 and LC=0 */
   int Tact_or_Low_IMU=1; /* Tactical=1 and Low grade=0*/
-  FILE *ppp_llh;
+  //FILE *ppp_llh;
   char str[100];
   double G = 9.80665;
 
@@ -1182,9 +1182,9 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   /*  Map information ********
   // Fetching data to the first buffer structure (lane.buffer)
-  inibuff();
+  //inibuff();
   // Closest point computation
-  clstpt(xyz_ini_pos);
+  //clstpt(xyz_ini_pos);
   for (j=0;j<3;j++) xyz_prev_clst_pos[j]=lane.buffer[j];
   // Heading (body-frame) or Azimuth (local-nav-frame)? constrain using lanes
   head_angle=headfrommap(xyz_prev_clst_pos);
@@ -1405,7 +1405,7 @@ char *infile[MAXFILE],*outfile="";
 //char file[] = "../data/Lanes_XYZ_rtklib";//_corr";
 //char file[] = "../out/LineInterp_rtklib3.txt";//_corr";
 char file[] = "../out/LineInterp_rtklib5_kin_static_heights_using_corners_exp4.txt";//leverarm accounted
-fp_lane=fopen(file,"r");//lane_t lane;
+//fp_lane=fopen(file,"r");//lane_t lane;
 //char imufilename[]="../data/LOG__010.SBF_SBF_ASCIIIn.txt"; //MEM-IMU file path exp1
 //char imufilename[]="../data/LOG__033.SBF_SBF_ASCIIIn.txt"; //MEM-IMU file path exp2
 //char imufilename[]="../data/LOG__038.SBF_SBF_ASCIIIn.txt"; //IMU file path exp3
@@ -1487,7 +1487,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 /* Declarations from rnx2rtkp */
 
 /* Reference lane size measurement */
-for(;;){
+/*for(;;){
   c =fgetc(fp_lane);
     if( c == EOF ){break;
     }else if ( c == '\n') {
@@ -1498,7 +1498,7 @@ for(;;){
    lane.size = ftell(fp_lane);
    lane.sizeline = lane.size/l;
    rewind(fp_lane);
-
+*/
 
 /* load options from configuration file */
 //printf("%d\n",argc);

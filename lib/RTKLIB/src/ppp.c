@@ -38,7 +38,7 @@
 *                           fix bug on m2 computation in tide_pole()
 *-----------------------------------------------------------------------------*/
 #include "rtklib.h"
-#include "/home/emerson/Desktop/Connected_folders/SatInsMap/src/satinsmap.h"
+#include "../../../src/satinsmap.h"
 
 static const char rcsid[]="$Id:$";
 

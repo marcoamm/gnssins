@@ -10,7 +10,7 @@
 
 #include "rtklib.h"
 #include "INS_GNSS.h"
-#include "/home/emerson/Desktop/Connected_folders/SatInsMap/src/satinsmap.h"
+#include "../../src/satinsmap.h"
 
 
 /* struct declaration -------------------------------------------------------*/
