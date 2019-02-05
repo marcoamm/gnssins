@@ -1568,18 +1568,9 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   if (!ret) fprintf(stderr,"%40s\r","");
 
  /* Closing global files */
-<<<<<<< HEAD
   //fclose(fp_lane);
   //fclose (fimu);
-=======
-printf("HERE 1");
-  fclose(fp_lane);
-printf("HERE 2");
-  fclose (fimu);
-printf("HERE 3");
->>>>>>> b5cb1c276c435663222702b89ca4514ff4e9bd7b
   fclose(imu_tactical);
-printf("HERE 4");
   fclose(out_PVA);
   fclose(out_clock_file);
   fclose(out_IMU_bias_file);
