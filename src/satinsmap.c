@@ -1563,12 +1563,13 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
 /* Start rnx2rtkp processing  ----------------------------------- --*/
 /* Processing ------------------------------------------------------*/
+
   ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
   if (!ret) fprintf(stderr,"%40s\r","");
 
  /* Closing global files */
-  fclose(fp_lane);
-  fclose (fimu);
+  //fclose(fp_lane);
+  //fclose (fimu);
   fclose(imu_tactical);
   fclose(out_PVA);
   fclose(out_clock_file);
