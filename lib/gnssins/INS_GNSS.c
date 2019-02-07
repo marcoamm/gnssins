@@ -3244,6 +3244,7 @@ printf("\n *******************  TC_KF_EPOCH BEGINS ************************\n");
             est_v_eb_e_new, est_r_eb_e_new, est_IMU_bias_new,\
             est_clock_new, P_matrix_new);
 printf("\n *******************  TC_KF_EPOCH ENDS **************************\n");
+exit(999); //================================================================================================================debug
 /*
 printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP BEGINS **************\n");
 
