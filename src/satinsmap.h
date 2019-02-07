@@ -112,7 +112,7 @@ typedef struct {        /* Reference Lane record */
 typedef struct {        /* UM7 sensor package records */
     int count; 		/* Flag for type of data, 0:gyro,1:accelerometer,2:magnetometer */
     float internal_time; /* amount of time in seconds since the sensor was on */
-    float sec;		/*  If GPS is connected, this is synchronized to UTC time of day
+    double sec;		/*  If GPS is connected, this is synchronized to UTC time of day
 			(in seconds of the week) 		*/
     int gpsw;		/* GPS week	*/
     gtime_t time;	/* GPST time	*/

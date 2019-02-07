@@ -970,8 +970,9 @@ extern void velfrommap(double *xyz_curr_pos, double *xyz_prev_pos, double *ned_v
 *-----------------------------------------------------------------------------*/
 extern void insmap (){
   int j;
-  double xyz_ini_pos[3], xyz_ini_cov[3], ned_ini_vel[3], pos[3], head_angle=0.0;
+  double xyz_ini_pos[3], xyz_ini_cov[3], pos[3], head_angle=0.0;
   double xyz_prev_clst_pos[3];
+  double ned_ini_vel[3]={0};
   float ini_pos_time;
   char datastring[150];
   imuraw_t imu_obs_prev={0};
@@ -1213,7 +1214,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   /* Tactical IMU reading */
    fgets(str, 100, imu_tactical);
-   sscanf(str, "%f %lf %lf %lf %lf %lf %lf", &imu_curr_meas.sec, &imu_curr_meas.a[2],\
+   sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &imu_curr_meas.sec, &imu_curr_meas.a[2],\
    &imu_curr_meas.a[1],&imu_curr_meas.a[0], &imu_curr_meas.g[2],&imu_curr_meas.g[1],\
    &imu_curr_meas.g[0]);
    imu_curr_meas.status=1;
@@ -1228,8 +1229,8 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    imu_curr_meas.a[0],\
    imu_curr_meas.a[1],imu_curr_meas.a[2], imu_curr_meas.g[0],imu_curr_meas.g[1],
    imu_curr_meas.g[2]);
-
-   printf("GNSS.INS.INSPREV.TIMES.DIFF: %lf, %lf, %lf, %lf\n",ini_pos_time,imu_obs_prev.sec,\
+   
+   printf("GNSS.INS.INSPREV.TIMES.DIFF: %.3f, %.3lf, %lf\n",roundf(ini_pos_time),\
    imu_curr_meas.sec, ini_pos_time-imu_curr_meas.sec );
 
   /* Interpolate INS measurement to match GNSS time
