@@ -101,8 +101,9 @@ extern void imueulerplot(char* filename){
               "set ylabel 'ATTITUDE ANGLE (deg)' \n"
 	      "set yrange [-200:200] \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s exp4_euler.ps'\n"
-	      "set autoscale \n"
+	      "set output '%s euler_angles.ps'\n"
+	      //"set autoscale \n"
+        "set xrange [242141.328125:244778.140625] \n"
 	      "set grid \n", outpath[0]);
 
   /* printing Euler angles */
@@ -122,7 +123,7 @@ extern void imuposplot(char* filename){
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s exp4_positions.ps'\n"
+	      "set output '%s positions.ps'\n"
         /* General view  */
         "set yrange [45.942:45.9432] \n"  //BMO field general view
         "set xrange [-66.6418:-66.6402] \n"
@@ -134,6 +135,8 @@ extern void imuposplot(char* filename){
         "set xrange [-66.675:-66.63] \n"
         //"set yrange [45.958:45.962] \n"  // Downtown Interruptions
         //"set xrange [-66.64:-66.635] \n"
+        //"set yrange [45.9475:45.9575] \n"  // UNB departure and arrival points
+        //"set xrange [-66.64:-66.645] \n"
 	      "set grid \n", outpath[0]);
 
         // Obstructions: 396546.04 < $1 < , Off-road: 396838.72 - end
@@ -181,10 +184,11 @@ extern void imuvelplot(char* filename){
   /* Gnuplot plot commands   - PLotting INS data  */
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'VELOCITIES (m/s)' \n"
-	      "set yrange [-10:10] \n"
+	      "set yrange [-20:20] \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s exp4_velocities.ps'\n"
-	      //"set autoscale \n"
+	      "set output '%s velocities.ps'\n"
+        "set xrange [242141.328125:244778.140625] \n"
+	      "set autoscale \n"
         //"set yrange [-10:10] \n"
 	      "set grid \n", outpath[0]);
 

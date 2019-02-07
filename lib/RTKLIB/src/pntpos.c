@@ -519,10 +519,12 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
 
         for (j=0;j<4;j++) x[j]+=dx[j];
 
-
+        printf("VEL FROM RTKLIB: %lf, %lf, %lf\n", x[0],x[1],x[2]);
+        printf("NORM dx: %lf\n", norm(dx,4));
         if (norm(dx,4)<1E-06) {
 
             for (i=0;i<3;i++) sol->rr[i+3]=x[i];
+
             sol->dtrr=x[4];
             for (j=0;j<3;j++) sol->qrv[j]=(float)Q[j+j*NX];
             sol->qrv[3]=(float)Q[1];    /* cov xy */
@@ -608,8 +610,6 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
             ssat[obs[i].sat-1].resp[0]=resp[i];
         }
     }
-
-    printf("ESTIMATING VEL HERE: %lf, %lf, %lf \n",sol->rr[3],sol->rr[4],sol->rr[5]);
 
 
     free(rs); free(dts); free(var); free(azel_); free(resp);

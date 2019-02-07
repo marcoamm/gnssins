@@ -187,7 +187,7 @@ typedef struct {      /* Position velocity and attitude solution structure */
 typedef struct {      /* Position velocity and attitude solution structure */
   unsigned char sat;            /* Satellite number */
   gtime_t time;       /* receiver sampling time (GPST) */
-  float sec;		/* amount of time in seconds since the sensor was onor in week time	*/
+  double sec;		/* amount of time in seconds since the sensor was onor in week time	*/
   double tt;          /* time difference between current and previous (s) */
   double P[NFREQ+NEXOBS];             /* Pseudo-range measurements (m)  */
   double L[NFREQ+NEXOBS];    /* Pseudo-range rate measurements (m/s) or cycles*/
@@ -197,7 +197,7 @@ typedef struct {      /* Position velocity and attitude solution structure */
 } GNSS_measurements;
 
 typedef struct {        /* IMU sensor measurements */
-    float sec;		/* amount of time in seconds since the sensor was on or in week time*/
+    double sec;		/* amount of time in seconds since the sensor was on or in week time*/
     gtime_t time;	/* GPS UTC time	*/
     double tt;          /* time difference between current and previous (s) */
     double omega_ib_b[3];	/* rate-gyro b-frame {wx,wy,wz} (rad/sec)	*/

@@ -146,7 +146,7 @@ typedef struct {        /* IMU sensor measurements */
 } imuraw_t;
 
 typedef struct {        /* Position, velocity and attitude structure (PVA) */
-    float sec;		/* amount of time in seconds since the sensor was on		*/
+    double sec;		/* amount of time in seconds since the sensor was on		*/
     float t_s;    /* State-time estimation */
     gtime_t time;	/* GPS UTC time	*/
     double clock_offset_drift[2]; /* Esimated receiver clock offset and drift */

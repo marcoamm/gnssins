@@ -970,9 +970,8 @@ extern void velfrommap(double *xyz_curr_pos, double *xyz_prev_pos, double *ned_v
 *-----------------------------------------------------------------------------*/
 extern void insmap (){
   int j;
-  double xyz_ini_pos[3], xyz_ini_cov[3], pos[3], head_angle=0.0;
+  double xyz_ini_pos[3], xyz_ini_cov[3], ned_ini_vel[3], pos[3], head_angle=0.0;
   double xyz_prev_clst_pos[3];
-  double ned_ini_vel[3]={0};
   float ini_pos_time;
   char datastring[150];
   imuraw_t imu_obs_prev={0};
@@ -1097,7 +1096,7 @@ extern void insmap (){
 }
 
 /* From Shin 2001, page 42   */
-void IMU_meas_interpolation(float t_imu_prev, float t_imu_curr, float t_gps, \
+void IMU_meas_interpolation(double t_imu_prev, double t_imu_curr, double t_gps, \
   um7pack_t *imu_curr, imuraw_t *imu_prev){
     int i;
     double imu_t_gps_a[3], imu_t_gps_g[3];
@@ -1131,16 +1130,16 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   double gnss_xyz_ini_cov[6];
   double Qenu[9]={0};
   double ned_ini_vel[3]={0};
-  float ini_pos_time;
+  double ini_pos_time;
   char datastring[150];
   imuraw_t imu_obs_prev={0};
-  um7pack_t imu_curr_meas={0};
+  um7pack_t imu_curr_meas={{0}};
   pva_t PVA_prev_sol={{0}};
   int j;
   int TC_or_LC=1; /* TC:1 and LC=0 */
   int Tact_or_Low_IMU=1; /* Tactical=1 and Low grade=0*/
   //FILE *ppp_llh;
-  char str[100];
+  char str[100], check;
   double G = 9.80665;
 
   printf("\n *****************  CORE BEGINS ***********************\n");
@@ -1156,15 +1155,21 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   for (j=0;j<3;j++) xyz_ini_pos[j]=rtk->sol.rr[j];
 
   /* Velocity from GNSS in case there is no doppler observable */
-  if (rtk->sol.rr[3] <= 0.0 || rtk->sol.rr[4] <= 0.0) {
+  if (rtk->sol.rr[3] <= 0.000001 || rtk->sol.rr[4] <= 0.000000001 || \
+  rtk->sol.rr[5] <= 0.000000001) {
     /* NO VELOCITY */
     for (j=0;j<3;j++) vxyz[j]=(xyz_ini_pos[j]-pvagnss.r[j])/(ini_pos_time-pvagnss.sec);
     ecef2enu(pvagnss.r,vxyz,ned_ini_vel); /* Here is ENU! */
-    printf("Estimated velocity: %lf %lf %lf\n",ned_ini_vel[0],ned_ini_vel[1],ned_ini_vel[2]);
+    //printf("Estimated velocity: %lf %lf %lf\n",ned_ini_vel[0],ned_ini_vel[1],ned_ini_vel[2]);
   }else{
     ecef2pos(xyz_ini_pos,llh_pos);
     ecef2enu(llh_pos,rtk->sol.rr+3,ned_ini_vel); /* Here is ENU! */
-  } 
+  }
+
+  ecef2pos(xyz_ini_pos,llh_pos);
+  ecef2enu(llh_pos,rtk->sol.rr+3,ned_ini_vel); /* Here is ENU! */
+
+  printf("Estimated velocity: %lf %lf %lf\n",ned_ini_vel[0],ned_ini_vel[1],ned_ini_vel[2]);
 
   /* ENU to NED velocity from gnss solution */
      aux=ned_ini_vel[1];
@@ -1213,7 +1218,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 */
 
   /* Tactical IMU reading */
-   fgets(str, 100, imu_tactical);
+   check=fgets(str, 100, imu_tactical);
    sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &imu_curr_meas.sec, &imu_curr_meas.a[2],\
    &imu_curr_meas.a[1],&imu_curr_meas.a[0], &imu_curr_meas.g[2],&imu_curr_meas.g[1],\
    &imu_curr_meas.g[0]);
@@ -1229,22 +1234,23 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    imu_curr_meas.a[0],\
    imu_curr_meas.a[1],imu_curr_meas.a[2], imu_curr_meas.g[0],imu_curr_meas.g[1],
    imu_curr_meas.g[2]);
-   
-   printf("GNSS.INS.INSPREV.TIMES.DIFF: %.3f, %.3lf, %lf\n",roundf(ini_pos_time),\
-   imu_curr_meas.sec, ini_pos_time-imu_curr_meas.sec );
 
-  /* Interpolate INS measurement to match GNSS time
+
+  /* Interpolate INS measurement to match GNSS time  */
   if (imu_obs_prev.sec>0.0) {
     if (ini_pos_time < imu_curr_meas.sec && ini_pos_time > imu_obs_prev.sec) {
       printf("INTERPOLATE INS MEAS TO GNSS TIME \n");
-      /* imu_curr_meas is modified
+      /* imu_curr_meas is modified  */
       IMU_meas_interpolation(imu_obs_prev.sec, imu_curr_meas.sec, ini_pos_time, \
         &imu_curr_meas, &imu_obs_prev);
-      /*Return imu file pointer to process the imu_curr in the next epoch
+      /* Return imu file pointer to process the imu_curr in the next epoch */
        //imufileback();
     }
   }
- */
+
+  printf("GNSS.INSPREV.INS.TIMES.DIFF: %f, %f, %f, %.3f\n",ini_pos_time,imu_obs_prev.sec,\
+  imu_curr_meas.sec, ini_pos_time-imu_curr_meas.sec );
+
   /* Stationary-condition detection --------------------*/
    /* Horizontal velocity threshold for land-vehicles:
    low-cost imu < 0.5 m/s per axis for aviation-grade IMU < 0.0075 m/s per axis*/
@@ -1347,7 +1353,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   ecef2pos(PVA_prev_sol.r,llh_pos);
 
   /* Output PVA solution */
-  fprintf(out_PVA,"%f %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",\
+  fprintf(out_PVA,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",\
   PVA_prev_sol.sec, llh_pos[0]*R2D, llh_pos[1]*R2D, llh_pos[2],\
   PVA_prev_sol.v[0], PVA_prev_sol.v[1], PVA_prev_sol.v[2],
   PVA_prev_sol.A[0]*R2D,PVA_prev_sol.A[1]*R2D,PVA_prev_sol.A[2]*R2D );
@@ -1362,16 +1368,19 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
        printf("UPDATE INS AND GNSS \n");
        break;
      }else{
-       printf("KEEP UPDATING INS \n");
+       if (check==NULL) {
+         /* end of file */
+         break;
+       }else{printf("KEEP UPDATING INS \n");}
      }
    }
 
  } while(ini_pos_time-imu_curr_meas.sec > 0.0001 || \
    ini_pos_time-imu_curr_meas.sec > -0.0001 );
 
-
  printf("OUT OF LOOP\n \
  IMU_TIME_AND_GNSS_TIMES: %f %f\n", imu_curr_meas.sec, ini_pos_time);
+
 
 
   // printf("Vel NED GNSS: %lf, %lf, %lf\n",ned_ini_vel[0],ned_ini_vel[1],ned_ini_vel[2]);
@@ -1417,8 +1426,11 @@ char imufilename[]="../data/LOG__040.SBF_SBF_ASCIIIn.txt"; //IMU file path exp4
 FILE *res;
 //  char residualsfname[]="../out/exp1_PPP.stat"; //Residuals file
 char residualsfname[]="../out/PPP_car_back.pos.stat"; //Residuals file
+char tracefname[]="../out/trace.txt"; //trace file
 int l=0,c;
 int argc; // Size of file or options?
+
+strcpy(filopt.trace,tracefname);
 
 /* Global TC_KF_INS_GNSS output files*/
 out_PVA=fopen("../out/out_PVA.txt","w");
@@ -1456,8 +1468,8 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/igs19674.*  ../data/SEPT
 */
 
 /* PPP-Kinematic  Kinematic Positioning dataset */
- char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/CAR_2890.18N", "../data/igs20232.*", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf"};
- char *comlin = "./rnx2rtkp ../data/CAR_2890.18O ../data/CAR_2890.18N ../data/igs20232.* -o ../out/PPP_car_back.pos -k ../config/opts3.conf";
+ char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/CAR_2890.18N", "../data/igs20232.*", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf", "-x 5"};
+ char *comlin = "./rnx2rtkp ../data/CAR_2890.18O ../data/CAR_2890.18N ../data/igs20232.* -o ../out/PPP_car_back.pos -k ../config/opts3.conf -x 5";
       // Command line
 
 /* PPP-AR Kinematic
@@ -1569,28 +1581,42 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
   if (!ret) fprintf(stderr,"%40s\r","");
 
- /* Closing global files */
+ /* Closing global files  */
   //fclose(fp_lane);
   //fclose (fimu);
-  fclose(imu_tactical);
   fclose(out_PVA);
   fclose(out_clock_file);
   fclose(out_IMU_bias_file);
   fclose(out_KF_SD_file);
   fclose(out_raw_fimu);
+  fclose(imu_tactical);
+
+
+
 
 
 /* Other function call after processing ------------------------------*/
 
-/*
-FILE *new=fopen("/home/emerson/Desktop/Connected_folders/data/imu_ascii_new.txt", "w");
+/* Adjusting IMU tactical time
+FILE *new=fopen("../data/imu_ascii_new.txt", "w");
 char str[100];
-float t_0=242844.99572, t_end, t;
+char timeini[]="2018 10 16 19 5 35.600";
+gtime_t t_ini;
+double gpst;
+int week=2023;
+
+str2time(timeini, 0, 23, &t_ini);
+gpst=time2gpst(t_ini, &week);
+printf("Time of week: %lf\n",gpst );
+
+
+double t_0=gpst+622.0;
+double t_end, t;
 double a[3], g[3];
 i=0;
 while ( fgets(str, 100, imu_tactical)!= NULL ){
   //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,%lf", &hh, &m,&s, &ht);
-  sscanf(str, "%f %lf %lf %lf %lf %lf %lf", &t, &a[0], &a[1], &a[2], &g[0], &g[1], &g[2]);
+  sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &t, &a[0], &a[1], &a[2], &g[0], &g[1], &g[2]);
   if(i==0){
       t_end = t_0;
   }else{
@@ -1598,16 +1624,15 @@ while ( fgets(str, 100, imu_tactical)!= NULL ){
   }
   //printf("%lf %lf %lf\n", posp[0]*R2D, posp[1]*R2D, posp[2]);
   //t=(double)(hh+(m/60.0)+(s/3600.0));
-  fprintf(new, "%6.5f %lf %lf %lf %lf %lf %lf\n", t_end, a[0], a[1], a[2], g[0], g[1], g[2]);
+  fprintf(new, "%.3lf %lf %lf %lf %lf %lf %lf\n", t_end, a[0], a[1], a[2], g[0], g[1], g[2]);
   i++;
 }
-*/
 
-/*Processing imu_tactical only */
-//imuaccplot("/home/emerson/Desktop/Connected_folders/data/imu_ascii.txt");
-//imugyroplot("/home/emerson/Desktop/Connected_folders/data/imu_ascii.txt");
-//imu_tactical_navigation(imu_tactical);
-/**/
+fclose(new);
+  */
+
+
+/* INS/GNSS plots */
 char gyrofile[]="../out/out_PVA.txt";
 imueulerplot(gyrofile);
 char velfile[]="../out/out_PVA.txt";
@@ -1625,12 +1650,16 @@ char imu_KF_clk[]="../out/out_clock_file.txt";
 KF_clock_plot(imu_KF_clk);
 
 
+/*Processing imu_tactical only */
+//imuaccplot("/home/emerson/Desktop/Connected_folders/data/imu_ascii.txt");
+//imugyroplot("/home/emerson/Desktop/Connected_folders/data/imu_ascii.txt");
+//imu_tactical_navigation(imu_tactical);
 
-  /* IMU-MAP test
+/* IMU-MAP test
   while ( 1 ) {
     if(ferror(fimu)||feof(fimu)) break;
     insmap ();
-  }*/
+}*/
 
 /* IMU PLOTS
 char accfile[]="../out/ins_acceleration.txt";

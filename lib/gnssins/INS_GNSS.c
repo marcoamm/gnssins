@@ -3231,7 +3231,8 @@ printf("\n *****************  NAV_EQUATIONS BEGINS ************************\n");
 printf("\n *****************  NAV_EQUATIONS ENDS **************************\n");
 
     /* Determine whether to update GNSS simulation and run Kalman filter */
-  if ( fabs(GNSS_measurements->sec - INS_measurements->sec) < 0.001) {
+    printf("GNSS-INS DIFF: %lf\n", GNSS_measurements->sec - INS_measurements->sec);
+  if ( fabs(GNSS_measurements->sec - INS_measurements->sec) < 0.0001) {
       /* KF time interval */
       tor_s = time - time_last_GNSS;
 
