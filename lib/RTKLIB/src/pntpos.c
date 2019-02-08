@@ -519,13 +519,26 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
 
         for (j=0;j<4;j++) x[j]+=dx[j];
 
+<<<<<<< HEAD
+        printf("VEL FROM RTKLIB: %lf, %lf, %lf, %lf\n", x[0],x[1],x[2], x[3]);
+        for (i=0;i<3;i++) sol->rr[i+3]=x[i];
+        sol->dtrr=x[3];
+        for (j=0;j<3;j++) sol->qrv[j]=(float)Q[j+j*NX];
+        printf("VELunc: %f, %f, %f\n",(float)Q[0+0*NX],(float)Q[1+1*NX],(float)Q[2+2*NX] );
+
+=======
         printf("VEL FROM RTKLIB: %lf, %lf, %lf\n", x[0],x[1],x[2]);
         printf("NORM dx: %lf\n", norm(dx,4));
+>>>>>>> e8356994bd455f59a8e1a032644c31ed8f1a5741
         if (norm(dx,4)<1E-06) {
 
             for (i=0;i<3;i++) sol->rr[i+3]=x[i];
 
+<<<<<<< HEAD
+            sol->dtrr=x[3];
+=======
             sol->dtrr=x[4];
+>>>>>>> e8356994bd455f59a8e1a032644c31ed8f1a5741
             for (j=0;j<3;j++) sol->qrv[j]=(float)Q[j+j*NX];
             sol->qrv[3]=(float)Q[1];    /* cov xy */
             sol->qrv[4]=(float)Q[2+NX]; /* cov yz */

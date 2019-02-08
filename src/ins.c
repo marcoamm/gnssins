@@ -110,7 +110,8 @@ void coarseAlign(um7pack_t* imu, double* gan)
  double r1[9], r2[9], aux[3], sign=1.0;
  double sineyaw, coseyaw;
  /* Is it a static or kinematic alignment? Use GNSS velocity or any velocity in imu->v */
- if ( norm(imu->v,3) < 0.01){
+ if ( norm(imu->v,3) < 0.5){
+   printf("LEVELLING.STATIC, %lf, %lf, %lf\n", imu->a[0], imu->a[1],imu->a[2]);
                                     //static alignment
   /* Then we can solve for the roll(x(phi)) and pitch(y(theta)) angles using accelerometers */
   //if(imu->a[2]<0.0){sign=-1.0;}
@@ -134,6 +135,8 @@ void coarseAlign(um7pack_t* imu, double* gan)
 }else{                            //kinematic alignment
  /* Roll can be initialized to zero with an uncertainty of +-5 degrees,
  in most cases, on the road */
+ printf("LEVELLING.KINE, %lf, %lf, %lf\n", imu->a[0], imu->a[1],imu->a[2] );
+
  imu->aea[0]=0.0;
 
  /* Levelling from Groves (2013) */
@@ -1572,7 +1575,7 @@ void velfromgnss(um7pack_t *imu, float gnsscurrent_time){
     pvagnss.v[1]=venu[0];
     pvagnss.v[2]=venu[2];
   }
-  
+
 }
 
 /* INS navigation mechanization -------------------------------------------------

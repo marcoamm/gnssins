@@ -1814,6 +1814,8 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     /* INS/GNSS with MAP constrains - HERE BECAUSE I AM PROCESSING ONLY SPP UNTIL SP3 ARRIVES*/
     //core(rtk, obs, n, nav);
 
+    printf("RTKLIB_clk_off_drift: %lf (m) %lf (s/s)",rtk->sol.dtr[0]*CLIGHT, rtk->sol.dtrr );
+
     /* single point positioning */
     if (opt->mode==PMODE_SINGLE) {
         outsolstat(rtk);
@@ -1829,6 +1831,9 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
        ecef2enu(pos,rtk->x+3,vel);
 
        /* INS/GNSS with MAP constrains */
+       rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+       printf("RTKLIB_clk_off_drift1: %lf (m) %lf (s/s)",rtk->sol.dtr[0], rtk->sol.dtrr );
+
        core(rtk, obs, n, nav);
 
        /* loosley coupled inertial gnss integration  */
@@ -1877,7 +1882,6 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     /* relative potitioning */
     relpos(rtk,obs,nu,nr,nav);
     outsolstat(rtk);
-
     //fclose(f1);
 
     return 1;

@@ -325,18 +325,18 @@ GNSS_config->rx_clock_offset = 10000;
 GNSS_config->rx_clock_drift = 100;
 
 /* Initial attitude uncertainty per axis (deg, converted to rad) */
-for (i=0;i<3;i++) TC_KF_config->init_att_unc[i] = D2R*2;
+for (i=0;i<3;i++) TC_KF_config->init_att_unc[i] = D2R*2.0;
 /* Initial velocity uncertainty per axis (m/s) */
 for (i=0;i<3;i++) TC_KF_config->init_vel_unc[i] = 0.1;
 /* Initial position uncertainty per axis (m) */
-for (i=0;i<3;i++) TC_KF_config->init_pos_unc[i] = 10;
+for (i=0;i<3;i++) TC_KF_config->init_pos_unc[i] = 10.0;
 /* Initial accelerometer bias uncertainty per instrument (micro-g, converted
 /* to m/s^2) */
-TC_KF_config->init_b_a_unc = 10000 * micro_g_to_meters_per_second_squared;
+TC_KF_config->init_b_a_unc = 10000.0 * micro_g_to_meters_per_second_squared;
 /* Initial gyro bias uncertainty per instrument (deg/hour, converted to rad/sec)*/
-TC_KF_config->init_b_g_unc = 200 * deg_to_rad / 3600;
+TC_KF_config->init_b_g_unc = 200.0 * deg_to_rad / 3600.0;
 /* Initial clock offset uncertainty per axis (m) */
-TC_KF_config->init_clock_offset_unc = 10;
+TC_KF_config->init_clock_offset_unc = 10.0;
 /* Initial clock drift uncertainty per axis (m/s) */
 TC_KF_config->init_clock_drift_unc = 0.1;
 
@@ -1223,6 +1223,10 @@ void Initialize_TC_P_matrix(TC_KF_config *TC_KF_config, double *P_matrix){
 
   /* The 17-states {de,dv,dr,dba,dbg, dt, dtdot} system model order */
 
+  for (i=0;i<3;i++) {
+    printf("att: %lf, vel: %lf, pos: %lf\n", att_var[i], vel_var[i], pos_var[i]);
+  }
+
   /* Attitude  */
    for (i = 0; i < 3; i++) {
      for (j = 0; j < 3; j++) {
@@ -1453,9 +1457,13 @@ Euler_to_quaternion(double *eul_nb, double *q_nb){
 Reference: Groves (2013, pag.42)
 *-----------------------------------------------------------------------------*/
 Quaternion_to_euler(double *q, double *eul){
+
   eul[0]=atan2(2*(q[0]*q[1]+q[2]*q[3]),(1-2*q[1]-2*q[2]));
   eul[1]=asin(2*(q[0]*q[2]-q[1]*q[3]));
   eul[2]=atan2(2*(q[0]*q[3]+q[1]*q[2]),(1-2*q[2]-2*q[3]));
+
+  printf("Quat.euler: %lf\n", 2*(q[0]*q[2]-q[1]*q[3]) );
+
 }
 
 
@@ -1707,12 +1715,12 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
 /*
     for (i = 0; i < 17; i++) {
       for (j = 0; j < 17; j++) {
-        printf("Phi_matrix:[%d] %1.15lf\t", i*17+j,Phi_matrix[i*17+j]);
+        printf("Phi_matrix:[%d] %lf\t", i*17+j,Phi_matrix[i*17+j]);
       }
       printf("\n");
     }
-    printf("\n");*/
-
+    printf("\n");
+*/
     /* 2. Determine approximate system noise covariance matrix using (14.82) */
     //Q_prime_matrix(1:3,1:3) = eye(3) * TC_KF_config.gyro_noise_PSD * tor_s;
     for (i = 0; i < 3; i++) {
@@ -1750,8 +1758,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
 /*
     for (i = 0; i < 17; i++) {
       for (j = 0; j < 17; j++) {
-        if(i==j){
-        printf("Q_prime_matrix:[%d] %1.15lf\t", i*17+j,Q_prime_matrix[i*17+j]);}
+        printf("Q_prime_matrix:[%d] %lf\t", i*17+j,Q_prime_matrix[i*17+j]);
       }
       printf("\n");
     }
@@ -1766,7 +1773,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     //printf("REC. CLK OFF: %lf m AND DRIFT: %lf m/s \n",est_clock_old[0],est_clock_old[1]);
 
     /* Using values estimated in RTKLIB per epoch */
-    x_est_propagated[15] = est_clock_old[0] + est_clock_old[1] * tor_s;
+    x_est_propagated[15] = est_clock_old[0];// + est_clock_old[1] * tor_s;
     x_est_propagated[16] = est_clock_old[1];
     //x_est_propagated[15] = 0.0; //+ est_clock_old[1] * tor_s;
     //x_est_propagated[16] = 0.0;
@@ -1790,16 +1797,24 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
       }
     }
 /*
+
     for (i = 0; i < 17; i++) {
       for (j = 0; j < 17; j++) {
-        printf("P_matrix_propagated:[%d] %1.15lf\t", i*17+j,P_matrix_propagated[i*17+j]);
+        printf("P_matrix_old[%d] %lf\t", i*17+j,P_matrix_old[i*17+j]);
+      }
+      printf("\n");
+    }
+    printf("\n");
+
+    for (i = 0; i < 17; i++) {
+      for (j = 0; j < 17; j++) {
+        printf("Q_[%d] %lf\t", i*17+j,Q_[i*17+j]);
       }
       printf("\n");
     }
     printf("\n");
 */
     /* MEASUREMENT UPDATE PHASE */
-
 
      ecef2pos(est_r_eb_e_old,pos);
      xyz2enu(pos,E);
@@ -1830,7 +1845,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
 
 
         printf("RHO RTKLIB:%lf AND RHO GROVES: %lf\n", rho, range);
-        //range=rho;
+        range=rho;
 
         pred_meas[j*2+0] = range + x_est_propagated[15];
 
@@ -1967,14 +1982,54 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
       }
     }
     /*
+    for(i=0;i<17;i++) {
+      for (j=0; j < 17; j++) {
+        printf("P_matrix_propagated[%d]:%lf\t",(int)(i*(17)+j),P_matrix_propagated[i*(17)+j]);
+      }
+      printf("\n");
+    }
+    printf("\n");
+
+    for(i=0;i<no_meas*2;i++) {
+      for (j=0; j < 17; j++) {
+        printf("F1[%d]:%lf\t",(int)(i*(17)+j),F1[i*(17)+j]);
+      }
+      printf("\n");
+    }
+    printf("\n");
+
+    for(i=0;i<no_meas*2;i++) {
+      for (j=0; j < 17; j++) {
+        printf("H_matrix[%d]:%lf\t",(int)(i*(17)+j),H_matrix[i*(17)+j]);
+      }
+      printf("\n");
+    }
+    printf("\n");
+
+    for(i=0;i<no_meas*2;i++) {
+      for (j=0; j < no_meas*2; j++) {
+        printf("R_matrix[%d]:%lf\t",(int)(i*(no_meas*2)+j),R_matrix[i*(no_meas*2)+j]);
+      }
+      printf("\n");
+    }
+    printf("\n");
+
     for(i=0;i<no_meas*2;i++) {
       for (j=0; j < no_meas*2; j++) {
         printf("Q1[%d]:%lf\t",(int)(i*(no_meas*2)+j),Q1[i*(no_meas*2)+j]);
       }
       printf("\n");
     }
-    printf("\n"); */
+    printf("\n");
 
+    for(i=0;i<no_meas*2;i++) {
+      for (j=0; j < no_meas*2; j++) {
+        printf("K_matrix_inv[%d]:%lf\t",(int)(i*(no_meas*2)+j),K_matrix_inv[i*(no_meas*2)+j]);
+      }
+      printf("\n");
+    }
+    printf("\n");
+*/
     if (!(info=matinv(K_matrix_inv,2*no_meas))) {
       printf("Invertion status, if 0 > info:error! info:%d\n", info);
         matmul("NN",17,2*no_meas,2*no_meas,1.0,F1,K_matrix_inv,0.0,K_matrix);
@@ -1983,14 +2038,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
       printf("Invertion status, if 0 > info:error! info:%d\n", info);
       printf("\n\n\n\n********************************** ERROR INVERTING MATRIX**************************************\n\n\n\n\n");
     }
-/*
-    for(i=0;i<no_meas*2;i++) {
-      for (j=0; j < no_meas*2; j++) {
-        printf("Q1inv[%d]:%lf\t",(int)(i*(no_meas*2)+j),Q1[i*(no_meas*2)+j]);
-      }
-      printf("\n");
-    }
-    printf("\n");
+
 /*
     for(i=0;i<17;i++) {
       for (j=0; j < no_meas*2; j++) {
@@ -1999,7 +2047,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
       printf("\n");
     }
     printf("\n");
-/**/
+*/
 
 
     /* 8. Formulate measurement innovations using (14.119) */
@@ -2039,7 +2087,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
 /*
     for(i=0;i<no_meas;i++) {
       for (j = 0; j < 2; j++) {
-       printf("pred_meas[%d]:%lf\t",i*2+j,pred_meas[i*2+j]);
+       printf("pred_meas[%d]:%lf\t",i*2+j,K_matrix[i*2+j]);
       }
       printf("\n");
     }
@@ -2065,12 +2113,17 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     printf("\n");
 */
 
-/*
+/**/
     for (i=0; i < 17;i++) {
       printf("x_est_propagated[%d]:%lf, ",i,x_est_propagated[i]);
     }
     printf("\n");
-*/
+
+    for (i=0; i < 17;i++) {
+      printf("k_x_delta_z[%d]:%lf, ",i,K_x_delta_z[i]);
+    }
+    printf("\n");
+
 
 /*
     for(i=0;i<no_meas*2;i++) {
@@ -2081,14 +2134,6 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     }
     printf("\n");
 /*
-
-for(i=0;i<no_meas*2;i++) {
-  for (j=0; j < 17; j++) {
-    printf("H_matrix[%d]:%lf\t",(int)(i*(17)+j),H_matrix[i*(17)+j]);
-  }
-  printf("\n");
-}
-printf("\n");
 
     for(i=0;i<17;i++) {
       for (j=0; j < 17; j++) {
@@ -3047,7 +3092,7 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
 
   /* Free memory */
   free(P_matrix); free(P_matrix_new);
-  printf("\n *****************  TC_INS/GNSS ENDS **************************\n");
+  printf("\n *****************  LC_INS/GNSS ENDS **************************\n");
 
 }
 
@@ -3132,7 +3177,7 @@ void Tightly_coupled_INS_GNSS(INS_measurements *INS_measurements, \
   double est_IMU_bias[6]={0};
   double quant_residuals[6]={0};
   double *P_matrix, *P_matrix_new;
-  float GNSS_epoch, tor_i, time, tor_s;
+  double GNSS_epoch, tor_i, time, tor_s;
   int i,j;
   double est_C_b_e_new[9], est_C_b_n_T[9], est_v_eb_e_new[3], est_r_eb_e_new[3];
   double est_IMU_bias_new[6], est_clock_new[2];
@@ -3185,6 +3230,15 @@ void Tightly_coupled_INS_GNSS(INS_measurements *INS_measurements, \
   P_matrix=zeros(no_par,no_par); // in this case 17x17
   P_matrix_new=zeros(no_par,no_par);
   Initialize_TC_P_matrix(TC_KF_config, P_matrix); //IT WILL CHANGE FOR THE UNDIFF/UNCOMB MODEL
+/*
+  for (i = 0; i < 17; i++) {
+    for (j = 0; j < 17; j++) {
+        printf("P_matrix_bef_KF[%d]:%lf\t",i*17+j, P_matrix[i*17+j]);
+    }
+    printf("\n");
+  }
+  printf("\n");
+*/
   if (out_errors[0] > 0.0 && out_errors[1]>0.0 && out_errors[2]>0.0) {
     for (i = 0; i < 17; i++) {
       for (j = 0; j < 17; j++) {
@@ -3194,6 +3248,15 @@ void Tightly_coupled_INS_GNSS(INS_measurements *INS_measurements, \
       }
     }
   }
+  /*
+  for (i = 0; i < 17; i++) {
+    for (j = 0; j < 17; j++) {
+        printf("P_matrix_bef_KF[%d]:%lf\t",i*17+j, P_matrix[i*17+j]);
+    }
+    printf("\n");
+  }
+  printf("\n");*/
+
 
   /* Generate IMU bias and clock output records
   out_IMU_bias_est(1,1) = old_time;
@@ -3266,18 +3329,22 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
       time_last_GNSS = GNSS_measurements->sec;
 
       /* Generate IMU bias and clock output records */
-     fprintf(out_clock_file,"%f %lf %lf\n", time, est_clock_new[0],\
+      fprintf(out_clock_file,"%lf %lf %lf\n", time, est_clock_new[0],\
       est_clock_new[1]);
-    /*  printf("CLOCK: %f %lf %lf\n", time, est_clock_new[0],\
-      est_clock_new[1]);*/
-      fprintf(out_IMU_bias_file,"%f %lf %lf %lf %lf %lf %lf\n", time, \
+      fprintf(out_IMU_bias_file,"%lf %lf %lf %lf %lf %lf %lf\n", time, \
       est_IMU_bias_new[0],est_IMU_bias_new[1],est_IMU_bias_new[2],\
       est_IMU_bias_new[3],est_IMU_bias_new[4], est_IMU_bias_new[5] );
 
       for (i = 0; i < 6; i++) out_IMU_bias_est[i]=est_IMU_bias_new[i];
 
+      /* */printf("CLOCK: %lf %lf %lf\n", time, est_clock_new[0],\
+        est_clock_new[1]);
+        printf("IMU_bias: %lf %lf %lf %lf %lf %lf %lf\n", time, \
+        est_IMU_bias_new[0],est_IMU_bias_new[1],est_IMU_bias_new[2],\
+        est_IMU_bias_new[3],est_IMU_bias_new[4], est_IMU_bias_new[5] );
+
       /* Generate KF uncertainty output record */
-      fprintf(out_KF_SD_file,"%f\t", time);
+      fprintf(out_KF_SD_file,"%lf\t", time);
       for (i=0;i<no_par;i++) {
         for (j=0;j<no_par;j++) {
           if (i==j) {
@@ -3308,12 +3375,21 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
      }
    }
 
+
   double q_b_n[4];
    DCM_to_quaternion(est_C_b_n, q_b_n);
+
+      for (i=0;i<3;i++){
+        for (j=0;j<3;j++) {
+          printf("[%d]:%lf\t",j*3+i, est_C_b_e_new[j*3+i] );
+        }
+        printf("\n");
+      }
+
    Quaternion_to_euler(q_b_n, pvat_new->euler_angles);
 
    printf("Euler from Quaternions: %lf, %lf, %lf\n",pvat_new->euler_angles[0],\
- pvat_new->euler_angles[1],pvat_new->euler_angles[2] );
+    pvat_new->euler_angles[1],pvat_new->euler_angles[2] );
 
     pvat_new->latitude = est_L_b;
     pvat_new->longitude = est_lambda_b;
@@ -3321,6 +3397,9 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
     for (i=0;i<3;i++) pvat_new->ned_velocity[i] = est_v_eb_n[i];
     CTM_to_Euler(pvat_new->euler_angles, est_C_b_n);
     pvat_new->time=time;
+
+    printf("Euler from CTM: %lf, %lf, %lf\n",pvat_new->euler_angles[0],\
+     pvat_new->euler_angles[1],pvat_new->euler_angles[2] );
 
     /* Clock update */
     for(i=0;i<2;i++) out_clock[i]=est_clock_new[i];
@@ -3510,7 +3589,7 @@ extern void TC_INS_GNSS_core(rtk_t *rtk, const obsd_t *obs, int n,\
   INS_measurements INS_meas = {0};
   double *rs, *dts, *var, *azel, llh[3], enu_ini_vel[3];
   double r,rr[3],e[3], dion, vion, dtrp, vtrp, lam_L1, P, vs[3];
-  float old_time=0.0, last_GNSS_time=0.0;
+  double old_time=0.0, last_GNSS_time=0.0;
   int svh[MAXOBS], i, j, k, sys, flag[n], m;
   prcopt_t opt=rtk->opt;
 
@@ -3593,6 +3672,8 @@ extern void TC_INS_GNSS_core(rtk_t *rtk, const obsd_t *obs, int n,\
   /* initialize clock offset and drift from gnss */
   clock_offset[0] = rtk->sol.dtr[0]*CLIGHT;//rtk->sol.dtr[0];//]x[3]; //or = rtk->sol.dtr[0];
   clock_offset[1] = rtk->sol.dtrr;
+
+  printf("Clock OFF and DRIFT: %lf, %lf\n", clock_offset[0], clock_offset[1]);
 
   /* From gyrocompassing and levelling from current IMU meas.
   for(j=0;j<3;j++) pvat_old.euler_angles[j]=imu_data->aea[j];*/
@@ -3726,12 +3807,17 @@ if (Tact_or_Low_IMU) {
 }
 
   /* Position and velocity covariance from GNSS */
+  /*
+  if (rtk->sol.qrv[1]<0.0) {
+    rtk->sol.qrv[1]=-1.0*rtk->sol.qrv[1];
+  }
+
   for (j = 0; j < 3; j++) TC_KF_Epoch.init_pos_unc[j]=sqrt(rtk->sol.qr[j]);
   for (j = 0; j < 3; j++) TC_KF_Epoch.init_vel_unc[j]=sqrt(rtk->sol.qrv[j]);
   TC_KF_Epoch.init_clock_offset_unc=sqrt(rtk->sol.qdtr); // It is in s should be in m ?
   TC_KF_Epoch.init_clock_drift_unc=sqrt(rtk->sol.qdtrr); // In (s/s) it should be in m/s?
   //for (i = 0; i < 3; i++) =rtk->sol.qr[i];
-
+*/
   if (out_IMU_bias_est[0]>0.0 || out_IMU_bias_est[3]>0.0) {
     for(i=0;i<3;i++) IMU_errors.b_a[i]=out_IMU_bias_est[i];
     for(i=0;i<3;i++) IMU_errors.b_g[i]=out_IMU_bias_est[i+3];

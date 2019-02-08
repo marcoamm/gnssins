@@ -1248,7 +1248,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     }
   }
 
-  printf("GNSS.INSPREV.INS.TIMES.DIFF: %f, %f, %f, %.3f\n",ini_pos_time,imu_obs_prev.sec,\
+  printf("GNSS.INSPREV.INS.TIMES.DIFF: %lf, %lf, %lf, %lf\n",ini_pos_time,imu_obs_prev.sec,\
   imu_curr_meas.sec, ini_pos_time-imu_curr_meas.sec );
 
   /* Stationary-condition detection --------------------*/
@@ -1257,6 +1257,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    /* Stationary detection walking --------------------
     Use a window of 0.5 second and 1.5 m/s-2 threshold is suitable
     gn(llh_pos[0],llh_pos[2])
+
     if (fabs( (norm(imu_curr_meas.a,3)-gn(llh_pos[0],llh_pos[2])) )<1.626) {
     //  printf("Is Stationary \t");
      }else{ //printf("Is Moving \t");
@@ -1271,9 +1272,9 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   /* Stationary-condition */
   if (norm(ned_ini_vel,3) > 0.5) {
-  //  printf("IS MOVING\n");
-  }else{//printf("IS STATIC\n");
-    //for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
+    printf("Stationary_detection.IS MOVING\n");
+  }else{printf("Stationary_detection.IS STATIC\n");
+    for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0; 
   }
 
   /* Attitude Initialization (Groves, 2013)  */
@@ -1293,7 +1294,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     PVA_prev_sol.A[0]=imu_curr_meas.aea[0]=0.0;
     PVA_prev_sol.A[1]=imu_curr_meas.aea[1]=0.0;
   }
-  */
+ */
   //PVA_prev_sol.A[2]=imu_curr_meas.aea[2]=head_angle;
 
  /* If INS time is ahead of GNSS */
@@ -1392,6 +1393,33 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    for (j=0;j<3;j++) PVA_prev_sol.v[j]=ned_ini_vel[j];
    PVA_prev_sol.clock_offset_drift[0]=rtk->sol.dtr[0]*CLIGHT;
    PVA_prev_sol.clock_offset_drift[1]=rtk->sol.dtrr;
+
+   /* State and covariances to satellite positioning */
+   /* Initialize position from GNSS SPP */
+   for (j=0;j<3;j++) rtk->sol.rr[j]=PVA_prev_sol.r[j];
+   for (j=0;j<3;j++) rtk->sol.qr[j]=(1.0/PVA_prev_sol.out_errors[j+6]);
+
+
+   /* Velocity from GNSS in case there is no doppler observable */
+   if (rtk->sol.rr[3] <= 0.000001 || rtk->sol.rr[4] <= 0.000000001 || \
+   rtk->sol.rr[5] <= 0.000000001) {
+     /* NO VELOCITY */
+     for (j=0;j<3;j++) vxyz[j]=(xyz_ini_pos[j]-pvagnss.r[j])/(ini_pos_time-pvagnss.sec);
+     ecef2enu(pvagnss.r,vxyz,ned_ini_vel); /* Here is ENU! */
+     //printf("Estimated velocity: %lf %lf %lf\n",ned_ini_vel[0],ned_ini_vel[1],ned_ini_vel[2]);
+   }else{
+     ecef2pos(xyz_ini_pos,llh_pos);
+     ecef2enu(llh_pos,rtk->sol.rr+3,ned_ini_vel); /* Here is ENU! */
+   }
+
+   ecef2pos(xyz_ini_pos,llh_pos);
+   ecef2enu(llh_pos,rtk->sol.rr+3,ned_ini_vel); /* Here is ENU! */
+
+
+
+
+
+
 
    /* Update *//* observation data doppler frequency (Hz) */
    PVA_prev_sol.t_s = time2gpst(rtk->sol.time,NULL); /* time of week in (GPST) */
