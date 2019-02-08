@@ -1274,7 +1274,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   if (norm(ned_ini_vel,3) > 0.5) {
     printf("Stationary_detection.IS MOVING\n");
   }else{printf("Stationary_detection.IS STATIC\n");
-    for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0; 
+    for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
   }
 
   /* Attitude Initialization (Groves, 2013)  */
@@ -1336,7 +1336,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       for (j=0;j<3;j++) PVA_prev_sol.r[j]=xyz_ini_pos[j];
       for (j=0;j<3;j++) PVA_prev_sol.v[j]=ned_ini_vel[j];
       for (j=0;j<3;j++) PVA_prev_sol.A[j]=imu_curr_meas.aea[j];
-      PVA_prev_sol.clock_offset_drift[0]=rtk->sol.dtr[0]*CLIGHT;
+      PVA_prev_sol.clock_offset_drift[0]=rtk->sol.dtr[0]*CLIGHT; 
       PVA_prev_sol.clock_offset_drift[1]=rtk->sol.dtrr;
       PVA_prev_sol.sec=imu_curr_meas.sec;
       PVA_prev_sol.time=imu_curr_meas.time;

@@ -529,7 +529,7 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
 
             for (i=0;i<3;i++) sol->rr[i+3]=x[i];
 
-            sol->dtrr=x[4];
+            sol->dtrr=x[3];
 
             for (j=0;j<3;j++) sol->qrv[j]=(float)Q[j+j*NX];
             sol->qrv[3]=(float)Q[1];    /* cov xy */
