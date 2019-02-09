@@ -2588,11 +2588,11 @@ void Nav_equations_ECEF(float tor_i,\
     double *f_ib_b, double *omega_ib_b, double *r_eb_e, \
     double *v_eb_e, double *C_b_e){
 
-      /*
+      /**/
       printf("NAVIGATION EQUATIONS\nOLD_P: %lf, %lf, %lf\n",old_r_eb_e[0],old_r_eb_e[1],old_r_eb_e[2] );
       printf("OLD_V: %lf, %lf, %lf\n",old_v_eb_e[0],old_v_eb_e[1],old_v_eb_e[2] );
       printf("ACC: %lf, %lf, %lf\n",f_ib_b[0],f_ib_b[1],f_ib_b[2] );
-      printf("GYR: %lf, %lf, %lf\n",omega_ib_b[0],omega_ib_b[1],omega_ib_b[2] );*/
+      printf("GYR: %lf, %lf, %lf\n",omega_ib_b[0],omega_ib_b[1],omega_ib_b[2] );
 
 
      /* parameters  */
@@ -2628,6 +2628,10 @@ void Nav_equations_ECEF(float tor_i,\
      attitude_update(alpha_ib_b, omega_ie_vec, tor_i, old_C_b_e, new_q_b_e);
 
      Quaternion_to_DCM(new_q_b_e, new_C_b_e);
+
+          printf("new_C_b_e: %lf, %lf, %lf\n%lf, %lf, %lf\n%lf, %lf, %lf\n",\
+          new_C_b_e[0],new_C_b_e[1],new_C_b_e[2],new_C_b_e[3],\
+          new_C_b_e[4],new_C_b_e[5],new_C_b_e[6],new_C_b_e[7],new_C_b_e[8]);
 
      /* Obtain coordinate transformation matrix from the new attitude w.r.t. an
       inertial frame to the old using Rodrigues' formula, (5.73)  */
@@ -2679,13 +2683,13 @@ void Nav_equations_ECEF(float tor_i,\
      /* UPDATE CARTESIAN POSITION
      % From (5.38), */
      for (i=0;i<3;i++) r_eb_e[i] = old_r_eb_e[i] + (v_eb_e[i] + old_v_eb_e[i]) * 0.5 * tor_i;
-/*
+/**/
 printf("tor_i: %f \n",tor_i);
-     printf("f_ib_e: %lf, %lf, %lf\n",f_ib_e[0],f_ib_e[1],f_ib_e[2] );
-     printf("old_C_b_e: %lf, %lf, %lf\n%lf, %lf, %lf\n%lf, %lf, %lf\n",\
-     old_C_b_e[0],old_C_b_e[1],old_C_b_e[2],old_C_b_e[3],\
-     old_C_b_e[4],old_C_b_e[5],old_C_b_e[6],old_C_b_e[7],old_C_b_e[8]);
-     printf("ave_C_b_e: %lf, %lf, %lf\n%lf, %lf, %lf\n%lf, %lf, %lf\n",\
+    // printf("f_ib_e: %lf, %lf, %lf\n",f_ib_e[0],f_ib_e[1],f_ib_e[2] );
+     printf("C_b_e: %lf, %lf, %lf\n%lf, %lf, %lf\n%lf, %lf, %lf\n",\
+     C_b_e[0],C_b_e[1],C_b_e[2],C_b_e[3],\
+     C_b_e[4],C_b_e[5],C_b_e[6],C_b_e[7],C_b_e[8]);
+/*     printf("ave_C_b_e: %lf, %lf, %lf\n%lf, %lf, %lf\n%lf, %lf, %lf\n",\
      ave_C_b_e[0],ave_C_b_e[1],ave_C_b_e[2],ave_C_b_e[3],\
      ave_C_b_e[4],ave_C_b_e[5],ave_C_b_e[6],ave_C_b_e[7],ave_C_b_e[8]);
      printf("Omega_v_eb_e: %lf, %lf, %lf\n%lf, %lf, %lf\n%lf, %lf, %lf\n",\
@@ -3319,12 +3323,13 @@ for (i=0;i<3;i++) meas_omega_ib_b[i] = meas_omega_ib_b[i] - est_IMU_bias_new[i+3
 for (i=0;i<3;i++) old_est_r_eb_e[i]=est_r_eb_e_new[i];
 for (i=0;i<3;i++) old_est_v_eb_e[i]=est_v_eb_e_new[i];
 for (i=0;i<9;i++) old_true_C_b_e[i]=est_C_b_e_new[i];
-
+*/
     Nav_equations_ECEF(tor_i,\
         old_est_r_eb_e, old_est_v_eb_e,old_true_C_b_e, meas_f_ib_b,\
         meas_omega_ib_b, est_r_eb_e_new, est_v_eb_e_new, est_C_b_e_new);
+
 printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n");
-*/
+
       time_last_GNSS = GNSS_measurements->sec;
 
       /* Generate IMU bias and clock output records */

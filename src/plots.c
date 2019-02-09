@@ -133,10 +133,10 @@ extern void imuposplot(char* filename){
         //"set autoscale \n"
         "set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
         "set xrange [-66.675:-66.63] \n"
-        //"set yrange [45.958:45.962] \n"  // Downtown Interruptions
-        //"set xrange [-66.64:-66.635] \n"
-        //"set yrange [45.9475:45.9575] \n"  // UNB departure and arrival points
-        //"set xrange [-66.64:-66.645] \n"
+        "set yrange [45.958:45.962] \n"  // Downtown Interruptions
+        "set xrange [-66.64:-66.635] \n"
+        //"set yrange [45.932:45.937] \n"  // UNB departure and arrival points
+        //"set xrange [-66.650:-66.655] \n"
 	      "set grid \n", outpath[0]);
 
         // Obstructions: 396546.04 < $1 < , Off-road: 396838.72 - end
@@ -188,7 +188,7 @@ extern void imuvelplot(char* filename){
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s velocities.ps'\n"
         "set xrange [242141.328125:244778.140625] \n"
-	      "set autoscale \n"
+	      //"set autoscale \n"
         //"set yrange [-10:10] \n"
 	      "set grid \n", outpath[0]);
 
@@ -210,7 +210,7 @@ extern void imuaccbiasplot(char* filename){
 	      "set yrange [-0.05:0.05] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s IMU_acc_bias.ps'\n"
-	      "set autoscale \n"
+	      //"set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($2) w l title \"acc. bias x\" ,\
@@ -231,7 +231,7 @@ extern void imugyrobiasplot(char* filename){
 	      "set yrange [-0.05:0.05] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s IMU_gyro_bias.ps'\n"
-	      "set autoscale \n"
+	      //"set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($5) w l title \"gyr. bias x\" ,\
