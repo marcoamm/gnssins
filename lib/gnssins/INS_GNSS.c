@@ -3749,6 +3749,12 @@ extern void TC_INS_GNSS_core(rtk_t *rtk, const obsd_t *obs, int n,\
           m++; continue;
       }
 
+      if (obs[i].P[0] <= 0.0 || obs[i].D[0] <= 0.0 || obs[i].L[0] <= 0.0) {
+          flag[i]=0;
+          m++;
+          continue;
+      }
+
       /* pseudorange residual
       //printf("Pres: %lf\n", obs[i].P[0]-(r+CLIGHT*rtk->sol.dtr[0]-CLIGHT*dts[i*2]+dion+dtrp));
       //printf("Dres: %lf\n", -obs[i].D[j]*lam_L1+CLIGHT*dts[1+i*2]);

@@ -133,8 +133,8 @@ extern void imuposplot(char* filename){
         //"set autoscale \n"
         "set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
         "set xrange [-66.675:-66.63] \n"
-        "set yrange [45.958:45.962] \n"  // Downtown Interruptions
-        "set xrange [-66.64:-66.635] \n"
+        //"set yrange [45.958:45.962] \n"  // Downtown Interruptions
+        //"set xrange [-66.64:-66.635] \n"
         //"set yrange [45.932:45.937] \n"  // UNB departure and arrival points
         //"set xrange [-66.650:-66.655] \n"
 	      "set grid \n", outpath[0]);

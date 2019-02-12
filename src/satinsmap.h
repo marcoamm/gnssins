@@ -111,7 +111,7 @@ typedef struct {        /* Reference Lane record */
 
 typedef struct {        /* UM7 sensor package records */
     int count; 		/* Flag for type of data, 0:gyro,1:accelerometer,2:magnetometer */
-    float internal_time; /* amount of time in seconds since the sensor was on */
+    double internal_time; /* amount of time in seconds since the sensor was on */
     double sec;		/*  If GPS is connected, this is synchronized to UTC time of day
 			(in seconds of the week) 		*/
     int gpsw;		/* GPS week	*/
@@ -129,7 +129,7 @@ typedef struct {        /* UM7 sensor package records */
 } um7pack_t;
 
 typedef struct {        /* IMU sensor measurements */
-    float sec;		/* amount of time in seconds since the sensor was on		*/
+    double sec;		/* amount of time in seconds since the sensor was on		*/
     gtime_t time;	/* GPS UTC time	*/
     double wibb[3];	/* rate-gyro b-frame {wx,wy,wz} (deg/sec)	*/
     double stdw[3];	/* rate-gyro stds */
@@ -147,7 +147,7 @@ typedef struct {        /* IMU sensor measurements */
 
 typedef struct {        /* Position, velocity and attitude structure (PVA) */
     double sec;		/* amount of time in seconds since the sensor was on		*/
-    float t_s;    /* State-time estimation */
+    double t_s;    /* State-time estimation */
     gtime_t time;	/* GPS UTC time	*/
     double clock_offset_drift[2]; /* Esimated receiver clock offset and drift */
     double r[3];	/* Position in n-frame {n,e,d} or {lat,lon,h} (m or rads)	*/

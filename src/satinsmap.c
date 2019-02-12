@@ -1460,13 +1460,13 @@ int argc; // Size of file or options?
 
 strcpy(filopt.trace,tracefname);
 
-/* Global TC_KF_INS_GNSS output files
+/* Global TC_KF_INS_GNSS output files*/
 out_PVA=fopen("../out/out_PVA.txt","w");
 out_clock_file=fopen("../out/out_clock_file.txt","w");
 out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
 out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
 out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
-imu_tactical=fopen("../data/imu_ascii_new.txt", "r");*/
+imu_tactical=fopen("../data/imu_ascii_new.txt", "r");
 
 /* Declarations from rnx2rtkp source code program */
 //clk93stream.rtcm3  CLK930600.rtcm3
@@ -1606,10 +1606,10 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 /* Start rnx2rtkp processing  ----------------------------------- --*/
 /* Processing ------------------------------------------------------*/
 
-  //ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
-  //if (!ret) fprintf(stderr,"%40s\r","");
+  ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
+  if (!ret) fprintf(stderr,"%40s\r","");
 
- /* Closing global files
+ /* Closing global files*/
   //fclose(fp_lane);
   //fclose (fimu);
   fclose(out_PVA);
@@ -1618,7 +1618,6 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   fclose(out_KF_SD_file);
   fclose(out_raw_fimu);
   fclose(imu_tactical);
-*/
 
 
 
