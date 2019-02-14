@@ -1264,18 +1264,19 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     }
   */
 
-  /* Horizontal condition based on velocities derived from INS measurements /
+  /* Horizontal condition based on velocities derived from INS measurements */
     0.5590 corresponds to the horizontal resultant threshold
   if (norm(PVA_prev_sol.v,2) > 0.55901) {
     printf("IS MOVING\n");
   }else{printf("IS STATIC\n");}  */
 
-  /* Stationary-condition */
+  /* Stationary-condition
   if (norm(ned_ini_vel,3) > 0.5) {
     printf("Stationary_detection.IS MOVING\n");
   }else{printf("Stationary_detection.IS STATIC\n");
     for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
   }
+*/
 
   /* Attitude Initialization (Groves, 2013)  */
 
@@ -1460,13 +1461,14 @@ int argc; // Size of file or options?
 
 strcpy(filopt.trace,tracefname);
 
-/* Global TC_KF_INS_GNSS output files*/
+/* Global TC_KF_INS_GNSS output files */
 out_PVA=fopen("../out/out_PVA.txt","w");
 out_clock_file=fopen("../out/out_clock_file.txt","w");
 out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
 out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
 out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 imu_tactical=fopen("../data/imu_ascii_new.txt", "r");
+
 
 /* Declarations from rnx2rtkp source code program */
 //clk93stream.rtcm3  CLK930600.rtcm3
@@ -1609,7 +1611,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
   if (!ret) fprintf(stderr,"%40s\r","");
 
- /* Closing global files*/
+ /* Closing global files */
   //fclose(fp_lane);
   //fclose (fimu);
   fclose(out_PVA);
@@ -1618,7 +1620,6 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   fclose(out_KF_SD_file);
   fclose(out_raw_fimu);
   fclose(imu_tactical);
-
 
 
 
@@ -1659,7 +1660,7 @@ fclose(new);
   */
 
 
-/* INS/GNSS plots */  
+/* INS/GNSS plots */
 char gyrofile[]="../out/out_PVA.txt";
 imueulerplot(gyrofile);
 char velfile[]="../out/out_PVA.txt";

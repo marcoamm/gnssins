@@ -917,17 +917,17 @@ void ECEF_to_NED(double *r_eb_e, double *v_eb_e, double *C_b_e, \
    sin_lat = sin(*L_b);
    cos_long = cos(*lambda_b);
    sin_long = sin(*lambda_b);
+
    C_e_n[0] = -sin_lat * cos_long; C_e_n[1] = -sin_lat * sin_long; C_e_n[2] =  cos_lat;
    C_e_n[3] = -sin_long;           C_e_n[4] = cos_long;            C_e_n[5] = 0;
    C_e_n[6] = -cos_lat * cos_long; C_e_n[7] = -cos_lat * sin_long; C_e_n[8] =-sin_lat;
 
    /* Transform velocity using (2.73) */
-   matmul("NN",3,1,3,1.0,C_e_n, v_eb_e, 0.0, v_eb_n);
+   matmul("TN",3,1,3,1.0, C_e_n, v_eb_e, 0.0, v_eb_n);
 
    /* Transform attitude using (2.15) */
-   matmul("NN",3,3,3,1.0,C_e_n, C_b_e, 0.0, C_b_n);
+   matmul("TN",3,3,3,1.0,C_e_n, C_b_e, 0.0, C_b_n);
 
-   /* Ends */
 
 
 }
@@ -936,7 +936,7 @@ void NED_to_ECEF(double *L_b, double *lambda_b, double *h_b, double *v_eb_n,\
   double *C_b_n, double* r_eb_e, double *v_eb_e, double *C_b_e)
  {
 /*NED_to_ECEF - Converts curvilinear to Cartesian position, velocity
-%resolving axes from NED to ECEF and attitude from NED- to ECEF-referenced
+%resolving axes from NED to ECEF ECEF_to_NEDand attitude from NED- to ECEF-referenced
 %
 % Software for use with "Principles of GNSS, Inertial, and Multisensor
 % Integrated Navigation Systems," Second Edition.
@@ -985,13 +985,12 @@ e = 0.0818191908425; %WGS84 eccentricity  */
      C_e_n[3] = -sin_long;           C_e_n[4] = cos_long;            C_e_n[5] = 0;
      C_e_n[6] = -cos_lat * cos_long; C_e_n[7] = -cos_lat * sin_long; C_e_n[8] =-sin_lat;
 
+
     /* Transform velocity using (2.73)  */
-    matmul("TN",3,1,3,1.0, C_e_n, v_eb_n, 0.0, v_eb_e);
+    matmul("NN",3,1,3,1.0, C_e_n, v_eb_n, 0.0, v_eb_e);
 
     /* Transform attitude using (2.15) */
-    matmul("TN",3,3,3,1.0,C_e_n, C_b_n, 0.0, C_b_e);
-
-    /* Ends */
+    matmul("NN",3,3,3,1.0,C_e_n, C_b_n, 0.0, C_b_e);
 
 }
 
