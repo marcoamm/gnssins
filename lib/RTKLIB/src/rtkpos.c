@@ -1814,7 +1814,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     /* INS/GNSS with MAP constrains - HERE BECAUSE I AM PROCESSING ONLY SPP UNTIL SP3 ARRIVES*/
     //core(rtk, obs, n, nav);
 
-    printf("RTKLIB_clk_off_drift: %lf (m) %lf (s/s)",rtk->sol.dtr[0]*CLIGHT, rtk->sol.dtrr );
+    printf("RTKLIB_clk_off_drift: %lf (m) %lf (s/s)\n",rtk->sol.dtr[0]*CLIGHT, rtk->sol.dtrr );
 
     /* single point positioning */
     if (opt->mode==PMODE_SINGLE) {
@@ -1830,16 +1830,32 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
        ecef2pos(rtk->sol.rr,pos);
        ecef2enu(pos,rtk->x+3,vel);
 
-       /* INS/GNSS with MAP constrains */
-       rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
-       printf("RTKLIB_clk_off_drift1: %lf (m) %lf (s/s)",rtk->sol.dtr[0], rtk->sol.dtrr );
+       /* INS/GNSS with MAP constrains
+       if (fabs(rtk->sol.dtr[0])<10.0) {
+         // in s, do nothing
+      }else{
+         // in meters, pass it to s
+         rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+       }*/
 
-       core(rtk, obs, n, nav);
+      double cdiff=(double)fabs((rtk->sol.prevclk + rtk->sol.prevdrf*rtk->tt)-(rtk->sol.dtr[0]));
+
+      if (cdiff < 300000 && rtk->tt >= 0.0 ) {
+         rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+      }
+
+
+      printf("RTKLIB_clk_off_drift:1 %lf (m) %lf (s/s)\n",rtk->sol.dtr[0], \
+        rtk->sol.dtrr );
+      core(rtk, obs, n, nav);
+
+      rtk->sol.prevclk=rtk->sol.dtr[0];
+      rtk->sol.prevdrf=rtk->sol.dtrr;
 
        /* loosley coupled inertial gnss integration  */
       // printf("GNSS TIME BEFORE: %lf\n", time2gpst(rtk->sol.time,NULL));
       // printf("GNSS VEL BEFORE: %lf %lf %lf\n", vel[0],vel[1],vel[2]);
-       //insgnssLC(rtk->sol.rr, rtk->sol.qr, vel, time2gpst(rtk->sol.time,NULL));
+      //insgnssLC(rtk->sol.rr, rtk->sol.qr, vel, time2gpst(rtk->sol.time,NULL));
 
         //undiffppp(rtk,obs,nu, nav);
         pppoutsolstat(rtk,statlevel,fp_stat);

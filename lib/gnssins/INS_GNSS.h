@@ -126,7 +126,7 @@ typedef struct {        /* IMU errors */
 } IMU_errors;
 
 typedef struct {      /* GNSS configuration */
-  float epoch_interval;      /* Interval between GNSS epochs (s) */
+  double epoch_interval;      /* Interval between GNSS epochs (s) */
   double init_est_r_ea_e[3];     /* Initial estimated position (m; ECEF) */
   int no_sat;              /* Number of satellites in constellation */
   double r_os;              /* Orbital radius of satellites (m) */
@@ -176,12 +176,14 @@ typedef struct {      /* Loosely coupled Kalman Filter configuration */
 } LC_KF_config;
 
 typedef struct {      /* Position velocity and attitude solution structure */
-  float time;             /* time (sec) */
+  double time;             /* time (sec) */
   double latitude;        /* latitude (rad) */
   double longitude;       /* longitude (rad) */
   double height;           /* height (m) */
   double ned_velocity[3];  /* north, east, down velocity (m/s) */
   double euler_angles[3];  /* roll, pitch, yaw angle of body w.r.t NED (rad) */
+  double C_b_e[9];        /* Tranformation matrix from body-to-ECEF frame  */
+  int Nav_or_KF;          /* Navigation sol:0 KF Integrated sol:1   */
 } PVAT_solution;
 
 typedef struct {      /* Position velocity and attitude solution structure */

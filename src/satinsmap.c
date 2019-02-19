@@ -1177,7 +1177,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
      ned_ini_vel[0]=aux;
      ned_ini_vel[2]=-ned_ini_vel[2];
 
-  /* Position covariance */
+  /* Position covariance and velocity */
   for (j = 0; j < 6; j++) gnss_xyz_ini_cov[j]=rtk->sol.qr[j];
   for (j = 0; j < 6; j++) gnss_vel_cov[j]=rtk->sol.qrv[j];
   covenu(llh_pos, gnss_vel_cov, Qenu);
@@ -1186,6 +1186,9 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   gnss_vel_cov[0] = Qenu[1];
   gnss_vel_cov[1] = Qenu[0];
   gnss_vel_cov[2] = -Qenu[2];
+
+  printf("Pos and vel cov.: %lf, %lf, %lf, %lf, %lf, %lf\n",gnss_xyz_ini_cov[0],\
+gnss_xyz_ini_cov[1],gnss_xyz_ini_cov[2],gnss_vel_cov[0],gnss_vel_cov[1],gnss_vel_cov[2]);
 
   /*  Map information ********
   // Fetching data to the first buffer structure (lane.buffer)
@@ -1222,10 +1225,10 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &imu_curr_meas.sec, &imu_curr_meas.a[2],\
    &imu_curr_meas.a[1],&imu_curr_meas.a[0], &imu_curr_meas.g[2],&imu_curr_meas.g[1],\
    &imu_curr_meas.g[0]);
-   imu_curr_meas.status=1;
+   imu_curr_meas.status=1;    
 
-   /* raw acc. to m/s*s and rate velocity from degrees to radians */
-   for (j=0;j<3;j++) imu_curr_meas.a[j]=imu_curr_meas.a[j]*G;
+   /* raw acc. to m/s*s and rate ve locity from degrees to radians */
+   for (j= 0;j<3;j++) imu_curr_meas.a[j]=imu_curr_meas.a[j]*G;
    for (j=0;j<3;j++) imu_curr_meas.g[j]=imu_curr_meas.g[j]*D2R;
 
 
@@ -1253,22 +1256,26 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   /* Stationary-condition detection --------------------*/
    /* Horizontal velocity threshold for land-vehicles:
-   low-cost imu < 0.5 m/s per axis for aviation-grade IMU < 0.0075 m/s per axis*/
+   low-cost imu < 0.5 m/s per axis for aviation-grade IMU < 0.0075 m/s per axis
+   resultant for tree axis is 0.01299 m/s */
    /* Stationary detection walking --------------------
     Use a window of 0.5 second and 1.5 m/s-2 threshold is suitable
     gn(llh_pos[0],llh_pos[2])
 
-    if (fabs( (norm(imu_curr_meas.a,3)-gn(llh_pos[0],llh_pos[2])) )<1.626) {
-    //  printf("Is Stationary \t");
-     }else{ //printf("Is Moving \t");
-    }
-  */
 
-  /* Horizontal condition based on velocities derived from INS measurements */
+    if (fabs( (norm(imu_obs_prev.fb,3)-gn(llh_pos[0],llh_pos[2])) )<0.01299) {
+      printf("Is.Stationary \t");
+    }else{ printf("Is.Moving \t");
+    }
+*/
+
+  /* Horizontal condition based on velocities derived from INS measurements
     0.5590 corresponds to the horizontal resultant threshold
-  if (norm(PVA_prev_sol.v,2) > 0.55901) {
-    printf("IS MOVING\n");
-  }else{printf("IS STATIC\n");}  */
+  if (norm(PVA_prev_sol.v,2) > 0.55901){
+    printf("MOVING\n");
+  }else{printf("STATIC\n");
+    for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
+ }*/
 
   /* Stationary-condition
   if (norm(ned_ini_vel,3) > 0.5) {
@@ -1286,9 +1293,22 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   /* local apparent gravity vector */
   appgrav(llh_pos, gan, wiee);
 
+  printf("ATTITUDE:BEF %lf, %lf, %lf \n", PVA_prev_sol.A[0],PVA_prev_sol.A[1],PVA_prev_sol.A[2]);
+
   /* Coarse alignment or use of previous solution? */
   /* Levelling and gyrocompassing, update imu->aea[] vector */
-  coarseAlign(&imu_curr_meas, gan);
+  if(imu_obs_prev.sec > 0.0){
+    /* Not the first solution */
+    printf("NOT the First solution attitude initialization  \n");
+    coarseAlign(&imu_obs_prev.fb, &imu_obs_prev.wibb, &PVA_prev_sol.v, gan, &PVA_prev_sol.A); // it modifies imu->aea[] vector
+  }else{
+    /* The first solution*/
+    printf("First solution attitude initialization  \n");
+    coarseAlign(&imu_curr_meas.a, &imu_curr_meas.g, ned_ini_vel, gan, &imu_curr_meas.aea); // it modifies imu->aea[] vector
+    for (j=0;j<3;j++) PVA_prev_sol.A[j]=imu_curr_meas.aea[j]; // Attitude in A_nb frame
+  }
+
+  printf("ATTITUDE:AFT %lf, %lf, %lf \n", PVA_prev_sol.A[0],PVA_prev_sol.A[1],PVA_prev_sol.A[2]);
 
   /* Levelled period - 7 initial minutes
   if ( fabs((ini_pos_time-394469.000)/60.0) < 7) {
@@ -1359,6 +1379,14 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   PVA_prev_sol.sec, llh_pos[0]*R2D, llh_pos[1]*R2D, llh_pos[2],\
   PVA_prev_sol.v[0], PVA_prev_sol.v[1], PVA_prev_sol.v[2],
   PVA_prev_sol.A[0]*R2D,PVA_prev_sol.A[1]*R2D,PVA_prev_sol.A[2]*R2D );
+
+  /* Stationary-condition  */
+  if (norm(ned_ini_vel,3) > 0.5) {
+    printf("IS MOVING\n");
+  }else{printf("IS STATIC\n");
+    for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
+  }
+
 }
 
    /* Loop conditions */
@@ -1384,9 +1412,17 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
  IMU_TIME_AND_GNSS_TIMES: %f %f\n", imu_curr_meas.sec, ini_pos_time);
 
 
-
   // printf("Vel NED GNSS: %lf, %lf, %lf\n",ned_ini_vel[0],ned_ini_vel[1],ned_ini_vel[2]);
   // printf("Vel NED INS: %lf, %lf, %lf\n",PVA_prev_sol.v[0],PVA_prev_sol.v[1],PVA_prev_sol.v[2]);
+
+   /* State and covariances to satellite positioning */
+   /* Initialize position from GNSS SPP */
+   for (j=0;j<3;j++) rtk->sol.rr[j]=PVA_prev_sol.r[j];
+   if (PVA_prev_sol.out_errors[6]<=0.0 || PVA_prev_sol.out_errors[7]<=0.0 || \
+    PVA_prev_sol.out_errors[8]<=0.0 ) {
+   }else{
+     for (j=0;j<3;j++) rtk->sol.qr[j]=(1.0/PVA_prev_sol.out_errors[j+6]);
+   }
 
    /* Making GNSS position and velocity be the INS initialization on the next
     processing, instead of the Navigation-derived one */
@@ -1394,33 +1430,6 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    for (j=0;j<3;j++) PVA_prev_sol.v[j]=ned_ini_vel[j];
    PVA_prev_sol.clock_offset_drift[0]=rtk->sol.dtr[0]*CLIGHT;
    PVA_prev_sol.clock_offset_drift[1]=rtk->sol.dtrr;
-
-   /* State and covariances to satellite positioning */
-   /* Initialize position from GNSS SPP */
-   for (j=0;j<3;j++) rtk->sol.rr[j]=PVA_prev_sol.r[j];
-   for (j=0;j<3;j++) rtk->sol.qr[j]=(1.0/PVA_prev_sol.out_errors[j+6]);
-
-
-   /* Velocity from GNSS in case there is no doppler observable */
-   if (rtk->sol.rr[3] <= 0.000001 || rtk->sol.rr[4] <= 0.000000001 || \
-   rtk->sol.rr[5] <= 0.000000001) {
-     /* NO VELOCITY */
-     for (j=0;j<3;j++) vxyz[j]=(xyz_ini_pos[j]-pvagnss.r[j])/(ini_pos_time-pvagnss.sec);
-     ecef2enu(pvagnss.r,vxyz,ned_ini_vel); /* Here is ENU! */
-     //printf("Estimated velocity: %lf %lf %lf\n",ned_ini_vel[0],ned_ini_vel[1],ned_ini_vel[2]);
-   }else{
-     ecef2pos(xyz_ini_pos,llh_pos);
-     ecef2enu(llh_pos,rtk->sol.rr+3,ned_ini_vel); /* Here is ENU! */
-   }
-
-   ecef2pos(xyz_ini_pos,llh_pos);
-   ecef2enu(llh_pos,rtk->sol.rr+3,ned_ini_vel); /* Here is ENU! */
-
-
-
-
-
-
 
    /* Update *//* observation data doppler frequency (Hz) */
    PVA_prev_sol.t_s = time2gpst(rtk->sol.time,NULL); /* time of week in (GPST) */
@@ -1624,6 +1633,36 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
 
 /* Other function call after processing ------------------------------*/
+/*
+double A[8], B[8], C[4]={0.0};
+//A[0]=5.0;A[1]=6.0;
+//A[2]=3.0;A[3]=7.0;
+//B[0]=3.0;B[1]=1.0; // B^T
+//B[2]=2.0;B[3]=5.0;
+
+A[0]=1.0;A[1]=0.0;A[2]=-4.0;A[3]=2.0;
+A[4]=3.0;A[5]=-1.0;A[6]=4.0;A[7]=5.0;
+
+// B^T
+B[0]=6.0;B[1]=7.0;B[2]=-1.0;B[3]=3.0;
+B[4]=-3.0;B[5]=-2.0;B[6]=8.0;B[7]=0.0;
+
+
+matmul("NN",2,2,2,1.0,A,B,0.0,C); // Here is wrong for A*B^T, actualy it is B*A
+for (i = 0; i < 2; i++) {
+  for (j = 0; j < 2; j++) {
+    printf("C[%d]: %lf\t",i*2+j,C[i*2+j]);
+  }
+  printf("\n");
+}
+matmul("TN",2,2,2,1.0,B,A,0.0,C); // Here it is right for A*B^T
+for (i = 0; i < 2; i++) {
+  for (j = 0; j < 2; j++) {
+    printf("C[%d]: %lf\t",i*2+j,C[i*2+j]);
+  }
+  printf("\n");
+}
+*/
 
 /* Adjusting IMU tactical time
 FILE *new=fopen("../data/imu_ascii_new.txt", "w");

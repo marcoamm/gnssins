@@ -342,9 +342,11 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
             sprintf(msg,"lsq error info=%d",info);
             break;
         }
+        printf("Dx_clock_offset: %lf+=%lf - nsat: %d, Valid: %d\n", x[3], dx[3], n, nv);
         for (j=0;j<NX;j++) x[j]+=dx[j];
 
         if (norm(dx,NX)<1E-4) {
+
             sol->type=0;
             sol->time=timeadd(obs[0].time,-x[3]/CLIGHT);
             sol->dtr[0]=x[3]/CLIGHT; /* receiver clock bias (s) */
@@ -519,11 +521,14 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
 
         for (j=0;j<4;j++) x[j]+=dx[j];
 
-        printf("VEL FROM RTKLIB: %lf, %lf, %lf, %lf\n", x[0],x[1],x[2], x[3]);
+        printf("Numb. of sat data: %d, N. of equations: %d\n", n, nv);
+        printf("VEL FROM RTKLIB: %lf, %lf, %lf, %lf\n", x[0],x[1],x[2],x[3]);
         for (i=0;i<3;i++) sol->rr[i+3]=x[i];
         sol->dtrr=x[3];
-        for (j=0;j<3;j++) sol->qrv[j]=(float)Q[j+j*NX];
-        printf("VELunc: %f, %f, %f\n",(float)Q[0+0*NX],(float)Q[1+1*NX],(float)Q[2+2*NX] );
+        for (j=0;j<3;j++) sol->qrv[j]=Q[j+j*NX];
+        sol->qdtrr = Q[3*4+3];
+        printf("VELunc: %lf, %lf, %lf\n",sol->qrv[0],sol->qrv[1],sol->qrv[2]);
+        printf("Clockdriftcov: %lf\n",sol->qdtrr);
 
         if (norm(dx,4)<1E-06) {
 
@@ -595,6 +600,8 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
 
     /* estimate receiver velocity with doppler */
     if (stat) estvel(obs,n,rs,dts,nav,&opt_,sol,azel_,vsat);
+
+    printf("Clock_offset_cov: %lf\n",sol->qdtr);
 
     if (azel) {
         for (i=0;i<n*2;i++) azel[i]=azel_[i];

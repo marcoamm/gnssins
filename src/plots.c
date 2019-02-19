@@ -135,8 +135,8 @@ extern void imuposplot(char* filename){
         "set xrange [-66.675:-66.63] \n"
         "set yrange [45.958:45.963] \n"  // Downtown Interruptions
         "set xrange [-66.64:-66.635] \n"
-        "set yrange [45.932:45.937] \n"  // UNB departure and arrival points
-        "set xrange [-66.650:-66.655] \n"
+        //"set yrange [45.932:45.937] \n"  // Highway
+        //"set xrange [-66.650:-66.655] \n"
 	      "set grid \n", outpath[0]);
 
         // Obstructions: 396546.04 < $1 < , Off-road: 396838.72 - end

@@ -846,11 +846,13 @@ typedef struct {        /* solution type */
     float  qr[6];       /* position variance/covariance (m^2) */
                         /* {c_xx,c_yy,c_zz,c_xy,c_yz,c_zx} or */
                         /* {c_ee,c_nn,c_uu,c_en,c_nu,c_ue} */
-    float qrv[6];        /* velocity covariance */
+    double qrv[6];        /* velocity covariance */
     double dtr[6];      /* receiver clock bias to time systems (s) */
-    float qdtr;         /* receiver clock variance s^2*/
+    double qdtr;         /* receiver clock variance s^2*/
     double dtrr;        /* receiver drift (s/s) */
-    float qdtrr;        /* receiver drift variance (s/s)^2 */
+    double qdtrr;        /* receiver drift variance (s/s)^2 */
+    double prevclk;      /*Previous clock solution*/
+    double prevdrf;      /*Previous drift estimation*/
     unsigned char type; /* type (0:xyz-ecef,1:enu-baseline) */
     unsigned char stat; /* solution status (SOLQ_???) */
     unsigned char ns;   /* number of valid satellites */

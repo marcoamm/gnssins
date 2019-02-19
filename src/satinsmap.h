@@ -154,9 +154,11 @@ typedef struct {        /* Position, velocity and attitude structure (PVA) */
     double v[3]; /* Velocity in n-frame {vn,ve,vd} (m/s) */
     double A[3]; /* Attitude vector xyz {roll,pitch,yaw} (rad) */
     double Cbn[9]; /* Attitude matrix {rad}*/
+    double Cbe[9]; /* Attitude matrix {rad}*/
     double P[9]; /* Attitude [3], velocity [3] and position [3] uncertainties (m^2 / (m/s)^2 rad)*/
     double out_errors[17];  /*(weights) Attitude, velocity, position, acc. and gyro bias, clock offset and drift errors */
     double out_IMU_bias_est[6]; /* Estimated IMU acc. and gyro. bias*/
+    int Nav_or_KF;          /* Navigation sol:0 KF Integrated sol:1   */
 } pva_t;
 
 /* global variables ----------------------------------------------------------*/

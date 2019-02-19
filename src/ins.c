@@ -19,16 +19,12 @@
 * Reference: Chatfiled (1997, pag. 80)
 *----------------------------------------------------------------------------*/
 void appgrav (double* pos, double* gan, double* wiee){
- double ge[3], r[3], pos1[3];
+ double ge[3], r[3];
  double auxvec[3], aux1vec[3], gae[3], Ren[9];
  int i;
 
- pos1[0]=pos[0];
- pos1[1]=pos[1];
- pos1[2]=pos[2];
-
  /* llh to xyz	*/
- pos2ecef(pos1, r);
+ pos2ecef(pos, r);
 
  /* apparent gravity vector in e-frame
  from normal gravity vector at the location and altitude	*/
@@ -40,10 +36,10 @@ void appgrav (double* pos, double* gan, double* wiee){
  for (i=0; i<3;i++){gae[i]=ge[i]-aux1vec[i];}
 
  /* Rotation matrix from e to n-frame	*/
- Ce2n(pos1[0],pos1[1],Ren);
+ Ce2n(pos[0],pos[1],Ren);
 
  /* Local apparent gravity vector in n-frame	*/
- matmul("NN", 3, 1, 3, 1.0, Ren, gae, 0.0, gan);
+ matmul("NN", 1, 3, 3, 1.0, gae, Ren, 0.0, gan);
 
  for (i=0; i<3;i++) gan[i]=-gan[i];
 
@@ -102,50 +98,55 @@ void winncomp(double* r, double* v, double* winn){
 * description: Coarse alignment of roll, pitch and yaw
 * args   : um7pack_t* imu       IO    imu structure
 *	   double* gn	I	local gravity
-*          double v[3]	I	GNSS/or previous state derived velocities {vn, ve, vup}
+           double acc[3]	I	INS accelerations from previous epoch
+*          double v[3]	I	GNSS/or INS/GNSS previous state velocities {vn, ve, vup}
+           gan[3]  I  gravity vector
+           euler_angles[3]  IO  attitude angles in _nb frame
 Reference: Shin (2005, pag.42) and Groves (2013, pages 198 to 199)
 *-----------------------------------------------------------------------------*/
-void coarseAlign(um7pack_t* imu, double* gan)
+//void coarseAlign(um7pack_t* imu, double* gan)
+void coarseAlign(double *acc, double *gyr, double *vel, double *gan, double *euler_angles)
 {
  double r1[9], r2[9], aux[3], sign=1.0;
  double sineyaw, coseyaw;
+
  /* Is it a static or kinematic alignment? Use GNSS velocity or any velocity in imu->v */
- if ( norm(imu->v,3) < 0.5){
-   printf("LEVELLING.STATIC, %lf, %lf, %lf\n", imu->a[0], imu->a[1],imu->a[2]);
+ if ( norm(vel,3) < 0.5){
+   printf("LEVELLING.STATIC, %lf, %lf, %lf\n", acc[0], acc[1],acc[2]);
                                     //static alignment
   /* Then we can solve for the roll(x(phi)) and pitch(y(theta)) angles using accelerometers */
-  //if(imu->a[2]<0.0){sign=-1.0;}
-  //imu->aea[0]= sign*(asin((imu->a[1])/norm(gan,3)));
-  //imu->aea[1]=-sign*(asin((imu->a[0])/norm(gan,3)));
+  //if(acc[2]<0.0){sign=-1.0;}
+  //accea[0]= sign*(asin((acc[1])/norm(gan,3)));
+  //accea[1]=-sign*(asin((acc[0])/norm(gan,3)));
 
   /* Levelling from Groves (2013) */
   /* roll - phi angle */
-  imu->aea[0]= atan2(-imu->a[1],-imu->a[2]);
+  euler_angles[0]= atan2(-acc[1],-acc[2]);
 
   /* pitch - theta angle */
-  imu->aea[1]= atan (-imu->a[0]/sqrt(imu->a[1]*imu->a[1]+imu->a[2]*imu->a[2]));
+  euler_angles[1]= atan (-acc[0]/sqrt(acc[1]*acc[1]+acc[2]*acc[2]));
 
   /* Gyrocompasing by Groves(2013,page 199)  */
   /* yaw - psi angle */
-  sineyaw=-imu->g[1]*cos(imu->aea[0])+imu->g[2]*sin(imu->aea[0]);
-  coseyaw= imu->g[0]*cos(imu->aea[1])+imu->g[1]*sin(imu->aea[0])*sin(imu->aea[1])+\
-  imu->g[2]*cos(imu->aea[0])*sin(imu->aea[1]);
-  imu->aea[2]=atan2(sineyaw,coseyaw);
+  sineyaw=-gyr[1]*cos(euler_angles[0])+gyr[2]*sin(euler_angles[0]);
+  coseyaw= gyr[0]*cos(euler_angles[1])+gyr[1]*sin(euler_angles[0])*sin(euler_angles[1])+\
+  gyr[2]*cos(euler_angles[0])*sin(euler_angles[1]);
+  euler_angles[2]=atan2(sineyaw,coseyaw);
 
 }else{                            //kinematic alignment
  /* Roll can be initialized to zero with an uncertainty of +-5 degrees,
  in most cases, on the road */
- printf("LEVELLING.KINE, %lf, %lf, %lf\n", imu->a[0], imu->a[1],imu->a[2] );
+ printf("LEVELLING.KINE, %lf, %lf, %lf\n", acc[0], acc[1],acc[2] );
 
- imu->aea[0]=0.0;
+ euler_angles[0]=0.0;
 
  /* Levelling from Groves (2013) */
  /* roll - phi angle */
- imu->aea[0]= atan2(-imu->a[1],-imu->a[2]); /* CORRECT IT LATER*/
+ euler_angles[0]= atan2(-acc[1],-acc[2]); /* CORRECT IT LATER*/
 
  /* The pitch(y(theta)) and heading(z(psi)) angles using velocities */
- imu->aea[1]= atan(imu->v[2]/sqrt(imu->v[0]*imu->v[0]+imu->v[1]*imu->v[1]));
- imu->aea[2]= atan(imu->v[2]/imu->v[1]);
+ euler_angles[1]= atan(vel[2]/sqrt(vel[0]*vel[0]+vel[1]*vel[1]));
+ euler_angles[2]= atan(vel[2]/vel[1]);
  /* Can be improved using an EKF with LHU model, see Shin (2005) chapter 3	*/
  }
 
@@ -1701,7 +1702,8 @@ extern int insnav (rtk_t *rtk, um7pack_t *imu, pva_t *pvap, imuraw_t *imuobsp)
       if (norm(pvap->A,3)==0.0) {
       //  printf("HERE1\n");
         /* Levelling and gyrocompassing, update imu->aea[] vector */
-        coarseAlign(imu, gan);
+        coarseAlign(imu->a, imu->g, imu->v, gan, imu->aea);
+        //coarseAlign(imu, gan);
       }else{
       //  printf("HERE2\n");
         for (i=0;i<3;i++) imuprev.aea[i]=pvap->A[i];
@@ -1925,7 +1927,8 @@ extern int insnav1 (double* gnss_xyz_ini_pos, double* gnss_enu_vel,
      /* Coarse alignment or use of previous solution */
       if (norm(pvap->A,3) == 0.0 || norm(pvap->r,3) == 0.0) {
         /* Levelling and gyrocompassing, update imu_curr_meas->aea[] vector */
-        coarseAlign(imu_curr_meas, gan);
+        //coarseAlign(imu_curr_meas, gan);
+        coarseAlign(imu_curr_meas->a, imu_curr_meas->g, imu_curr_meas->v, gan, imu_curr_meas->aea);
         /* Initial rotation matrix from e to n-frame */
         Cb2n(imu_curr_meas->aea[0],imu_curr_meas->aea[1],imu_curr_meas->aea[2],old_C_b_n);
       }else{
@@ -1936,7 +1939,8 @@ extern int insnav1 (double* gnss_xyz_ini_pos, double* gnss_enu_vel,
         /* Heading use only */
         //imuprev.aea[2]=pvap->A[2];
         /* Using previous meas to initialize  */
-        coarseAlign(&imuprev, gan);
+        coarseAlign(&imuprev.a, &imuprev.g, &imuprev.v, gan, &imuprev.aea);
+        //coarseAlign(&imuprev, gan);
         /* Initial rotation matrix from e to n-frame */
         Cb2n(imuprev.aea[0],imuprev.aea[1],imuprev.aea[2],old_C_b_n);
       }
