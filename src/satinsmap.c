@@ -446,6 +446,28 @@ extern void vec2skew (double *vec, double *W){
   W[6]=-vec[1]; W[7]= vec[0]; W[8]= 0.0;
 }
 
+/* matl2c */
+/* matl2c ----------------------------------------------------------------------
+* description: converts a matrix A (l by c) into A (l by c) in column-major
+order, or tranpose A
+* GNSS solutions
+* args :
+*       double*   A_l  I  matrix in line-order (l by c)
+*       int       l    I  number of lines
+*       int       c    I  number of columns
+*       double*   A_c  IO matrix converted into column-order (l by c)
+*-----------------------------------------------------------------------------*/
+extern void matl2c(double *A_l, int l, int c, double *A_c){
+  int i,j;
+
+  for (i=0;i<l;i++) {
+    for (j=0;j<c;j++) {
+      A_c[i*c+j]=A_l[j*l+i];
+    }
+  }
+
+}
+
 /* Check if GNSS and IMU measurements are synchronized
    return 1 if yes, 0 if is not, status=-1 if GNSS time behing IMU ----------------*/
 int gnssimusync(float tgps, um7pack_t *imu){
@@ -1225,7 +1247,7 @@ gnss_xyz_ini_cov[1],gnss_xyz_ini_cov[2],gnss_vel_cov[0],gnss_vel_cov[1],gnss_vel
    sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &imu_curr_meas.sec, &imu_curr_meas.a[2],\
    &imu_curr_meas.a[1],&imu_curr_meas.a[0], &imu_curr_meas.g[2],&imu_curr_meas.g[1],\
    &imu_curr_meas.g[0]);
-   imu_curr_meas.status=1;    
+   imu_curr_meas.status=1;
 
    /* raw acc. to m/s*s and rate ve locity from degrees to radians */
    for (j= 0;j<3;j++) imu_curr_meas.a[j]=imu_curr_meas.a[j]*G;
@@ -1617,8 +1639,8 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 /* Start rnx2rtkp processing  ----------------------------------- --*/
 /* Processing ------------------------------------------------------*/
 
-  ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
-  if (!ret) fprintf(stderr,"%40s\r","");
+//  ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
+//  if (!ret) fprintf(stderr,"%40s\r","");
 
  /* Closing global files */
   //fclose(fp_lane);
@@ -1633,22 +1655,27 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
 
 /* Other function call after processing ------------------------------*/
-/*
+/**/
+
 double A[8], B[8], C[4]={0.0};
-//A[0]=5.0;A[1]=6.0;
-//A[2]=3.0;A[3]=7.0;
+A[0]=5.0;A[1]=6.0;
+A[2]=3.0;A[3]=7.0;
+B[0]=3.0;B[1]=2.0; // B^T
+B[2]=1.0;B[3]=5.0;
 //B[0]=3.0;B[1]=1.0; // B^T
 //B[2]=2.0;B[3]=5.0;
 
-A[0]=1.0;A[1]=0.0;A[2]=-4.0;A[3]=2.0;
-A[4]=3.0;A[5]=-1.0;A[6]=4.0;A[7]=5.0;
+//A[0]=1.0;A[1]=0.0;A[2]=-4.0;A[3]=2.0;
+//A[4]=3.0;A[5]=-1.0;A[6]=4.0;A[7]=5.0;
 
 // B^T
-B[0]=6.0;B[1]=7.0;B[2]=-1.0;B[3]=3.0;
-B[4]=-3.0;B[5]=-2.0;B[6]=8.0;B[7]=0.0;
+//B[0]=6.0;B[1]=7.0;B[2]=-1.0;B[3]=3.0;
+//B[4]=-3.0;B[5]=-2.0;B[6]=8.0;B[7]=0.0;
 
 
-matmul("NN",2,2,2,1.0,A,B,0.0,C); // Here is wrong for A*B^T, actualy it is B*A
+//matmul("NN",2,2,2,1.0,A,B,0.0,C); // Here is wrong for A*B^T, actualy it is B*A
+matmul_line("NN",2,2,2,1.0,A,B,0.0,C);
+
 for (i = 0; i < 2; i++) {
   for (j = 0; j < 2; j++) {
     printf("C[%d]: %lf\t",i*2+j,C[i*2+j]);
@@ -1662,7 +1689,7 @@ for (i = 0; i < 2; i++) {
   }
   printf("\n");
 }
-*/
+
 
 /* Adjusting IMU tactical time
 FILE *new=fopen("../data/imu_ascii_new.txt", "w");
