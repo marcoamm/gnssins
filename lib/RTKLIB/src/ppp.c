@@ -239,7 +239,7 @@ static void tide_oload(gtime_t tut, const double *odisp, double *denu)
     time2epoch(tut,ep);
     fday=ep[3]*3600.0+ep[4]*60.0+ep[5];
     ep[3]=ep[4]=ep[5]=0.0;
-    days=timediff(epoch2time(ep),epoch2time(ep1975))/86400.0;
+    days=timediff(epoch2time(ep),epoch2time(ep1975))/86400.0+1.0;
     t=(27392.500528+1.000000035*days)/36525.0;
     t2=t*t; t3=t2*t;
 
@@ -929,16 +929,6 @@ static int res_ppp1(int iter, const obsd_t *obs, int n, const double *rs,
 
         for (k = 0; k <3; k++) rr[k]=mmcand[p*3+k];
 
-        /* earth tides correction */
-        if (opt->tidecorr) {
-            tideopt=opt->tidecorr==1?1:7; /* 1:solid, 2:solid+otl+pole */
-
-            tidedisp(gpst2utc(obs[0].time),rr,tideopt,&nav->erp,opt->odisp[0],
-                     disp);
-            for (k=0;k<3;k++) rr[k]+=disp[k];
-        }
-
-        ecef2pos(rr,pos);
 
         if (!(sys=satsys(sat,NULL))||!rtk->ssat[sat-1].vs) continue;
 
@@ -990,48 +980,48 @@ static int res_ppp1(int iter, const obsd_t *obs, int n, const double *rs,
         for (j=0;j<2;j++) { /* for phase and code */
 
             if (meas[j]==0.0) continue;
-
-            for (k=0;k<nx;k++) H1=0.0;
-
-            v1[nv1]=meas[j]-r;
-
-            for (k=0;k<3;k++) H1=-e[k];
-
+            
+            for (k=0;k<nx;k++) H[k+nx*nv]=0.0;
+            
+            v[nv]=meas[j]-r;
+            
+            for (k=0;k<3;k++) H[k+nx*nv]=-e[k];
+            
             if (sys!=SYS_GLO) {
-                v1[nv1]-=x[IC(0,opt)];
-                H1=1.0;
+                v[nv]-=x[IC(0,opt)];
+                H[IC(0,opt)+nx*nv]=1.0;
             }
             else {
                 v1[nv1]-=x[IC(1,opt)];
-                H1=1.0;
+                H[IC(1,opt)+nx*nv]=1.0;
             }
             if (opt->tropopt>=TROPOPT_EST) {
                 for (k=0;k<(opt->tropopt>=TROPOPT_ESTG?3:1);k++) {
-                    H1=dtdx[k];
+                    H[IT(opt)+k+nx*nv]=dtdx[k];
                 }
             }
             if (j==0) {
-                v1[nv1]-=x[IB(obs[i].sat,opt)];
-                H1=1.0;
+                v[nv]-=x[IB(obs[i].sat,opt)];
+                H[IB(obs[i].sat,opt)+nx*nv]=1.0;
             }
-        //    var1=varerr(obs[i].sat,sys,azel[1+i*2],j,opt)+varm[j]+vare[i]+vart;
-
-        //    if (j==0) rtk->ssat[sat-1].resc[0]=v1[nv1];
-        //    else      rtk->ssat[sat-1].resp[0]=v1[nv1];
-
+            var[nv]=varerr(obs[i].sat,sys,azel[1+i*2],j,opt)+varm[j]+vare[i]+vart;
+            
+            if (j==0) rtk->ssat[sat-1].resc[0]=v[nv];
+            else      rtk->ssat[sat-1].resp[0]=v[nv];
+            
             /* test innovation */
 #if 0
             if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno) {
 #else
-            if (opt->maxinno>0.0&&fabs(v1[nv1])>opt->maxinno&&sys!=SYS_GLO) {
+            if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno&&sys!=SYS_GLO) {
 #endif
                 trace(2,"ppp outlier rejected %s sat=%2d type=%d v=%.3f\n",
-                      time_str(obs[i].time,0),sat,j,v1[nv1]);
-              //  rtk->ssat[sat-1].rejc[0]++;
+                      time_str(obs[i].time,0),sat,j,v[nv]);
+                rtk->ssat[sat-1].rejc[0]++;
                 continue;
             }
-          //  if (j==0) rtk->ssat[sat-1].vsat[0]=1;
-            nv1++;
+            if (j==0) rtk->ssat[sat-1].vsat[0]=1;
+            nv++;
         } // Phase and code loop (j)
 
       // printf("vL: %lf, vP: %lf\n", v1[nv1-2],v1[nv1-1]);
