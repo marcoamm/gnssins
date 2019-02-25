@@ -279,7 +279,7 @@ static int rescode(int iter, const obsd_t *obs, int n, const double *rs,
 /* validate solution ---------------------------------------------------------*/
 static int valsol(const double *azel, const int *vsat, int n,
                   const prcopt_t *opt, const double *v, int nv, int nx,
-                  char *msg)
+                  char *msg, sol_t *sol)
 {
     double azels[MAXOBS*2],dop[4],vv;
     int i,ns;
@@ -300,6 +300,7 @@ static int valsol(const double *azel, const int *vsat, int n,
         ns++;
     }
     dops(ns,azels,opt->elmin,dop);
+    for (i=0;i<4;i++) sol->gdop[i]=dop[i];
     if (dop[0]<=0.0||dop[0]>opt->maxgdop) {
         sprintf(msg,"gdop error nv=%d gdop=%.1f",nv,dop[0]);
         return 0;
@@ -363,7 +364,7 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
             sol->age=sol->ratio=0.0;
 
             /* validate solution */
-            if ((stat=valsol(azel,vsat,n,opt,v,nv,NX,msg))) {
+            if ((stat=valsol(azel,vsat,n,opt,v,nv,NX,msg,sol))) {
                 sol->stat=opt->sateph==EPHOPT_SBAS?SOLQ_SBAS:SOLQ_SINGLE;
             }
             free(v); free(H); free(var);
@@ -521,14 +522,13 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
 
         for (j=0;j<4;j++) x[j]+=dx[j];
 
-        printf("Numb. of sat data: %d, N. of equations: %d\n", n, nv);
-        printf("VEL FROM RTKLIB: %lf, %lf, %lf, %lf\n", x[0],x[1],x[2],x[3]);
+        /* Getting values here in case they don't pass the threshold */
         for (i=0;i<3;i++) sol->rr[i+3]=x[i];
-        sol->dtrr=x[3];
-        for (j=0;j<3;j++) sol->qrv[j]=Q[j+j*NX];
+        sol->dtrr=x[3];for (j=0;j<3;j++) sol->qrv[j]=Q[j+j*4];
+        sol->qrv[3]=Q[1];    /* cov xy */
+        sol->qrv[4]=Q[2+4]; /* cov yz */
+        sol->qrv[5]=Q[2];    /* cov zx */
         sol->qdtrr = Q[3*4+3];
-        printf("VELunc: %lf, %lf, %lf\n",sol->qrv[0],sol->qrv[1],sol->qrv[2]);
-        printf("Clockdriftcov: %lf\n",sol->qdtrr);
 
         if (norm(dx,4)<1E-06) {
 
@@ -536,10 +536,10 @@ static void estvel(const obsd_t *obs, int n, const double *rs, const double *dts
 
             sol->dtrr=x[3];
 
-            for (j=0;j<3;j++) sol->qrv[j]=(float)Q[j+j*NX];
-            sol->qrv[3]=(float)Q[1];    /* cov xy */
-            sol->qrv[4]=(float)Q[2+NX]; /* cov yz */
-            sol->qrv[5]=(float)Q[2];    /* cov zx */
+            for (j=0;j<3;j++) sol->qrv[j]=Q[j+j*4];
+            sol->qrv[3]=Q[1];    /* cov xy */
+            sol->qrv[4]=Q[2+4]; /* cov yz */
+            sol->qrv[5]=Q[2];    /* cov zx */
             sol->qdtrr = Q[3*4+3];
             break;
         }

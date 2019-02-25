@@ -39,7 +39,7 @@ void appgrav (double* pos, double* gan, double* wiee){
  Ce2n(pos[0],pos[1],Ren);
 
  /* Local apparent gravity vector in n-frame	*/
- matmul("NN", 1, 3, 3, 1.0, gae, Ren, 0.0, gan);
+ matmul_row("NN", 3, 1, 3, 1.0, Ren, gae, 0.0, gan);
 
  for (i=0; i<3;i++) gan[i]=-gan[i];
 

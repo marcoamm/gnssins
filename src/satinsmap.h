@@ -99,6 +99,9 @@ extern "C" {
  (X)[6]=0;        (X)[7]=0;        (X)[8]=0;\
 } while (0)
 
+#define matmul_row(tr, n, k,  m, alpha, A, B, beta, C) \
+        matmul(tr, k, n, m, alpha, B, A, beta, C)
+
 /* type definitions ----------------------------------------------------------*/
 
 typedef struct {        /* Reference Lane record */

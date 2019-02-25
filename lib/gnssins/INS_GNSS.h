@@ -147,6 +147,7 @@ typedef struct {      /* Tighlty coupled Kalman Filter configuration */
  float init_att_unc[3];           /* Initial attitude uncertainty per axis (rad) */
  float init_vel_unc[3];           /* Initial velocity uncertainty per axis (m/s) */
  float init_pos_unc[3];           /* Initial position uncertainty per axis (m) */
+ double init_pos_unc_ned[3];           /* Initial position uncertainty per axis (m) in NED */
  double init_b_a_unc;           /* Initial accel. bias uncertainty (m/s^2) */
  double init_b_g_unc;           /* Initial gyro. bias uncertainty (rad/s) */
  float init_clock_offset_unc;  /* Initial clock offset uncertainty per axis (m) */

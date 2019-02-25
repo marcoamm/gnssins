@@ -868,6 +868,29 @@ extern void matcpy(double *A, const double *B, int n, int m)
 
 #ifdef LAPACK /* with LAPACK/BLAS or MKL */
 
+
+extern void matmul_line(const char *tr, int n, int k, int m, double alpha,
+                   const double *A, const double *B, double beta, double *C)
+{
+    int lda=tr[0]=='T'?m:n,ldb=tr[1]=='T'?k:m;
+    double *A_c, *B_c, *C_c;
+    int i,j;
+
+    A_c=mat(n,m); B_c=mat(m,k);C_c=mat(n,k);
+
+    matl2c(A, n, m, A_c);
+    matl2c(B, m, k, B_c);
+
+    dgemm_((char *)tr,(char *)tr+1,&n,&k,&m,&alpha,(double *)A_c,&lda,(double *)B_c,
+          &ldb,&beta,C_c,&n);
+
+    matl2c(C_c, n, k, C);
+
+    free(A_c); free(B_c); free(C_c);
+
+
+}
+
 /* multiply matrix (wrapper of blas dgemm) -------------------------------------
 * multiply matrix by matrix (C=alpha*A*B+beta*C)
 * args   : char   *tr       I  transpose flags ("N":normal,"T":transpose)
@@ -882,8 +905,6 @@ extern void matmul(const char *tr, int n, int k, int m, double alpha,
                    const double *A, const double *B, double beta, double *C)
 {
     int lda=tr[0]=='T'?m:n,ldb=tr[1]=='T'?k:m;
-
-    printf("THIS.ONE??\n");
 
     dgemm_((char *)tr,(char *)tr+1,&n,&k,&m,&alpha,(double *)A,&lda,(double *)B,
            &ldb,&beta,C,&n);
@@ -933,30 +954,7 @@ extern int solve(const char *tr, const double *A, const double *Y, int n,
 #else /* without LAPACK/BLAS or MKL */
 
 /* multiply matrix -----------------------------------------------------------*/
-extern void matmul_line(const char *tr, int n, int k, int m, double alpha,
-                   const double *A, const double *B, double beta, double *C)
-{
-    double d;
-    int i,j,x,f=tr[0]=='N'?(tr[1]=='N'?1:2):(tr[1]=='N'?3:4);
-    double *A_c, *B_c;
 
-    A_c=mat(n,m); B_c=mat(m,k);
-    matl2c(A, n, m, A_c);
-    matl2c(B, m, k, B_c);
-
-    for (i=0;i<n;i++) for (j=0;j<k;j++) {
-        d=0.0;
-        switch (f) {
-            case 1: for (x=0;x<m;x++) d+=A_c[i+x*n]*B_c[x+j*m]; break;
-            case 2: for (x=0;x<m;x++) d+=A_c[i+x*n]*B_c[j+x*k]; break;
-            case 3: for (x=0;x<m;x++) d+=A_c[x+i*m]*B_c[x+j*m]; break;
-            case 4: for (x=0;x<m;x++) d+=A_c[x+i*m]*B_c[j+x*k]; break;
-        }
-        if (beta==0.0) C[i+j*n]=alpha*d; else C[i+j*n]=alpha*d+beta*C[i+j*n];
-    }
-
-    free(A_c); free(B_c);
-}
 
 /* multiply matrix -----------------------------------------------------------*/
 extern void matmul(const char *tr, int n, int k, int m, double alpha,
