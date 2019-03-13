@@ -1282,6 +1282,9 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     for (j= 0;j<3;j++) imu_curr_meas.a[j]=imu_curr_meas.a[j]*G;
     for (j=0;j<3;j++) imu_curr_meas.g[j]=imu_curr_meas.g[j]*D2R;
 
+    /* IMU was mounted with Z axis towards up */
+    imu_curr_meas.a[2] = -imu_curr_meas.a[2];
+
     /* Turn-on initial biases             //city collection
   imu_curr_meas.a[0]=imu_curr_meas.a[0]-0.4453528;
   imu_curr_meas.a[1]=imu_curr_meas.a[1]-1.162248;;
@@ -1478,10 +1481,14 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
 
   /* Output PVA solution */
-  fprintf(out_PVA,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",\
-  PVA_prev_sol.sec, llh_pos[0]*R2D, llh_pos[1]*R2D, llh_pos[2],\
-  PVA_prev_sol.v[0], PVA_prev_sol.v[1], PVA_prev_sol.v[2],
-  PVA_prev_sol.A[0]*R2D,PVA_prev_sol.A[1]*R2D,PVA_prev_sol.A[2]*R2D );
+  if (PVA_prev_sol.sec<0.0) {
+  }else{
+    fprintf(out_PVA,"%lf %.12lf %.12lf %lf %lf %lf %lf %lf %lf %lf\n",\
+    PVA_prev_sol.sec, llh_pos[0]*R2D, llh_pos[1]*R2D, llh_pos[2],\
+    PVA_prev_sol.v[0], PVA_prev_sol.v[1], PVA_prev_sol.v[2],
+    PVA_prev_sol.A[0]*R2D,PVA_prev_sol.A[1]*R2D,PVA_prev_sol.A[2]*R2D );
+  }
+
 
   /* Update measurements */
   for (j=0;j<3;j++){
@@ -1493,12 +1500,11 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   //Stationary detection for next iteration
   /* Stationary-condition  */
-  if (norm(PVA_prev_sol.v,3) > 0.5) {
+  if (norm(PVA_prev_sol.v,3) > 0.04) {
     printf("IS MOVING\n");
   }else{printf("IS STATIC\n");
     for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
   }
-
 
 } // end if else If INS time is ahead of GNSS exit INS loop condition
 
@@ -1537,12 +1543,12 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     }else{
    /* INS and GNSS times are synchronized */
    /* State and covariances to satellite positioning */
-   for (j=0;j<3;j++) rtk->sol.rr[j]=PVA_prev_sol.r[j];
+   //for (j=0;j<3;j++) rtk->sol.rr[j]=PVA_prev_sol.r[j];
    if (PVA_prev_sol.out_errors[6]<=0.0 || PVA_prev_sol.out_errors[7]<=0.0 || \
     PVA_prev_sol.out_errors[8]<=0.0 ) {
 
    }else{
-       for (j=0;j<3;j++) rtk->sol.qr[j]=(1.0/PVA_prev_sol.out_errors[j+6]);
+       //for (j=0;j<3;j++) rtk->sol.qr[j]=(1.0/PVA_prev_sol.out_errors[j+6]);
      }
    }
    /* Making GNSS position and velocity be the INS initialization on the next
@@ -1610,7 +1616,7 @@ int argc; // Size of file or options?
 
 strcpy(filopt.trace,tracefname);
 
-/* Global TC_KF_INS_GNSS output files  */
+/* Global TC_KF_INS_GNSS output files */
 out_PVA=fopen("../out/out_PVA.txt","w");
 out_clock_file=fopen("../out/out_clock_file.txt","w");
 out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");

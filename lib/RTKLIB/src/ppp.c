@@ -1738,9 +1738,4 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     free(rs); free(dts); free(var); free(azel);
     free(xp); free(Pp); free(v); free(H); free(R);
 
-    for (i=0;i<n;i++) {
-        j=IB(obs[i].sat,&rtk->opt);
-      //  fprintf(fp1,"%lf %d %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), j+1,rtk->x[j],sqrt(rtk->P[j+j*rtk->nx]));
-    }
-    //fclose(fp1);
 }

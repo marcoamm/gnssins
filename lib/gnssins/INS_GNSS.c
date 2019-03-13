@@ -3515,9 +3515,11 @@ printf("\n *****************  NAV_EQUATIONS BEGINS ************************\n");
         meas_omega_ib_b, est_r_eb_e, est_v_eb_e, est_C_b_e);
 printf("\n *****************  NAV_EQUATIONS ENDS **************************\n");
 
+  printf("Norm of en_uncert.: t: %lf norm: %lf\n", GNSS_measurements->sec, norm(TC_KF_config->init_pos_unc_ned, 2));
+
     /* Determine whether to run Kalman filter */
   if ( fabs(GNSS_measurements->sec - INS_measurements->sec) < 0.0001 \
-   &&  GNSS_measurements[0].gdop[0]<2.5 && no_GNSS_meas>=4) {   //gdops: 2.4,2.8
+   &&  GNSS_measurements[0].gdop[0]<2.5 && no_GNSS_meas>=4 && norm(TC_KF_config->init_pos_unc_ned, 2)<3.0) {   //gdops: 2.4,2.8
      //no_GNSS_meas>=4 && norm(TC_KF_config->init_pos_unc_ned, 2)<4.0 &&
 
       /* KF time interval */
@@ -3552,6 +3554,10 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
       est_clock_new[1]);
 
       for (i = 0; i < 6; i++) out_IMU_bias_est[i]=est_IMU_bias_new[i];
+
+      fprintf(out_IMU_bias_file,"%lf %lf %lf %lf %.10lf %.10lf %.10lf\n", time, \
+      out_IMU_bias_est[0],out_IMU_bias_est[1],out_IMU_bias_est[2],\
+      out_IMU_bias_est[3],out_IMU_bias_est[4], out_IMU_bias_est[5] );
 
 
       /* Generate KF uncertainty output record */
@@ -3590,11 +3596,6 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
       pvat_new->Nav_or_KF=0;
 
     }
-
-
-    fprintf(out_IMU_bias_file,"%lf %lf %lf %lf %.10lf %.10lf %.10lf\n", time, \
-    out_IMU_bias_est[0],out_IMU_bias_est[1],out_IMU_bias_est[2],\
-    out_IMU_bias_est[3],out_IMU_bias_est[4], out_IMU_bias_est[5] );
 
     /* Convert navigation solution to NED  */
     ECEF_to_NED(est_r_eb_e_new,est_v_eb_e_new,est_C_b_e_new,\
@@ -3813,7 +3814,7 @@ printf("dtr, dtrs: %lf, %lf\n", PVA_old->clock_offset_drift[0],PVA_old->clock_of
 * return : what does it return?
 * notes  :
 *-----------------------------------------------------------------------------*/
-//int main (void){
+//int main (void){ 
 //int InsGnssCore (){ LATER, WHEN LINKED TO OTHER MAIN FUNCTION USE IT THIS WAY
 extern void TC_INS_GNSS_core(rtk_t *rtk, const obsd_t *obs, int n,\
   const nav_t *nav, um7pack_t *imu_data, double imu_time_diff, double *gnss_ned_cov, \

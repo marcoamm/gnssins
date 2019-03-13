@@ -124,7 +124,7 @@ extern void imuposplot(char* filename){
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s positions_genral_gdop2_5.ps'\n"
+	      "set output '%s positions_downtown_gdop2_5.ps'\n"
         /* General view  */
         "set yrange [45.942:45.9432] \n"  //BMO field general view
         "set xrange [-66.6418:-66.6402] \n"
@@ -134,8 +134,8 @@ extern void imuposplot(char* filename){
         //"set autoscale \n"
         "set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
         "set xrange [-66.675:-66.63] \n"
-        //"set yrange [45.958:45.963] \n"  // Downtown Interruptions
-        //"set xrange [-66.64:-66.635] \n"
+        "set yrange [45.955:45.965] \n"  // Downtown Interruptions
+        "set xrange [-66.645:-66.635] \n"
         //"set yrange [45.932:45.937] \n"  // Highway
         //"set xrange [-66.650:-66.655] \n"
         //"set yrange [45.95:45.955] \n"  // UNB parking lot
@@ -150,7 +150,7 @@ extern void imuposplot(char* filename){
        // With points: w points pointtype 1.4
 /**/
   //PPP_car_back(copy).pos  PPP_bmo(copy).pos
-  fprintf(gp,"plot '../out/PPP_car_back(copy).pos' u ($4):($3) with points pointsize 0.4 lt 3 title \" PPP \", \
+  fprintf(gp,"plot '../out/PPP_car_back(copy).pos' u ($4):($3) w lp pointsize 0.4 lt 3 title \" PPP \", \
    '%s' u ($3):($2) w lp lt 2 pt 1 ps 0.2 title \" ins/gnss position \"", filename);
 /*
   fprintf(gp,"plot '../data/Lanes_5_llh.csv' u ($2):($1) with points pointtype 1.4 ps 0.3 lc rgb \"red\" title \" Ground-truth \" ,\
