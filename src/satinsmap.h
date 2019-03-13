@@ -114,7 +114,7 @@ typedef struct {        /* Reference Lane record */
 
 typedef struct {        /* UM7 sensor package records */
     int count; 		/* Flag for type of data, 0:gyro,1:accelerometer,2:magnetometer */
-    double internal_time; /* amount of time in seconds since the sensor was on */
+    float internal_time; /* amount of time in seconds since the sensor was on */
     double sec;		/*  If GPS is connected, this is synchronized to UTC time of day
 			(in seconds of the week) 		*/
     int gpsw;		/* GPS week	*/
@@ -158,7 +158,7 @@ typedef struct {        /* Position, velocity and attitude structure (PVA) */
     double A[3]; /* Attitude vector xyz {roll,pitch,yaw} (rad) */
     double Cbn[9]; /* Attitude matrix {rad}*/
     double Cbe[9]; /* Attitude matrix {rad}*/
-    double P[9]; /* Attitude [3], velocity [3] and position [3] uncertainties (m^2 / (m/s)^2 rad)*/
+    double P[17*17]; /* Full TC KF weight matrix (and LC KF P[15*15])*/
     double out_errors[17];  /*(weights) Attitude, velocity, position, acc. and gyro bias, clock offset and drift errors */
     double out_IMU_bias_est[6]; /* Estimated IMU acc. and gyro. bias*/
     int Nav_or_KF;          /* Navigation sol:0 KF Integrated sol:1   */
@@ -176,6 +176,8 @@ extern FILE *out_PVA;
 extern FILE *out_clock_file;
 extern FILE *out_IMU_bias_file;
 extern FILE *out_KF_SD_file;
+extern FILE *out_KF_state_error;
+extern FILE *out_KF_residuals;
 extern FILE *imu_tactical;
 //fp_lane=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes1_XYZ_2016_ITRF08.txt","r");
        /* Lane coordinate file pointer */
@@ -239,6 +241,13 @@ extern void KF_vel_stds_plot(char* filename);
 extern void KF_pos_stds_plot(char* filename);
 extern void imugyrobiasplot(char* filename);
 extern void KF_clock_plot(char* filename);
+extern void KF_state_errors_plot_att(char* filename);
+extern void KF_state_errors_plot_vel(char* filename);
+extern void KF_state_errors_plot_pos(char* filename);
+extern void KF_state_errors_plot_accb(char* filename);
+extern void KF_state_errors_plot_gyrb(char* filename);
+extern void KF_state_errors_plot_clk(char* filename);
+extern void KF_residuals_plot_att(char* filename);
 extern void nsat ();
 
 /* geodetic and positioning functions ----------------------------------------*/

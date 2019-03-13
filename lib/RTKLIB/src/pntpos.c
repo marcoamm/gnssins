@@ -601,7 +601,6 @@ extern int pntpos(const obsd_t *obs, int n, const nav_t *nav,
     /* estimate receiver velocity with doppler */
     if (stat) estvel(obs,n,rs,dts,nav,&opt_,sol,azel_,vsat);
 
-    printf("Clock_offset_cov: %lf\n",sol->qdtr);
 
     if (azel) {
         for (i=0;i<n*2;i++) azel[i]=azel_[i];

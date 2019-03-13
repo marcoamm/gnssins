@@ -103,7 +103,8 @@ extern void imueulerplot(char* filename){
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s euler_angles.ps'\n"
 	      //"set autoscale \n"
-        "set xrange [242141.328125:244778.140625] \n"
+        "set xrange [242141.328125:244778.140625] \n"  // city collection
+        //"set xrange [394477.000:397062.000] \n"  //bmo collection
 	      "set grid \n", outpath[0]);
 
   /* printing Euler angles */
@@ -123,7 +124,7 @@ extern void imuposplot(char* filename){
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s positions_higway.ps'\n"
+	      "set output '%s positions_genral_gdop2_5.ps'\n"
         /* General view  */
         "set yrange [45.942:45.9432] \n"  //BMO field general view
         "set xrange [-66.6418:-66.6402] \n"
@@ -137,12 +138,19 @@ extern void imuposplot(char* filename){
         //"set xrange [-66.64:-66.635] \n"
         //"set yrange [45.932:45.937] \n"  // Highway
         //"set xrange [-66.650:-66.655] \n"
+        //"set yrange [45.95:45.955] \n"  // UNB parking lot
+        //"set xrange [-66.645:-66.640] \n"
+        //"set yrange [45.945:45.955] \n"  // UNB parking lot 2
+        //"set xrange [-66.65:-66.64] \n"
+        //"set yrange [45.97:45.98] \n"  // Northside
+        //"set xrange [-66.645:-66.635] \n"
 	      "set grid \n", outpath[0]);
 
         // Obstructions: 396546.04 < $1 < , Off-road: 396838.72 - end
        // With points: w points pointtype 1.4
 /**/
-  fprintf(gp,"plot '../out/PPP_car_back(copy).pos' u ($4):($3) with points pointsize 0.4 lt 3 title \" SPP \", \
+  //PPP_car_back(copy).pos  PPP_bmo(copy).pos
+  fprintf(gp,"plot '../out/PPP_car_back(copy).pos' u ($4):($3) with points pointsize 0.4 lt 3 title \" PPP \", \
    '%s' u ($3):($2) w lp lt 2 pt 1 ps 0.2 title \" ins/gnss position \"", filename);
 /*
   fprintf(gp,"plot '../data/Lanes_5_llh.csv' u ($2):($1) with points pointtype 1.4 ps 0.3 lc rgb \"red\" title \" Ground-truth \" ,\
@@ -184,10 +192,11 @@ extern void imuvelplot(char* filename){
   /* Gnuplot plot commands   - PLotting INS data  */
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'VELOCITIES (m/s)' \n"
-	      "set yrange [-20:20] \n"
+	      "set yrange [-40:40] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s velocities.ps'\n"
-        "set xrange [242141.328125:244778.140625] \n"
+        "set xrange [242141.328125:244778.140625] \n"  // city collection
+        //"set xrange [394477.000:397062.000] \n"  //bmo collection
 	      //"set autoscale \n"
         //"set yrange [-10:10] \n"
 	      "set grid \n", outpath[0]);
@@ -210,7 +219,7 @@ extern void imuaccbiasplot(char* filename){
 	      "set yrange [-0.05:0.05] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s IMU_acc_bias.ps'\n"
-	      //"set autoscale \n"
+	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($2) w l title \"acc. bias x\" ,\
@@ -231,7 +240,7 @@ extern void imugyrobiasplot(char* filename){
 	      "set yrange [-0.05:0.05] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s IMU_gyro_bias.ps'\n"
-	      //"set autoscale \n"
+	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($5) w l title \"gyr. bias x\" ,\
@@ -249,10 +258,10 @@ extern void KF_att_stds_plot(char* filename){
   /* Gnuplot plot commands   - PLotting INS data  */
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'ATTITUDE STDs' \n"
-	      "set yrange [0:2] \n"
+	      "set yrange [0:0.5] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_att_std.ps'\n"
-	      //"set autoscale \n"
+	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($2) w l title \"roll(x) std\" ,\
@@ -270,10 +279,10 @@ extern void KF_vel_stds_plot(char* filename){
   /* Gnuplot plot commands   - PLotting INS data  */
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'VELOCITY STDs' \n"
-	      "set yrange [0:2] \n"
+	      "set yrange [0:0.5] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_vel_std.ps.ps'\n"
-	      //"set autoscale \n"
+	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($5) w l title \"x vel. std\" ,\
@@ -291,10 +300,10 @@ extern void KF_pos_stds_plot(char* filename){
   /* Gnuplot plot commands   - PLotting INS data  */
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'POSITION STDs' \n"
-	      "set yrange [0:2] \n"
+	      "set yrange [0:0.5] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_pos_std.ps'\n"
-	      //"set autoscale \n"
+	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($8) w l title \"lat. std\" ,\
@@ -325,6 +334,218 @@ extern void KF_clock_plot(char* filename){
  return;
 }
 
+extern void KF_state_errors_plot_att(char* filename){
+ FILE * gp = popen ("gnuplot -persistent", "w");
+
+  /* Gnuplot plot commands   - PLotting INS data  */
+  fprintf(gp, "set xlabel 'TIME(s)' \n"
+	      "set ylabel 'ATTITUDE STATE ERRORS' \n"
+	      "set yrange [-1:1] \n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s KF_att_state_errors.ps'\n"
+	      "set autoscale \n"
+	      "set grid \n", outpath[0]);
+
+  fprintf(gp,"plot '%s' u ($1):($2) w lp ps 0.7 title \"roll(x) err.\" ,\
+         '%s' u ($1):($3) w lp ps 0.7 title \"phi(y) err.\" ,\
+         '%s' u ($1):($4) w lp ps 0.7 title \"yaw(z) err.\" \n", filename, \
+         filename, filename);
+
+ fflush(gp);
+ fclose(gp);
+ return;
+}
+
+extern void KF_state_errors_plot_vel(char* filename){
+ FILE * gp = popen ("gnuplot -persistent", "w");
+
+  /* Gnuplot plot commands   - PLotting INS data  */
+  fprintf(gp, "set xlabel 'TIME(s)' \n"
+	      "set ylabel 'VELOCITY STATE ERRORS' \n"
+	      "set yrange [-1:1] \n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s KF_state_errors_vel.ps'\n"
+	      //"set autoscale \n"
+	      "set grid \n", outpath[0]);
+
+  fprintf(gp,"plot '%s' u ($1):($5) w lp ps 0.7 title \"vel(x) err.\" ,\
+         '%s' u ($1):($6) w lp ps 0.7 title \"vel(y) err.\" ,\
+         '%s' u ($1):($7) w lp ps 0.7 title \"vel(z) err.\" \n", filename,\
+         filename, filename);
+
+ fflush(gp);
+ fclose(gp);
+ return;
+}
+
+extern void KF_state_errors_plot_pos(char* filename){
+ FILE * gp = popen ("gnuplot -persistent", "w");
+
+  /* Gnuplot plot commands   - PLotting INS data  */
+  fprintf(gp, "set xlabel 'TIME(s)' \n"
+	      "set ylabel 'POSITION STATE ERRORS' \n"
+	      "set yrange [-1:1] \n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s KF_state_errors_pos.ps'\n"
+	      //"set autoscale \n"
+	      "set grid \n", outpath[0]);
+
+  fprintf(gp,"plot '%s' u ($1):($8) w lp ps 0.7 title \"pos(x) err.\" ,\
+         '%s' u ($1):($9) w lp ps 0.7 title \"pos(y) err.\" ,\
+         '%s' u ($1):($10) w lp ps 0.7 title \"pos(z) err.\" \n", filename,filename, filename);
+
+ fflush(gp);
+ fclose(gp);
+ return;
+}
+
+extern void KF_state_errors_plot_accb(char* filename){
+ FILE * gp = popen ("gnuplot -persistent", "w");
+
+  /* Gnuplot plot commands   - PLotting INS data  */
+  fprintf(gp, "set xlabel 'TIME(s)' \n"
+	      "set ylabel 'ACC. BIAS STATE ERRORS' \n"
+	      "set yrange [-0.25:0.25] \n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s KF_state_errors_accb.ps'\n"
+	      //"set autoscale \n"
+	      "set grid \n", outpath[0]);
+
+  fprintf(gp,"plot '%s' u ($1):($11) w lp ps 0.7 title \"accb(x) err.\" ,\
+         '%s' u ($1):($12) w lp ps 0.7 title \"accb(y) err.\" ,\
+         '%s' u ($1):($13) w lp ps 0.7 title \"accb(z) err.\" \n", filename,\
+         filename, filename);
+
+ fflush(gp);
+ fclose(gp);
+ return;
+}
+
+extern void KF_state_errors_plot_gyrb(char* filename){
+ FILE * gp = popen ("gnuplot -persistent", "w");
+
+  /* Gnuplot plot commands   - PLotting INS data  */
+  fprintf(gp, "set xlabel 'TIME(s)' \n"
+	      "set ylabel 'GYRO. STATE ERRORS' \n"
+	      "set yrange [-0.25:0.25] \n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s KF_state_errors_gyrb.ps'\n"
+	      //"set autoscale \n"
+	      "set grid \n", outpath[0]);
+
+  fprintf(gp,"plot '%s' u ($1):($14) w lp ps 0.7 title \"gyrb(x) err.\" ,\
+         '%s' u ($1):($15) w lp ps 0.7 title \"gyrb(y) err.\" ,\
+         '%s' u ($1):($16) w lp ps 0.7 title \"gyrb(z) err.\" \n", filename,filename, filename);
+
+ fflush(gp);
+ fclose(gp);
+ return;
+}
+
+extern void KF_state_errors_plot_clk(char* filename){
+ FILE * gp = popen ("gnuplot -persistent", "w");
+
+  /* Gnuplot plot commands   - PLotting INS data  */
+  fprintf(gp, "set xlabel 'TIME(s)' \n"
+	      "set ylabel 'CLOCK OFF. AND DRIFT STATE ERRORS' \n"
+	      "set yrange [-1:1] \n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s KF_state_errors_clk.ps'\n"
+	      "set autoscale \n"
+	      "set grid \n", outpath[0]);
+
+  fprintf(gp,"plot '%s' u ($1):($17) w lp ps 0.7 title \"clkoff err.\" ,\
+         '%s' u ($1):($18) w lp ps 0.7 title \"clkdrft(z) err.\" \n", filename, \
+         filename);
+
+ fflush(gp);
+ fclose(gp);
+ return;
+}
+
+
+extern void KF_residuals_plot(char* filename){
+  FILE *fp;
+  fp = fopen(filename,"r");
+  char str[150];
+  double ti,tf,t,taux=0.0,vl1,vl2,vp1,vp2;
+  int i,j,sat=0,aux=0,count=0,countcand=0,eq,dif,cdd;
+  int prn[MAXSAT]={0};
+
+  /* Getting first sat to count the rest */
+  fgets(str, 150, fp);
+  sscanf(str, "%lf %2d", &t, &sat);
+  prn[0]=sat;
+  count=1;//one value in the vector position count-1
+  ti=t;
+  /* Counting the number of satellite from file and storing at prn[] vector */
+  while ( fgets(str, 150, fp)!= NULL ){
+   sscanf(str, "%*lf %2d", &sat);
+     eq=0;dif=0;
+     for (i = 0; i < count; i++) {
+       if (sat == prn[i]) {
+         eq++;
+         break;
+       }else dif++;
+    }
+    if (i==count) { //Add a new one
+      prn[count]=sat;
+      count++;
+    }
+  }
+
+  rewind(fp);
+
+  FILE * gp = popen ("gnuplot -persistent", "w");
+  FILE * gp1 = popen ("gnuplot -persistent", "w");
+
+  i=0;
+  /* Gnuplot plot commands   - Pseudorange */
+  fprintf(gp,  "set xlabel 'TIME' \n"
+               "set ylabel 'PSEUDORANGE RESIDUALS (m)' \n"
+              //"set autoscale \n"
+               "set key horiz \n"
+               "set yrange [-20:20]\n"
+              "set key top center \n"
+              "set term postscript eps enhanced color\n"
+             "set output '%s KF_pseudorange_residuals.ps'\n"
+  "set grid \n",outpath[0]);
+
+      /* Gnuplot plot commands   - Carrier phase */
+     fprintf(gp1, "set xlabel 'TIME' \n"
+                  "set ylabel 'DOPPLER RESIDUALS (m)' \n"
+                 //"set autoscale \n"
+                 "set yrange [-20:20]\n"
+                  "set key horiz \n"
+                 "set key top center \n"
+                 "set term postscript eps enhanced color\n"
+                 "set output '%s KF_doppler_residuals.ps'\n"
+                 "set grid \n",outpath[0]);
+
+
+  fprintf(gp,"plot '%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \" Sat %d \",\ ",\
+  filename,prn[i],prn[i]);
+
+  fprintf(gp1,"plot '%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
+  filename,prn[i],prn[i]);
+
+  //lt rgb 'red'
+
+   for (i = 1; i < count; i++) { //PRN loop
+     fprintf(gp,"'%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
+     filename,prn[i],prn[i]);
+
+     fprintf(gp1,"'%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
+     filename,prn[i],prn[i]);
+  }
+  //pointtype %d
+
+  fflush(gp);
+  fclose(gp);
+  fflush(gp1);
+  fclose(gp1);
+fclose(fp);
+}
 
 /* map-matching plotting functions ------------------------------------*/
 

@@ -185,6 +185,7 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double euler_angles[3];  /* roll, pitch, yaw angle of body w.r.t NED (rad) */
   double C_b_e[9];        /* Tranformation matrix from body-to-ECEF frame  */
   int Nav_or_KF;          /* Navigation sol:0 KF Integrated sol:1   */
+  double P[17*17];        /* Full TC KF weight matrix (it accomodates for the LC[15*15]) */
 } PVAT_solution;
 
 typedef struct {      /* Position velocity and attitude solution structure */
@@ -197,6 +198,7 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double D[NFREQ+NEXOBS];     /* observation data doppler frequency (Hz) */
   double Sat_r_eb_e[3];    /* Satellite ECEF position (m) */
   double Sat_v_eb_e[3];    /* Satellite ECEF velocity (m/s)time (sec) */
+  double gdop[4];         /* DOPs {GDOP,PDOP,HDOP,VDOP} */
 } GNSS_measurements;
 
 typedef struct {        /* IMU sensor measurements */

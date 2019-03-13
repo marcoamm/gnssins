@@ -26,7 +26,9 @@ FILE *out_PVA;
 FILE *out_clock_file;
 FILE *out_IMU_bias_file;
 FILE *out_KF_SD_file;
+FILE *out_KF_state_error;
 FILE *out_raw_fimu;
+FILE *out_KF_residuals;
 
 
 /* extract substrings from string ---------------------------------------------
@@ -1154,6 +1156,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   double Qenu[9]={0};
   double ned_ini_vel[3]={0};
   double ini_pos_time;
+  double enu_prev[3]={0.0}, enu_curr[3]={0.0}, azmt=0.0;
   char datastring[150];
   imuraw_t imu_obs_prev={0};
   um7pack_t imu_curr_meas={{0}};
@@ -1162,7 +1165,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   int TC_or_LC=1; /* TC:1 and LC=0 */
   int Tact_or_Low_IMU=1; /* Tactical=1 and Low grade=0*/
   //FILE *ppp_llh;
-  char str[100], check;
+  char str[100], check=1;
   double G = 9.80665;
 
   printf("\n *****************  CORE BEGINS ***********************\n");
@@ -1193,9 +1196,6 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   ecef2pos(xyz_ini_pos,llh_pos);
   ecef2enu(llh_pos,rtk->sol.rr+3,ned_ini_vel); /* Here is ENU! */
-
-  printf("Estimated velocity: %lf %lf %lf\n",ned_ini_vel[0],\
-  ned_ini_vel[1],ned_ini_vel[2]);
 
   /* ENU to NED velocity from gnss solution */
      aux=ned_ini_vel[1];
@@ -1231,10 +1231,6 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   gnss_vel_ned_cov[1] = Qvenu[0];
   gnss_vel_ned_cov[2] = Qvenu[8];
 
-  printf("Pos and vel cov.: %lf, %lf, %lf, %lf, %lf, %lf\n",\
- gnss_xyz_ini_cov[0],gnss_xyz_ini_cov[1],gnss_xyz_ini_cov[2],\
- gnss_vel_ned_cov[0],gnss_vel_ned_cov[1],gnss_vel_ned_cov[2]);
-
   /*  Map information ********
   // Fetching data to the first buffer structure (lane.buffer)
   //inibuff();
@@ -1250,37 +1246,57 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
  The do while takes care when INS or GNSS is too ahead from each other         */
  do {
 
- /*  Low-cost imu
+   printf("NEXT INS MEASUREMENT READING  **********************************\n");
+
+
    memset(&imu_curr_meas, 0, sizeof(um7pack_t));
+
+    /*  Low-cost imu  */
    /* Read imu current measurements
    while(imu_curr_meas.status!=1){
-     if(!fgets(datastring, 150, fimu)) return;
+     if(!fgets(datastring, 150, fimu)) {printf("END OF FILE?\n");check=NULL;break;}
+     puts(datastring);
      parseimudata(datastring,&imu_curr_meas);
    }
+
+   printf("TIMS FROM INS: %lf, %f\n", imu_curr_meas.sec, imu_curr_meas.internal_time);
+
+   /* Turn-on initial biases             //exp4
+ imu_curr_meas.a[0]=imu_curr_meas.a[0]-0.4453528;//-0.455972;//*G;
+ imu_curr_meas.a[1]=imu_curr_meas.a[1]-1.162248;//-1.02027;//-0.972083*G;
+ imu_curr_meas.a[2]=imu_curr_meas.a[2];//+8.0764127;//+8.1495;//-1.64328*G;
+
    // Fixing imu time
    imu_curr_meas.sec=imu_curr_meas.sec+ \
-   (imu_curr_meas.internal_time-(float)floor(imu_curr_meas.internal_time));
+   ((double)imu_curr_meas.internal_time-floor((double)imu_curr_meas.internal_time));
 */
 
-  /* Tactical IMU reading */
-   check=fgets(str, 100, imu_tactical);
-   sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &imu_curr_meas.sec, &imu_curr_meas.a[2],\
-   &imu_curr_meas.a[1],&imu_curr_meas.a[0], &imu_curr_meas.g[2],&imu_curr_meas.g[1],\
-   &imu_curr_meas.g[0]);
-   imu_curr_meas.status=1;
+   /* Tactical IMU reading  */
+     check=fgets(str, 100, imu_tactical);
+     sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &imu_curr_meas.sec, &imu_curr_meas.a[2],\
+     &imu_curr_meas.a[1],&imu_curr_meas.a[0], &imu_curr_meas.g[2],&imu_curr_meas.g[1],\
+     &imu_curr_meas.g[0]);
+     imu_curr_meas.status=1;
 
-   /* raw acc. to m/s*s and rate ve locity from degrees to radians */
-   for (j= 0;j<3;j++) imu_curr_meas.a[j]=imu_curr_meas.a[j]*G;
-   for (j=0;j<3;j++) imu_curr_meas.g[j]=imu_curr_meas.g[j]*D2R;
+    /* raw acc. to m/s*s and rate ve locity from degrees to radians  */
+    for (j= 0;j<3;j++) imu_curr_meas.a[j]=imu_curr_meas.a[j]*G;
+    for (j=0;j<3;j++) imu_curr_meas.g[j]=imu_curr_meas.g[j]*D2R;
+
+    /* Turn-on initial biases             //city collection
+  imu_curr_meas.a[0]=imu_curr_meas.a[0]-0.4453528;
+  imu_curr_meas.a[1]=imu_curr_meas.a[1]-1.162248;;
+  imu_curr_meas.a[2]=imu_curr_meas.a[2];*/
+
 
    /* Output raw INS */
-   fprintf(out_raw_fimu, "%f %lf %lf %lf %lf %lf %lf\n",imu_curr_meas.sec, \
+   fprintf(out_raw_fimu, "%lf %lf %lf %lf %lf %lf %lf\n",imu_curr_meas.sec, \
    imu_curr_meas.a[0],\
    imu_curr_meas.a[1],imu_curr_meas.a[2], imu_curr_meas.g[0],imu_curr_meas.g[1],
    imu_curr_meas.g[2]);
 
    /* If INS time is ahead of GNSS exit INS loop */
-  if (ini_pos_time-imu_curr_meas.sec < -0.01) {
+   printf("GPS AND IMU: %lf %lf\n", ini_pos_time, imu_curr_meas.sec);
+  if (ini_pos_time-imu_curr_meas.sec < -0.01) { // for tactical, -1.65 for consurmer
     /* Back INS file reader */
     printf("Coarse.GNSS time behind imu time!! INS stays in the same epoch\n");
     rewind(imu_tactical);
@@ -1303,18 +1319,17 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     break;
   }else{
 
-
-  /* Interpolate INS measurement to match GNSS time  */
-  if (imu_obs_prev.sec>0.0) {
-    if (ini_pos_time < imu_curr_meas.sec && ini_pos_time > imu_obs_prev.sec) {
-      printf("INTERPOLATE INS MEAS TO GNSS TIME \n");
-      /* imu_curr_meas is modified  */
-      IMU_meas_interpolation(imu_obs_prev.sec, imu_curr_meas.sec, ini_pos_time, \
+    /* Interpolate INS measurement to match GNSS time  */
+    if (imu_obs_prev.sec>0.0) {
+      if (ini_pos_time < imu_curr_meas.sec && ini_pos_time > imu_obs_prev.sec) {
+        printf("INTERPOLATE INS MEAS TO GNSS TIME \n");
+        /* imu_curr_meas is modified  */
+        IMU_meas_interpolation(imu_obs_prev.sec, imu_curr_meas.sec, ini_pos_time, \
         &imu_curr_meas, &imu_obs_prev);
-      /* Return imu file pointer to process the imu_curr in the next epoch */
+        /* Return imu file pointer to process the imu_curr in the next epoch */
        //imufileback();
-    }
-  }
+     }
+   }
 
   printf("GNSS.INSPREV.INS.TIMES.DIFF: %lf, %lf, %lf, %lf\n",ini_pos_time,imu_obs_prev.sec,\
   imu_curr_meas.sec, ini_pos_time-imu_curr_meas.sec );
@@ -1332,8 +1347,9 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     }
 */
   if (fabs( (norm(imu_obs_prev.fb,2)))<0.01299) {
-      printf("ATT.Is.Stationary \t");
-    }else{ printf("ATT.Is.Moving \t");}
+    //  printf("ATT.Is.Stationary \t");
+  }else{ //printf("ATT.Is.Moving \t");
+  }
 
   /* Horizontal condition based on velocities derived from INS measurements
     0.5590 corresponds to the horizontal resultant threshold
@@ -1361,14 +1377,35 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   /* Coarse alignment or use of previous solution? */
   /* Levelling and gyrocompassing, update imu->aea[] vector */
-  printf("\nCoarse.obs:               %lf, %lf, %lf, %lf, %lf, %lf, %lf \n", \
+  printf("\n Coarse.obs:               %lf, %lf, %lf, %lf, %lf, %lf, %lf \n", \
     imu_curr_meas.sec, imu_obs_prev.fb[0],imu_obs_prev.fb[1],imu_obs_prev.fb[2], \
-    imu_curr_meas.a[0],imu_curr_meas.a[1],imu_curr_meas.a[2]);
+  imu_curr_meas.a[0],imu_curr_meas.a[1],imu_curr_meas.a[2]);
+
+  /* Azimuth initialization with gnss */
+  double delta_xyz_prev[3], delta_xyz_prev_curr[3];
+  for (j=0;j<3;j++) delta_xyz_prev[j]=0.0; //difference to itself, since it is the origin
+  for (j=0;j<3;j++) delta_xyz_prev_curr[j]=xyz_ini_pos[j]-pvagnss.r[j];//PVA_prev_sol.r[j];
+  ecef2enu(llh_pos, delta_xyz_prev,enu_prev);
+  ecef2enu(llh_pos, delta_xyz_prev_curr, enu_curr);
+  azmt=azt(enu_prev, enu_curr);  /*azimuth in radians */
 
   if(imu_obs_prev.sec > 0.0){
-    /* Not the first solution
-    coarseAlign(imu_obs_prev.fb, imu_obs_prev.wibb, PVA_prev_sol.v, gan,\
-       PVA_prev_sol.A); // it modifies imu->aea[] vector */
+    /* Not the first solution */
+
+    if (PVA_prev_sol.Nav_or_KF) {
+      /* If coming from an integration */
+      //coarseAlign(imu_obs_prev.fb, imu_obs_prev.wibb, PVA_prev_sol.v, gan,\
+         PVA_prev_sol.A); // it modifies PVA_prev_sol.A[] vector */
+
+      /* Azimuth from GNSS */
+      //PVA_prev_sol.A[2]=azmt;
+
+    }else{
+      /* From navigation -> uses previous PVA_old
+      coarseAlign(imu_obs_prev.fb, imu_obs_prev.wibb, PVA_prev_sol.v, gan,\
+         PVA_prev_sol.A); // it modifies PVA_prev_sol.A[] vector */
+    }
+
     printf("Coarse.NOT the First sol.: %lf, %lf, %lf, %lf \n", \
       imu_curr_meas.sec, PVA_prev_sol.A[0],PVA_prev_sol.A[1], PVA_prev_sol.A[2]);
   }else{
@@ -1386,13 +1423,17 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       for (j=0;j<3;j++) PVA_prev_sol.A[j]=imu_curr_meas.aea[j]; //Attitude in A_nb frame
       printf("Coarse.First sol.:      %lf, %lf, %lf, %lf \n", \
       imu_curr_meas.sec, PVA_prev_sol.A[0],PVA_prev_sol.A[1],PVA_prev_sol.A[2]);
+
+      /* Azimuth from GNSS */
+      //PVA_prev_sol.A[2]=azmt;
     }
     /* Levelled period - 7 initial minutes
     if ( fabs((ini_pos_time-394469.000)/60.0) < 7) {
-      PVA_prev_sol.A[0]=imu_curr_meas.aea[0]=0.0;
-      PVA_prev_sol.A[1]=imu_curr_meas.aea[1]=0.0;
+      //PVA_prev_sol.A[0]=imu_curr_meas.aea[0]=0.0;
+      //PVA_prev_sol.A[1]=imu_curr_meas.aea[1]=0.0;
+      for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
     }
-   */
+*/
     //PVA_prev_sol.A[2]=imu_curr_meas.aea[2]=head_angle;
 
 /* Tightly or Loosley-coupled integration */
@@ -1435,10 +1476,6 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   ecef2pos(PVA_prev_sol.r,llh_pos);
 
-  printf("Coarse.PVA PVA_prev_sol: %lf, %lf, %lf\n",PVA_prev_sol.A[0],\
-  PVA_prev_sol.A[1],PVA_prev_sol.A[2]);
-  printf("Coarse.PVA PVA_prev_sol: %lf, %lf, %lf\n",PVA_prev_sol.A[0]*R2D,\
-  PVA_prev_sol.A[1]*R2D,PVA_prev_sol.A[2]*R2D);
 
   /* Output PVA solution */
   fprintf(out_PVA,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf\n",\
@@ -1453,15 +1490,15 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   }
   imu_obs_prev.sec=imu_curr_meas.sec;
   imu_obs_prev.time=imu_curr_meas.time;
-  //Stationary detection for next iteration
 
+  //Stationary detection for next iteration
   /* Stationary-condition  */
-  if (norm(ned_ini_vel,3) > 0.5) {
+  if (norm(PVA_prev_sol.v,3) > 0.5) {
     printf("IS MOVING\n");
   }else{printf("IS STATIC\n");
-    for (j=0;j<3;j++) ned_ini_vel[j]=0.0;
-    for (j=0;j<3;j++) PVA_prev_sol.v[j]=ned_ini_vel[j];
+    for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
   }
+
 
 } // end if else If INS time is ahead of GNSS exit INS loop condition
 
@@ -1476,6 +1513,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
      }else{
        if (check==NULL) {
          /* end of file */
+          printf("END OF INS FILE: %s\n", check);
          break;
        }else{printf("KEEP UPDATING INS \n");}
      }
@@ -1491,18 +1529,31 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   // printf("Vel NED GNSS: %lf, %lf, %lf\n",ned_ini_vel[0],ned_ini_vel[1],ned_ini_vel[2]);
   // printf("Vel NED INS: %lf, %lf, %lf\n",PVA_prev_sol.v[0],PVA_prev_sol.v[1],PVA_prev_sol.v[2]);
 
-   /* State and covariances to satellite positioning */
+
    /* Initialize position from GNSS SPP */
+   if (ini_pos_time-imu_curr_meas.sec < -0.01) { //-0.01
+   /* INS time ahead of GPS, don't pass anything to the satellite positioning */
+
+    }else{
+   /* INS and GNSS times are synchronized */
+   /* State and covariances to satellite positioning */
    for (j=0;j<3;j++) rtk->sol.rr[j]=PVA_prev_sol.r[j];
    if (PVA_prev_sol.out_errors[6]<=0.0 || PVA_prev_sol.out_errors[7]<=0.0 || \
     PVA_prev_sol.out_errors[8]<=0.0 ) {
+
    }else{
-
-     for (j=0;j<3;j++) rtk->sol.qr[j]=(1.0/PVA_prev_sol.out_errors[j+6]);
+       for (j=0;j<3;j++) rtk->sol.qr[j]=(1.0/PVA_prev_sol.out_errors[j+6]);
+     }
    }
-
    /* Making GNSS position and velocity be the INS initialization on the next
     processing, instead of the Navigation-derived one */
+    if (norm(ned_ini_vel,3) > 0.5) {
+      printf("IS MOVING\n");
+    }else{printf("IS STATIC\n");
+      for (j=0;j<3;j++) ned_ini_vel[j]=0.0;
+      for (j=0;j<3;j++) PVA_prev_sol.v[j]=ned_ini_vel[j];
+    }
+
     if (PVA_prev_sol.Nav_or_KF) {
       /* Integrated solution */
       for (j=0;j<3;j++) PVA_prev_sol.r[j]=xyz_ini_pos[j];
@@ -1518,10 +1569,13 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       PVA_prev_sol.clock_offset_drift[1]=rtk->sol.dtrr;
     }
 
+    printf("AZIMUTH: %lf t: %lf\n", time2gpst(rtk->sol.time,NULL), azmt*R2D);
+
    /* Update */
    PVA_prev_sol.t_s = time2gpst(rtk->sol.time,NULL); /* time of week in (GPST) */
    imu_obs_global=imu_obs_prev;
    pva_global=PVA_prev_sol;
+
 
    for (j=0;j<3;j++) pvagnss.r[j]=xyz_ini_pos[j];
    pvagnss.sec=PVA_prev_sol.t_s;
@@ -1545,9 +1599,8 @@ char file[] = "../out/LineInterp_rtklib5_kin_static_heights_using_corners_exp4.t
 //char imufilename[]="../data/LOG__010.SBF_SBF_ASCIIIn.txt"; //MEM-IMU file path exp1
 //char imufilename[]="../data/LOG__033.SBF_SBF_ASCIIIn.txt"; //MEM-IMU file path exp2
 //char imufilename[]="../data/LOG__038.SBF_SBF_ASCIIIn.txt"; //IMU file path exp3
-char imufilename[]="../data/LOG__040.SBF_SBF_ASCIIIn.txt"; //IMU file path exp4
+//char imufilename[]="../data/LOG__040.SBF_SBF_ASCIIIn.txt"; //IMU file path exp4
 //char imufilename[]="/home/emerson/Desktop/Connected_folders/data/imu_ascii_new.txt";
-//fimu=fopen(imufilename,"r");
 FILE *res;
 //  char residualsfname[]="../out/exp1_PPP.stat"; //Residuals file
 char residualsfname[]="../out/PPP_car_back.pos.stat"; //Residuals file
@@ -1561,10 +1614,12 @@ strcpy(filopt.trace,tracefname);
 out_PVA=fopen("../out/out_PVA.txt","w");
 out_clock_file=fopen("../out/out_clock_file.txt","w");
 out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
+out_KF_state_error=fopen("../out/out_KF_state_error.txt","w");
 out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
 out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
+out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
 imu_tactical=fopen("../data/imu_ascii_new.txt", "r");
-
+fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");
 
 /* Declarations from rnx2rtkp source code program */
 //clk93stream.rtcm3  CLK930600.rtcm3
@@ -1587,16 +1642,21 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/igs19674.*  ../data/SEPT
   char *comlin = "./rnx2rtkp ../data/LOG__038.18O ../data/LOG__038_gps.nav -o ../out/SPP_test3.pos -k ../config/opts4.conf";
          // Command line */
 
-/* PPP-Kinematic  4th experimet
- char *argv[] = {"./rnx2rtkp", "../data/LOG__040.18o", "../data/LOG__040_gps.18n", "../data/igs20094.*", "-o", "../out/PPP_mod_exp4.pos", "-k", "../config/opts3.conf"};
- char *comlin = "./rnx2rtkp ../data/LOG__040.18o ../data/LOG__040_gps.18n ../data/igs20094.* -o ../out/PPP_mod_exp4.pos -k ../config/opts3.conf";
-// Command line
-*/
+/* PPP-Kinematic  4th experimet - GPS AND GLONASS */
+ //char *argv[] = {"./rnx2rtkp", "../data/LOG__040.18o", "../data/BRDC00IGS_R_20181930000_01D_MN.rnx", "../data/grm20094.clk", "../data/grm20094.sp3", "-o", "../out/PPP_bmo.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
-/* PPP-Kinematic  Kinematic Positioning dataset */
+ //char *comlin = "./rnx2rtkp ../data/LOG__040.18o ../data/BRDC00IGS_R_20181930000_01D_MN.rnx ../data/igs20094.* -o ../out/PPP_mod_exp4.pos -k ../config/opts3.conf";
+// Command line
+
+
+/* PPP-Kinematic  Kinematic Positioning dataset
  char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/CAR_2890.18N", "../data/igs20232.*", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf", "-x 5"};
  char *comlin = "./rnx2rtkp ../data/CAR_2890.18O ../data/CAR_2890.18N ../data/igs20232.* -o ../out/PPP_car_back.pos -k ../config/opts3.conf -x 5";
-      // Command line
+  */    // Command line
+
+/* PPP-Kinematic  Kinematic Positioning dataset  GPS+GLONASS */
+char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/BRDC00IGS_R_20182890000_01D_MN.rnx", "../data/grm20232.clk","../data/grm20232.sp3", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf", "-x", "5"};
+
 
 /* PPP-AR Kinematic
 char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};
@@ -1615,10 +1675,12 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
    char *comlin = "./rnx2rtkp /home/emerson/Desktop/rtk_simul/unbj_constrain_test/unbj0600.16o /home/emerson/Desktop/rtk_simul/unbj_constrain_test/brdc0600.16n /home/emerson/Desktop/rtk_simul/unbj_constrain_test/igs18861.sp3 -o /home/emerson/Desktop/rtk_simul/unbj_constrain_test/sol_unbj1.pos -k /home/emerson/Desktop/rtk_simul/opts3.conf"; // Command line
 */
- argc= sizeof(comlin) / sizeof(char);
+
+ //argc= sizeof(comlin) / sizeof(char);
+ argc=11;
 
     prcopt.mode  =PMODE_KINEMA;
-    prcopt.navsys=SYS_GPS|SYS_GLO;
+  //  prcopt.navsys=SYS_GPS|SYS_GLO;
     prcopt.refpos=1;
     prcopt.glomodear=1;
     solopt.timef=0;
@@ -1703,11 +1765,10 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
 /* Start rnx2rtkp processing  ----------------------------------- --*/
 /* Processing ------------------------------------------------------*/
+ ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
+ if (!ret) fprintf(stderr,"%40s\r","");
 
-  ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
-  if (!ret) fprintf(stderr,"%40s\r","");
-
- /* Closing global files  */
+ /* Closing global files */
   //fclose(fp_lane);
   //fclose (fimu);
   fclose(out_PVA);
@@ -1716,18 +1777,21 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   fclose(out_KF_SD_file);
   fclose(out_raw_fimu);
   fclose(imu_tactical);
-
-
+  fclose(out_KF_state_error);
+  fclose(out_KF_residuals);
+  fclose(fimu);
 
 /* Other function call after processing ------------------------------*/
+
+char posfile[]="../out/out_PVA.txt";
+imuposplot(posfile);
 
 /* INS/GNSS plots */
 char gyrofile[]="../out/out_PVA.txt";
 imueulerplot(gyrofile);
 char velfile[]="../out/out_PVA.txt";
 imuvelplot(velfile);
-char posfile[]="../out/out_PVA.txt";
-imuposplot(posfile);
+
 char imu_bias[]="../out/out_IMU_bias.txt";
 imuaccbiasplot(imu_bias);
 imugyrobiasplot(imu_bias);
@@ -1737,11 +1801,26 @@ KF_vel_stds_plot(imu_KF_stds);
 KF_pos_stds_plot(imu_KF_stds);
 char imu_KF_clk[]="../out/out_clock_file.txt";
 KF_clock_plot(imu_KF_clk);
+char KF_states[]="../out/out_KF_state_error.txt";
+KF_state_errors_plot_att(KF_states);
+KF_state_errors_plot_vel(KF_states);
+KF_state_errors_plot_pos(KF_states);
+KF_state_errors_plot_accb(KF_states);
+KF_state_errors_plot_gyrb(KF_states);
+KF_state_errors_plot_clk(KF_states);
+char imu_KF_res[]="../out/out_KF_residuals.txt";
+KF_residuals_plot(imu_KF_res);
+
+/*
+char imu_raw_meas[]="../out/out_raw_imu.txt";
+imuaccplot(imu_raw_meas);
+imugyroplot(imu_raw_meas);
+*/
 
 /*
 double A[12]={0.475, 0.568, 0.494, 0.215, 0.297, 0.828,
 0.292, 0.487, 0.782, 0.943, 0.711, 0.139};
-
+/*
 double B[24]={0.596, 0.390, 0.995, 0.529,
 0.982, 0.633, 0.806, 0.927,
 0.477, 0.642, 0.565, 0.386,
@@ -1749,9 +1828,14 @@ double B[24]={0.596, 0.390, 0.995, 0.529,
 0.852, 0.947, 0.451, 0.414,
 0.100, 0.734, 0.094, 0.880 };
 
-double C[8]={0.0};
-int m=2;
-k=4;n=6;
+double B[24]={0.596000, 0.982000, 0.477000, 0.359000, 0.852000, 0.100000,
+0.390000, 0.633000, 0.642000, 0.248000, 0.947000, 0.734000,
+0.995000, 0.806000, 0.565000, 0.618000, 0.451000, 0.094000,
+0.529000, 0.927000, 0.386000, 0.097000, 0.414000, 0.880000};
+
+double C[8]={0.0}, AT[24];
+int m=6;
+k=4;n=2;
 double alpha=1.0, beta=0.0;
 
 //double A[4], B[4], C[4]={0.0};
@@ -1782,20 +1866,38 @@ B[0]=3.0;B[1]=-1.0; B[2]=2.0;
 
 /*matmul("NN",2,2,2,1.0,B,A,0.0,C); // Here is wrong for A*B^T, actualy it is B*A*/
 //matmul("NN",m,k,n,1.0,B,A,0.0,C);
-
 /*
+for (i = 0; i < 4; i++) {
+  for (j = 0; j < 6; j++) {
+    AT[j*4+i]= B[i*6+j];
+  }
+}
+
 for (i = 0; i < 2; i++) {
-  for (j = 0; j < 2; j++) {
-    printf("C[%d]: %lf\t",i*2+j,C[i*2+j]);
+  for (j = 0; j < 6; j++) {
+    printf("%lf ",A[i*6+j]);
   }
   printf("\n");
-}*/
+}
+
+printf("\n");
+for (i = 0; i < 6; i++) {
+  for (j = 0; j < 4; j++) {
+    printf("%lf ",AT[i*4+j]);
+  }
+  printf("\n");
+}
+printf("\n");
 //matmul_line("NN",2,2,4,1.0,A,B,0.0,C);
-//matmul_row("NN",m,k,n,1.0,A,B,0.0,C);
+//matmul_row("NN",2,4,6,1.0,A,AT,0.0,C);
 /*
-for (j = 0; j < 3; j++) {
-  printf("C[%d]: %lf\t",j,C[j]);
-}*/
+for (i = 0; i < 2; i++) {
+for (j = 0; j < 4; j++) {
+  printf("%lf ", C[i*4+j]);
+}
+printf("\n");
+}
+*/
 /*
 for (i = 0; i < m; i++) {
   for (j = 0; j < k; j++) {

@@ -34,7 +34,6 @@
 *           2014/10/21 1.16 fix bug on beidou amb-res with pos2-bdsarmode=0
 *           2014/11/08 1.17 fix bug on ar-degradation by unhealthy satellites
 *           2015/03/23 1.18 residuals referenced to reference satellite
-*           2018/01/29 1.19 unfix ambiguity between gps and qzss
 *-----------------------------------------------------------------------------*/
 #include <stdarg.h>
 #include "rtklib.h"
@@ -1006,12 +1005,12 @@ static double gloicbcorr(int sat1, int sat2, const prcopt_t *opt, double lam1,
 
     return opt->exterr.gloicb[f]*0.01*dfreq; /* (m) */
 }
-/* test navi system (m=0:gps/sbs,1:glo,2:gal,3:bds,4:qzs) --------------------*/
+/* test navi system (m=0:gps/qzs/sbs,1:glo,2:gal,3:bds) ----------------------*/
 static int test_sys(int sys, int m)
 {
     switch (sys) {
         case SYS_GPS: return m==0;
-        case SYS_QZS: return m==4;
+        case SYS_QZS: return m==0;
         case SYS_SBS: return m==0;
         case SYS_GLO: return m==1;
         case SYS_GAL: return m==2;
@@ -1051,8 +1050,8 @@ static int ddres(rtk_t *rtk, const nav_t *nav, double dt, const double *x,
             tropr[i]=prectrop(rtk->sol.time,posr,1,azel+ir[i]*2,opt,x,dtdxr+i*3);
         }
     }
-    for (m=0;m<5;m++) /* m=0:gps/sbs,1:glo,2:gal,3:bds,4:qzs */
-    
+    for (m=0;m<4;m++) /* m=0:gps/qzs/sbs,1:glo,2:gal,3:bds */
+
     for (f=opt->mode>PMODE_DGPS?0:nf;f<nf*2;f++) {
 
         /* search reference satellite with highest elevation */
@@ -1249,9 +1248,9 @@ static int ddmat(rtk_t *rtk, double *D)
         rtk->ssat[i].fix[j]=0;
     }
     for (i=0;i<na;i++) D[i+i*nx]=1.0;
-    
-    for (m=0;m<5;m++) { /* m=0:gps/sbs,1:glo,2:gal,3:bds,4:qzs */
-        
+
+    for (m=0;m<4;m++) { /* m=0:gps/qzs/sbs,1:glo,2:gal,3:bds */
+
         if (m==1&&rtk->opt.glomodear==0) continue;
         if (m==3&&rtk->opt.bdsmodear==0) continue;
 
@@ -1298,9 +1297,9 @@ static void restamb(rtk_t *rtk, const double *bias, int nb, double *xa)
 
     for (i=0;i<rtk->nx;i++) xa[i]=rtk->x [i];
     for (i=0;i<rtk->na;i++) xa[i]=rtk->xa[i];
-    
-    for (m=0;m<5;m++) for (f=0;f<nf;f++) {
-        
+
+    for (m=0;m<4;m++) for (f=0;f<nf;f++) {
+
         for (n=i=0;i<MAXSAT;i++) {
             if (!test_sys(rtk->ssat[i].sys,m)||rtk->ssat[i].fix[f]!=2) {
                 continue;
@@ -1325,9 +1324,9 @@ static void holdamb(rtk_t *rtk, const double *xa)
     trace(3,"holdamb :\n");
 
     v=mat(nb,1); H=zeros(nb,rtk->nx);
-    
-    for (m=0;m<5;m++) for (f=0;f<nf;f++) {
-        
+
+    for (m=0;m<4;m++) for (f=0;f<nf;f++) {
+
         for (n=i=0;i<MAXSAT;i++) {
             if (!test_sys(rtk->ssat[i].sys,m)||rtk->ssat[i].fix[f]!=2||
                 rtk->ssat[i].azel[1]<rtk->opt.elmaskhold) {
@@ -1825,11 +1824,8 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     /* precise point positioning */
     if (opt->mode>=PMODE_PPP_KINEMA) {
         pppos(rtk,obs,nu,nav);
-      //pppos1(rtk,obs,nu,nav); /* PPP-modified*/
 
-       /* Velocity from gnss solution */
-       ecef2pos(rtk->sol.rr,pos);
-       ecef2enu(pos,rtk->x+3,vel);
+      //pppos1(rtk,obs,nu,nav); /* PPP-modified*/
 
        /* INS/GNSS with MAP constrains
        if (fabs(rtk->sol.dtr[0])<10.0) {
@@ -1839,16 +1835,30 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
          rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
        }*/
 
+      printf("DOPS RTKLIB_clk_off_drift:0 %lf (m) %lf (s/s),rtk->sol.prevclk: %lf\n",rtk->sol.dtr[0], \
+         rtk->sol.dtrr, rtk->sol.prevclk );
+
       double cdiff=(double)fabs((rtk->sol.prevclk + rtk->sol.prevdrf*rtk->tt)-(rtk->sol.dtr[0]));
 
       if (cdiff < 300000 && rtk->tt >= 0.0 ) {
          rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+      }else{
+        if (fabs(rtk->sol.dtr[0]) > 10000 ) {
+          rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+        }
       }
+      printf("Cdiff, tt: %lf %lf %lf\n",cdiff, rtk->tt);
 
+      printf("DOPS %lf, %lf, %lf, %lf\n", rtk->sol.gdop[0],rtk->sol.gdop[1],rtk->sol.gdop[2],rtk->sol.gdop[3]);
 
-      printf("RTKLIB_clk_off_drift:1 %lf (m) %lf (s/s)\n",rtk->sol.dtr[0], \
+      printf("DOPS RTKLIB_clk_off_drift:1 %lf (m) %lf (s/s)\n",rtk->sol.dtr[0], \
         rtk->sol.dtrr );
+
       core(rtk, obs, n, nav);
+
+      if (cdiff < 300000 && rtk->tt >= 0.0 ) {
+         rtk->sol.dtr[0]=rtk->sol.dtr[0]*CLIGHT;
+      }
 
       rtk->sol.prevclk=rtk->sol.dtr[0];
       rtk->sol.prevdrf=rtk->sol.dtrr;

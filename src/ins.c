@@ -98,10 +98,10 @@ void winncomp(double* r, double* v, double* winn){
 * description: Coarse alignment of roll, pitch and yaw
 * args   : um7pack_t* imu       IO    imu structure
 *	   double* gn	I	local gravity
-           double acc[3]	I	INS accelerations from previous epoch
-*          double v[3]	I	GNSS/or INS/GNSS previous state velocities {vn, ve, vup}
+           double acc[3]	I	INS accelerations from previous epoch {xyz}
+*          double v[3]	I	GNSS/or INS/GNSS previous state velocities {NED}
            gan[3]  I  gravity vector
-           euler_angles[3]  IO  attitude angles in _nb frame
+           euler_angles[3]  IO  attitude angles in _nb frame {roll, pitch, yaw}
 Reference: Shin (2005, pag.42) and Groves (2013, pages 198 to 199)
 *-----------------------------------------------------------------------------*/
 //void coarseAlign(um7pack_t* imu, double* gan)
@@ -112,7 +112,7 @@ void coarseAlign(double *acc, double *gyr, double *vel, double *gan, double *eul
 
  /* Is it a static or kinematic alignment? Use GNSS velocity or any velocity in imu->v */
  if ( norm(vel,3) < 0.5){
-   printf("LEVELLING.STATIC, %lf, %lf, %lf\n", acc[0], acc[1],acc[2]);
+   printf("LEVELLING.STATIC, %lf, %lf, %lf\n", vel[0], vel[1],vel[2]);
                                     //static alignment
   /* Then we can solve for the roll(x(phi)) and pitch(y(theta)) angles using accelerometers */
   //if(acc[2]<0.0){sign=-1.0;}
@@ -124,7 +124,7 @@ void coarseAlign(double *acc, double *gyr, double *vel, double *gan, double *eul
   euler_angles[0]= atan2(-acc[1],-acc[2]);
 
   /* pitch - theta angle */
-  euler_angles[1]= atan (-acc[0]/sqrt(acc[1]*acc[1]+acc[2]*acc[2]));
+  euler_angles[1]= atan (acc[0]/sqrt(acc[1]*acc[1]+acc[2]*acc[2]));
 
   /* Gyrocompasing by Groves(2013,page 199)  */
   /* yaw - psi angle */
@@ -136,7 +136,7 @@ void coarseAlign(double *acc, double *gyr, double *vel, double *gan, double *eul
 }else{                            //kinematic alignment
  /* Roll can be initialized to zero with an uncertainty of +-5 degrees,
  in most cases, on the road */
- printf("LEVELLING.KINE, %lf, %lf, %lf\n", acc[0], acc[1],acc[2] );
+ printf("LEVELLING.KINE, %lf, %lf, %lf\n", vel[0], vel[1],vel[2] );
 
  euler_angles[0]=0.0;
 
@@ -763,10 +763,11 @@ void parseimudata(char* strline, um7pack_t* imu)
 {
    char *token;
    int i=1, sscanstat;
-   float sensor_x,sensor_y, sensor_z, imucurrtime;
+   float sensor_x,sensor_y,sensor_z;
+   double imucurrtime;
    double G = 9.80665;
 
-  sscanstat=sscanf(strline, "%f,%d,%*4s,%*2d,%*6s,%d,%f,%*f,%*f,%*f,%*s",
+  sscanstat=sscanf(strline, "%lf,%d,%*4s,%*2d,%*6s,%d,%f,%*f,%*f,%*f,%*s",
   &imu->sec, &imu->gpsw, &imu->count, &imu->internal_time);
 
   /* Checking if received message is complete and synchronized	*/
@@ -774,7 +775,8 @@ void parseimudata(char* strline, um7pack_t* imu)
     imu->status=-1;
     return;
   }
-  sscanstat=sscanf(strline, "%f,%d,%*4s,%*2d,%*6s,%d,%*f,%f,%f,%f,%3c",
+
+  sscanstat=sscanf(strline, "%lf,%d,%*4s,%*2d,%*6s,%d,%*f,%f,%f,%f,%3c",
   &imu->sec, &imu->gpsw, &imu->count, &sensor_x, &sensor_y, &sensor_z, &imu->checksum);
   /*printf("%6.1f, %d, %d, %f, %f, %f, %c \n",
   imu->sec, imu->gpsw, imu->count, sensor_x, sensor_y, sensor_z, imu->checksum);*/
@@ -802,13 +804,13 @@ void parseimudata(char* strline, um7pack_t* imu)
 
    /* Checking if data is complete for processing	*/
    /* Using time of each data measurement */
-   if (imu->tgyr==0.0 || imu->tacc==0.0 || imu->tmag==0.0) {
+   if (imu->tgyr==0.0 || imu->tacc==0.0 ) {
      /* Not complete yet */
      imu->status=0;
      return;
    }
 
-   if (imu->tgyr==imu->tacc && imu->tacc==imu->tmag) {
+   if (imu->tgyr==imu->tacc) {
      /* Data complete and synchronized */
      imu->status=1;
    }else{

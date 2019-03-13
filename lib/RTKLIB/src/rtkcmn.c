@@ -660,7 +660,7 @@ extern void setbits(unsigned char *buff, int pos, int len, int data)
 * return : crc-32 parity
 * notes  : see NovAtel OEMV firmware manual 1.7 32-bit CRC
 *-----------------------------------------------------------------------------*/
-extern unsigned int rtk_crc32(const unsigned char *buff, int len)
+extern unsigned int crc32(const unsigned char *buff, int len)
 {
     unsigned int crc=0;
     int i,j;
@@ -682,7 +682,7 @@ extern unsigned int rtk_crc32(const unsigned char *buff, int len)
 * return : crc-24Q parity
 * notes  : see reference [2] A.4.3.3 Parity
 *-----------------------------------------------------------------------------*/
-extern unsigned int rtk_crc24q(const unsigned char *buff, int len)
+extern unsigned int crc24q(const unsigned char *buff, int len)
 {
     unsigned int crc=0;
     int i;
@@ -699,7 +699,7 @@ extern unsigned int rtk_crc24q(const unsigned char *buff, int len)
 * return : crc-16 parity
 * notes  : see reference [10] A.3.
 *-----------------------------------------------------------------------------*/
-extern unsigned short rtk_crc16(const unsigned char *buff, int len)
+extern unsigned short crc16(const unsigned char *buff, int len)
 {
     unsigned short crc=0;
     int i;
@@ -1102,6 +1102,7 @@ static int filter_(const double *x, const double *P, const double *H,
 {
     double *F=mat(n,m),*Q=mat(m,m),*K=mat(n,m),*I=eye(n);
     int info;
+    int i=0,j=0;
 
     matcpy(Q,R,m,m);
     matcpy(xp,x,n,1);
@@ -3290,7 +3291,7 @@ extern void dops(int ns, const double *azel, double elmin, double *dop)
         H[  4*n]=cosel*sin(azel[i*2]);
         H[1+4*n]=cosel*cos(azel[i*2]);
         H[2+4*n]=sinel;
-        H[3+4*n++]=1.0;
+        H[3+4*n++]=1.0; 
     }
     if (n<4) return;
 
