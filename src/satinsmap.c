@@ -1274,8 +1274,8 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    /* Tactical IMU reading  */
      check=fgets(str, 100, imu_tactical);
      sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &imu_curr_meas.sec, &imu_curr_meas.a[2],\
-     &imu_curr_meas.a[1],&imu_curr_meas.a[0], &imu_curr_meas.g[2],&imu_curr_meas.g[1],\
-     &imu_curr_meas.g[0]);
+     &imu_curr_meas.a[0],&imu_curr_meas.a[1], &imu_curr_meas.g[2],&imu_curr_meas.g[0],\
+     &imu_curr_meas.g[1]);
      imu_curr_meas.status=1;
 
     /* raw acc. to m/s*s and rate ve locity from degrees to radians  */
@@ -1283,7 +1283,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     for (j=0;j<3;j++) imu_curr_meas.g[j]=imu_curr_meas.g[j]*D2R;
 
     /* IMU was mounted with Z axis towards up */
-    imu_curr_meas.a[2] = -imu_curr_meas.a[2];
+    //imu_curr_meas.a[2] = -imu_curr_meas.a[2];
 
     /* Turn-on initial biases             //city collection
   imu_curr_meas.a[0]=imu_curr_meas.a[0]-0.4453528;
