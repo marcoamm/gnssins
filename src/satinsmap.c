@@ -1271,7 +1271,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    ((double)imu_curr_meas.internal_time-floor((double)imu_curr_meas.internal_time));
 */
 
-   /* Tactical IMU reading  */
+   /* Tactical IMU reading  */ 
      check=fgets(str, 100, imu_tactical);
      sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &imu_curr_meas.sec, &imu_curr_meas.a[2],\
      &imu_curr_meas.a[0],&imu_curr_meas.a[1], &imu_curr_meas.g[2],&imu_curr_meas.g[0],\
@@ -1430,13 +1430,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       /* Azimuth from GNSS */
       //PVA_prev_sol.A[2]=azmt;
     }
-    /* Levelled period - 7 initial minutes
-    if ( fabs((ini_pos_time-394469.000)/60.0) < 7) {
-      //PVA_prev_sol.A[0]=imu_curr_meas.aea[0]=0.0;
-      //PVA_prev_sol.A[1]=imu_curr_meas.aea[1]=0.0;
-      for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
-    }
-*/
+
     //PVA_prev_sol.A[2]=imu_curr_meas.aea[2]=head_angle;
 
 /* Tightly or Loosley-coupled integration */
@@ -1562,8 +1556,8 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
     if (PVA_prev_sol.Nav_or_KF) {
       /* Integrated solution */
-      for (j=0;j<3;j++) PVA_prev_sol.r[j]=xyz_ini_pos[j];
-      for (j=0;j<3;j++) PVA_prev_sol.v[j]=ned_ini_vel[j];
+      //for (j=0;j<3;j++) PVA_prev_sol.r[j]=xyz_ini_pos[j];
+      //for (j=0;j<3;j++) PVA_prev_sol.v[j]=ned_ini_vel[j];
       PVA_prev_sol.clock_offset_drift[0]=rtk->sol.dtr[0]*CLIGHT;
       PVA_prev_sol.clock_offset_drift[1]=rtk->sol.dtrr;
 
@@ -1616,7 +1610,7 @@ int argc; // Size of file or options?
 
 strcpy(filopt.trace,tracefname);
 
-/* Global TC_KF_INS_GNSS output files */
+/* Global TC_KF_INS_GNSS output files  */
 out_PVA=fopen("../out/out_PVA.txt","w");
 out_clock_file=fopen("../out/out_clock_file.txt","w");
 out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
@@ -1771,8 +1765,11 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
 /* Start rnx2rtkp processing  ----------------------------------- --*/
 /* Processing ------------------------------------------------------*/
- ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
- if (!ret) fprintf(stderr,"%40s\r","");
+ //ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
+ //if (!ret) fprintf(stderr,"%40s\r","");
+
+ /* ins navigation only */
+ imu_tactical_navigation(imu_tactical);
 
  /* Closing global files */
   //fclose(fp_lane);
@@ -1787,17 +1784,22 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   fclose(out_KF_residuals);
   fclose(fimu);
 
+  char posfile[]="../out/out_PVA.txt";
+  imuposplot(posfile);
+  char gyrofile[]="../out/out_PVA.txt";
+  imueulerplot(gyrofile);
+
 /* Other function call after processing ------------------------------*/
 
-char posfile[]="../out/out_PVA.txt";
-imuposplot(posfile);
 
-/* INS/GNSS plots */
+
+/* INS/GNSS plots
 char gyrofile[]="../out/out_PVA.txt";
 imueulerplot(gyrofile);
 char velfile[]="../out/out_PVA.txt";
 imuvelplot(velfile);
-
+char posfile[]="../out/out_PVA.txt";
+imuposplot(posfile);
 char imu_bias[]="../out/out_IMU_bias.txt";
 imuaccbiasplot(imu_bias);
 imugyrobiasplot(imu_bias);
@@ -1815,7 +1817,7 @@ KF_state_errors_plot_accb(KF_states);
 KF_state_errors_plot_gyrb(KF_states);
 KF_state_errors_plot_clk(KF_states);
 char imu_KF_res[]="../out/out_KF_residuals.txt";
-KF_residuals_plot(imu_KF_res);
+KF_residuals_plot(imu_KF_res);  */
 
 /*
 char imu_raw_meas[]="../out/out_raw_imu.txt";
@@ -1952,6 +1954,7 @@ fclose(new);
 //imuaccplot("/home/emerson/Desktop/Connected_folders/data/imu_ascii.txt");
 //imugyroplot("/home/emerson/Desktop/Connected_folders/data/imu_ascii.txt");
 //imu_tactical_navigation(imu_tactical);
+
 
 /* IMU-MAP test
   while ( 1 ) {

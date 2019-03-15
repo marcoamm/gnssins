@@ -124,7 +124,7 @@ extern void imuposplot(char* filename){
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s positions_downtown_gdop2_5.ps'\n"
+	      "set output '%s positions_insonly.ps'\n"
         /* General view  */
         "set yrange [45.942:45.9432] \n"  //BMO field general view
         "set xrange [-66.6418:-66.6402] \n"
@@ -134,8 +134,8 @@ extern void imuposplot(char* filename){
         //"set autoscale \n"
         "set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
         "set xrange [-66.675:-66.63] \n"
-        "set yrange [45.955:45.965] \n"  // Downtown Interruptions
-        "set xrange [-66.645:-66.635] \n"
+        //"set yrange [45.955:45.965] \n"  // Downtown Interruptions
+        //"set xrange [-66.645:-66.635] \n"
         //"set yrange [45.932:45.937] \n"  // Highway
         //"set xrange [-66.650:-66.655] \n"
         //"set yrange [45.95:45.955] \n"  // UNB parking lot

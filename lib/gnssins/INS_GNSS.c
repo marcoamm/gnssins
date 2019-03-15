@@ -2353,7 +2353,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     /* Begins */
     double omega_ie_vec[3], Omega_ie[9];
     double *Phi_matrix, *Q_prime_matrix, *x_est_propagated, *x_est_new;
-    double *Q_, *Q_aux;
+    double *Q_, *Q_aux, *Phi_transp, *H_matrix_transp;
     double *P_matrix_propagated, *P_matrix, *P_aux, *u_as_e_T, *pred_meas;
     double *H_matrix, *R_matrix, *ones, *delta_r, *delta_z, approx_range, range;
     double range_rate, C_e_I[9], *I_meas, *K_matrix, *K_matrix_inv;
@@ -2722,7 +2722,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     free(F1); free(Q1); free(K_x_delta_z);
     free(I_meas); free(R_matrix); free (K_matrix_inv);
     free(K_x_H); free(I_less_k_x_H);
-    free(H_matrix);
+    free(H_matrix); free(Phi_transp); free(H_matrix_transp);
 
 }
 
@@ -3026,7 +3026,7 @@ void Loosely_coupled_INS_GNSS(INS_measurements *INS_measurements, int no_meas,\
 
   /* Initialize true navigation solution */
   time = INS_measurements->sec;
-  old_L_b=true_L_b = pvat_old->latitude;
+  est_L_b=true_L_b = pvat_old->latitude;
   true_lambda_b = pvat_old->longitude;
   true_h_b = pvat_old->height;
   for (i=0;i<3;i++) true_v_eb_n[i] = pvat_old->ned_velocity[i];
@@ -3121,7 +3121,7 @@ printf("\n *****************  NAV_EQUATIONS ENDS **************************\n");
 
    /* Only process if GNSS and INS timne differences are within 0.4 seconds */
   if ( fabs(time_last_GNSS - INS_measurements->sec) < 0.0001 \
-   &&  no_GNSS_meas>=4 && norm(LC_KF_config->init_pos_unc_ned, 2)<3.0) {
+   &&  no_meas>=4 && norm(LC_KF_config->init_pos_unc_ned, 2)<3.0) {
       /* KF time interval */
       tor_s = time - time_last_GNSS;
 
@@ -3715,6 +3715,7 @@ extern void LC_INS_GNSS_core(double* GNSS_r_eb_e, double* gnss_xyz_ini_cov,
         for (j=0;j<17;j++) {
           PVA_old->P[i*17+j]=pvat_new.P[i*17+j];
         }
+      }
 
       for(i=0;i<6;i++) PVA_old->out_IMU_bias_est[i]=out_IMU_bias_est[i];
       for(i=0;i<17;i++) PVA_old->out_errors[i]=out_errors[i];
@@ -4105,7 +4106,8 @@ extern void imu_tactical_navigation(FILE *imu_file) {
  double f_ib_b[3], omega_ib_b[3], f_ib_n[3], C_b_n[9], eul_nb_n[3];
  double r_eb_e[3], v_eb_e[3], C_b_e[9], eul_eb_e[3];
  double est_r_eb_e[3], est_v_eb_e[3], est_C_b_e[3];
- double wiee[3], llh[3], gan[3], q[4];
+  double C_Transp[9];
+ double wiee[3], llh[3]={0.0}, gan[3], q[4];
  um7pack_t imu={0};
  double G = 9.80665;
  int i,j;
@@ -4121,6 +4123,7 @@ extern void imu_tactical_navigation(FILE *imu_file) {
  old_r_eb_e[0]= 1761300.949;
  old_r_eb_e[1]= -4078202.553;
  old_r_eb_e[2]= 4561403.792;
+
  /* Local or navigation-frame velocities and acceleration */
  old_v_eb_n[0]=0.0;//-0.02;
  f_ib_n[0]= -0.144; //E-W
@@ -4129,12 +4132,14 @@ extern void imu_tactical_navigation(FILE *imu_file) {
  old_v_eb_n[2]=0.0;// 0.04;
  f_ib_n[2]=  0.605; //U-D
 
+
  /* Attitude Initialization (Groves, 2013)  */
 
  /* Earth rotation vector in e-frame	*/
  wiee[0]=0;wiee[1]=0;wiee[2]=OMGE;
 
  ecef2pos(old_r_eb_e, llh);
+  //llh[0]=45.950319743*D2R; llh[1]=-66.641372715*D2R;
  /* local apparent gravity vector */
  appgrav(llh, gan, wiee);
 
@@ -4142,15 +4147,28 @@ extern void imu_tactical_navigation(FILE *imu_file) {
  /* Levelling and gyrocompassing, update imu->aea[] vector */
  for (i=0;i<3;i++) imu.a[i]=f_ib_n[i];
  for (i=0;i<3;i++) imu.v[i]=old_v_eb_n[i];
- coarseAlign(&imu, gan);
+
+ coarseAlign(imu.a, imu.g, imu.v, gan, imu.aea);
+
 
  for (i=0;i<3;i++) eul_nb_n[i]=imu.aea[i];
 
- Euler_to_quaternion(eul_nb_n, q);
- Quaternion_to_DCM(q, C_b_n); //Euler_to_CTM(eul_nb_n, C_b_n);
 
- NED_to_ECEF(&llh[0], &llh[1], &llh[2], old_v_eb_n, C_b_n, \
+ for (i = 0; i <3; i++) {
+   for (j = 0; j < 3; j++) {
+     C_Transp[j*3+i]=C_b_n[i*3+j];
+   }
+ }
+
+ printf("POSb: %lf, %lf, %lf\n",old_r_eb_e[0],old_r_eb_e[1],old_r_eb_e[2] );
+  printf("llh: %lf, %lf, %lf\n",llh[0],llh[1],llh[2] );
+
+ NED_to_ECEF(&llh[0], &llh[1], &llh[2], old_v_eb_n, C_Transp, \
  old_r_eb_e, old_v_eb_e, old_C_b_e);
+
+ printf("POSa: %lf, %lf, %lf\n",old_r_eb_e[0],old_r_eb_e[1],old_r_eb_e[2] );
+
+ printf("Here 1\n");
 /*
  printf("Pllhnew: %lf, %lf, %lf\n",llh[0]*R2D,llh[1]*R2D,llh );
  printf("eul_nb_n: %lf, %lf, %lf\n",eul_nb_n[0],eul_nb_n[1],eul_nb_n[2] );
@@ -4165,14 +4183,22 @@ extern void imu_tactical_navigation(FILE *imu_file) {
    old_C_b_e[0],old_C_b_e[1],old_C_b_e[2],\
    old_C_b_e[3],old_C_b_e[4],old_C_b_e[5],\
    old_C_b_e[6],old_C_b_e[7],old_C_b_e[8]);
+
 */
+   fgets(str, 100, imu_file);
+   sscanf(str, "%f %lf %lf %lf %lf %lf %lf", &t_prev, &f_ib_b[2],\
+   &f_ib_b[1],&f_ib_b[0], &omega_ib_b[2],&omega_ib_b[1],&omega_ib_b[0]);
+
+   printf("time begninning: %f\n", t_prev);
 
  while ( fgets(str, 100, imu_file)!= NULL ){
 
    sscanf(str, "%f %lf %lf %lf %lf %lf %lf", &t_curr, &f_ib_b[2],\
-   &f_ib_b[0],&f_ib_b[1], &omega_ib_b[2],&omega_ib_b[0],&omega_ib_b[1]);
+   &f_ib_b[1],&f_ib_b[0], &omega_ib_b[2],&omega_ib_b[1],&omega_ib_b[0]);
 
    tor_i=t_curr-t_prev;
+
+   printf("Read time: %f and Diff: %f\n", t_curr, tor_i);
 
    /* Turn-on bias */
    /* Turn-on initial biases             //exp4*/
@@ -4195,13 +4221,6 @@ extern void imu_tactical_navigation(FILE *imu_file) {
 */
 
 
-   /* Stationary-condition */
-  if (norm(old_v_eb_n,3) > 0.5) {
-    //  printf("IS MOVING\n");
-  }else{//printf("IS STATIC\n");
-    //for (j=0;j<3;j++) PVA_prev_sol.v[j]=0.0;
-  }
-
    printf("\n *****************  NAV_EQUATIONS BEGINS ************************\n");
       Nav_equations_ECEF(tor_i,\
           old_r_eb_e, old_v_eb_e, old_C_b_e, f_ib_b,\
@@ -4213,20 +4232,30 @@ extern void imu_tactical_navigation(FILE *imu_file) {
    for (i=0;i<9;i++) old_C_b_e[i]= est_C_b_e[i];
    t_prev=t_curr;
 
-   ECEF_to_NED(est_r_eb_e, est_v_eb_e, est_C_b_e, &llh[0], &llh[1], &llh[2],\
+    printf("POS: %lf, %lf, %lf\n",old_r_eb_e[0],old_r_eb_e[1],old_r_eb_e[2] );
+
+   /* Convert navigation solution to NED  */
+   ECEF_to_NED(est_r_eb_e, est_v_eb_e, old_C_b_e, &llh[0], &llh[1], &llh[2],\
    old_v_eb_n, C_b_n);
-/*
-   printf("C_b_n:%lf, %lf, %lf, |%lf, %lf, %lf, |%lf, %lf, %lf\n",\
-    C_b_n[0],C_b_n[1],C_b_n[2],\
-    C_b_n[3],C_b_n[4],C_b_n[5],\
-    C_b_n[6],C_b_n[7],C_b_n[8]);
-*/
-   ecef2pos(est_r_eb_e, llh);
+
+
+     for (i=0;i<3;i++){
+       for (j=0;j<3;j++) {
+         C_Transp[j*3+i]=C_b_n[i*3+j];
+       }
+     }
+     for (i=0;i<3;i++){
+       for (j=0;j<3;j++) {
+         C_b_n[i*3+j]=C_Transp[i*3+j];
+       }
+     }
 
    /* Cbn to euler */
    CTM_to_Euler(eul_nb_n, C_b_n);
-   printf("eul_nb_n: %lf, %lf, %lf\n",eul_nb_n[0],eul_nb_n[1],eul_nb_n[2] );
-   DCM_to_quaternion(C_b_n,q);
+
+
+   ecef2pos(est_r_eb_e, llh);
+
 
    //Quaternion_to_euler(q, eul_nb_n);
    printf("eul_nb_n: %lf, %lf, %lf\n",eul_nb_n[0],eul_nb_n[1],eul_nb_n[2] );
