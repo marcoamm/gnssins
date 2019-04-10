@@ -1,0 +1,17 @@
+% program   : RTKPOST ver.2.4.2
+% inp file  : Z:\home\emerson\Desktop\Connected_folders\gnssins\data\APS_center.19O
+% inp file  : Z:\home\emerson\Desktop\Connected_folders\gnssins\data\APS_center.19N
+% inp file  : Z:\home\emerson\Desktop\Connected_folders\gnssins\data\igs20454.*
+% obs start : 2019/03/19 19:46:07.0 GPST (week2045 243967.0s)
+% obs end   : 2019/03/19 20:15:56.0 GPST (week2045 245756.0s)
+% pos mode  : ppp-kinematic
+% solution  : forward
+% elev mask : 15.0 deg
+% dynamics  : on
+% tidecorr  : off
+% tropo opt : est ztd
+% ephemeris : precise
+% antenna1  :                       ( 0.0000  0.0000  0.0000)
+%
+% (lat/lon/height=WGS84/ellipsoidal,Q=1:fix,2:float,3:sbas,4:dgps,5:single,6:ppp,ns=# of satellites)
+%  GPST                  latitude(deg) longitude(deg)  height(m)   Q  ns   sdn(m)   sde(m)   sdu(m)  sdne(m)  sdeu(m)  sdun(m) age(s)  ratio

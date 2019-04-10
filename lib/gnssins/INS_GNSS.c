@@ -686,7 +686,7 @@ TC_KF_config->range_rate_SD = 0.1;
 * return : what does it return?
 * notes  :
 *-----------------------------------------------------------------------------*/
-void Skew_symmetric (double *vec, double *W){
+extern void Skew_symmetric (double *vec, double *W){
   W[0]= 0.0;    W[1]=-vec[2]; W[2]= vec[1];
   W[3]= vec[2]; W[4]= 0.0;    W[5]=-vec[0];
   W[6]=-vec[1]; W[7]= vec[0]; W[8]= 0.0;
@@ -1695,8 +1695,6 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     F1=mat(17,2*no_meas); Q1=mat(2*no_meas,2*no_meas); K_x_delta_z=mat(17,1);
     K_x_H=mat(17,17); I_less_k_x_H=mat(17,17); I = eye(3);
 
-    printf("TCKF epoch propagation: %lf\n",tor_s);
-    printf("Number of measurements: %d\n", no_meas);
 
     for (i=0;i<no_meas;i++) ones[i]=1.0;
     for (i = 0; i < 3; i++) est_r_eb_e[i]=est_r_eb_e_old[i];
@@ -2185,7 +2183,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     Skew_symmetric(x_est_new, Skew_x_est_new);
     for (i=0;i<9;i++) I_less_Skew[i]= I[i]-Skew_x_est_new[i];
     matmul_row("NN",3,3,3,1.0,I_less_Skew,est_C_b_e_old,0.0,est_C_b_e_new);
-    matmul("NN",3,3,3,1.0,est_C_b_e_old,I_less_Skew,0.0,est_C_b_e_new);
+    //matmul("NN",3,3,3,1.0,est_C_b_e_old,I_less_Skew,0.0,est_C_b_e_new);
 
     for (i=3;i<6;i++) est_v_eb_e_new[i-3] = est_v_eb_e_old[i-3] - x_est_new[i];
     for (i=6;i<9;i++) est_r_eb_e_new[i-6] = est_r_eb_e_old[i-6] - x_est_new[i];
@@ -2337,8 +2335,8 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
 
 % Copyright 2012, Paul Groves
 % License: BSD; see license.txt for details  */
- void LC_KF_Epoch(double *GNSS_r_eb_e, double *GNSS_v_eb_e, int no_meas,\
-   float tor_s, double *est_C_b_e_old, double *est_v_eb_e_old, double *est_r_eb_e_old,\
+ void LC_KF_Epoch(double time, double *GNSS_r_eb_e, double *GNSS_v_eb_e, int no_meas,\
+   double tor_s, double *est_C_b_e_old, double *est_v_eb_e_old, double *est_r_eb_e_old,\
    double *est_IMU_bias_old, double *P_matrix_old, double *meas_f_ib_b,\
    double est_L_b_old, LC_KF_config *LC_KF_config, double *est_C_b_e_new,\
    double *est_v_eb_e_new, double *est_r_eb_e_new, double *est_IMU_bias_new,\
@@ -2372,17 +2370,36 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     Phi_matrix=eye(15); Phi_transp=zeros(15,15); Q_prime_matrix=zeros(15,15);
     x_est_propagated=zeros(15,1); x_est_new=zeros(15,1);
     P_matrix_propagated=mat(15,15); P_aux=mat(15,15); Q_aux=mat(15,15);
-    P_matrix=mat(15,15); u_as_e_T=zeros(no_meas,3); pred_meas=zeros(no_meas,2);
-    H_matrix=zeros((2 * no_meas),15); ones=mat(no_meas,1); I_meas=eye(no_meas);
-    H_matrix_transp=zeros(15, 2*no_meas);
-    R_matrix=zeros((2 * no_meas),(2 * no_meas)); I_par=eye(15);
-    K_matrix_inv=zeros((2 * no_meas),(2 * no_meas));
-    K_matrix=mat(15,(2 * no_meas));
-    delta_r=mat(no_meas,3); delta_z=mat(2 * no_meas,1); Q_=mat(15,15);
-    F1=mat(15,2*no_meas); Q1=mat(2*no_meas,2*no_meas); K_x_delta_z=mat(15,1);
+    P_matrix=mat(15,15); u_as_e_T=zeros(no_meas,3); pred_meas=zeros(no_meas,1);
+    H_matrix=zeros((no_meas),15); ones=mat(no_meas,1); I_meas=eye(no_meas);
+    H_matrix_transp=zeros(15, no_meas);
+    R_matrix=zeros((no_meas),(no_meas)); I_par=eye(15);
+    K_matrix_inv=zeros((no_meas),(no_meas));
+    K_matrix=mat(15,(no_meas));
+    delta_r=mat(no_meas,3); delta_z=mat(no_meas,1); Q_=mat(15,15);
+    F1=mat(15,no_meas); Q1=mat(no_meas,no_meas); K_x_delta_z=mat(15,1);
     K_x_H=mat(15,15); I_less_k_x_H=mat(15,15); I = eye(3);
+/*
+    printf("INPUT:\n");
+    printf("no_meas=%d;\n",no_meas);
+    printf("tor_s=%lf;\n",tor_s);
 
+    printf("est_IMU_bias_old=[");
+    for (i = 0; i < 6; i++) {
+      printf("%lf, \n", est_IMU_bias_old[i]);
+        }
+    printf("]\n");
 
+    printf("]\n");
+    printf("P_matrix_old=[");
+    for (i = 0; i < 15; i++) {
+      for (j = 0; j < 15; j++) {
+        printf("%.13lf, ", P_matrix_old[i*15+j]);
+      }
+      printf(";\n");
+    }
+    printf("]\n");
+*/
     for (i=0;i<no_meas;i++) ones[i]=1.0;
     for (i = 0; i < 3; i++) est_r_eb_e[i]=est_r_eb_e_old[i];
 
@@ -2443,7 +2460,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
         Phi_matrix[i*15+j] = I[(i-6)*3+(j-3)] * tor_s;
       }
     }
-
+/*
     printf("Phi_matrix\n");
     for (i = 0; i < 15; i++) {
       for (j = 0; j < 15; j++) {
@@ -2452,7 +2469,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
       printf("\n");
     }
     printf("\n");
-
+*/
 
     /* 2. Determine approximate system noise covariance matrix using (14.82) */
     //Q_prime_matrix(1:3,1:3) = eye(3) * LC_KF_config.gyro_noise_PSD * tor_s;
@@ -2483,7 +2500,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
          LC_KF_config->gyro_bias_PSD * tor_s:0.0);
       }
     }
-
+/*
     printf("Q_matrix\n");
     for (i = 0; i < 15; i++) {
       for (j = 0; j < 15; j++) {
@@ -2492,7 +2509,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
       printf("\n");
     }
     printf("\n");
-
+*/
     /* 3. Propagate state estimates using (3.14) noting that all states are zero
        due to closed-loop correction.  */
    for (i = 0; i < 15; i++) x_est_propagated[i] = 0.0;
@@ -2520,7 +2537,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
         P_matrix_propagated[i*15+j]= Q_[i*15+j]+0.5*Q_prime_matrix[i*15+j]; /*P_ = PHI*(Pp + 0.5*Q)*PHI^T + 0.5*Q*/
       }
     }
-
+/*
     printf("P_matrix_old\n");
     for (i = 0; i < 15; i++) {
       for (j = 0; j < 15; j++) {
@@ -2538,7 +2555,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
       printf("\n");
     }
     printf("\n");
-
+*/
     /* MEASUREMENT UPDATE PHASE */
 
     /* 5. Set-up measurement matrix using (14.115)  */
@@ -2556,16 +2573,16 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
        H_matrix[i*15+j] = (i==j?-1.0:0.0);
      }
    }
-
+/*
    printf("H_matrix\n");
-   for (i = 0; i < no_meas*2; i++) {
+   for (i = 0; i < no_meas; i++) {
      for (j = 0; j < 15; j++) {
        printf("%.12lf ", H_matrix[i*15+j]);
      }
      printf("\n");
    }
    printf("\n");
-
+*/
    /* 6. Set-up measurement noise covariance matrix assuming all components of
     GNSS position and velocity are independent and have equal variance. */
 
@@ -2598,19 +2615,19 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
          pow(LC_KF_config->vel_meas_SD,2);
       }
     }
-
+/*
     printf("R_meas_noise\n");
-    for (i = 0; i < no_meas*2; i++) {
-      for (j = 0; j < no_meas*2; j++) {
-        printf("%.12lf ", R_matrix[i*(no_meas*2)+j]);
+    for (i = 0; i < no_meas; i++) {
+      for (j = 0; j < no_meas; j++) {
+        printf("%.12lf ", R_matrix[i*(no_meas)+j]);
       }
       printf("\n");
     }
     printf("\n");
-
-    for (i = 0; i < 2*no_meas; i++) {
+*/
+    for (i = 0; i < no_meas; i++) {
       for (j = 0; j < 15; j++) {
-        H_matrix_transp[j*2*no_meas+i]= H_matrix[i*15+j];
+        H_matrix_transp[j*no_meas+i]= H_matrix[i*15+j];
       }
     }
 
@@ -2635,22 +2652,24 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
       printf("Invertion status, if 0 > info:error! info:%d\n", info);
       printf("\n\n\n\n********************************** ERROR INVERTING MATRIX**************************************\n\n\n\n\n");
     }
-
+/*
     printf("K_gain\n");
     for (i = 0; i < 15; i++) {
-      for (j = 0; j < no_meas*2; j++) {
-        printf("%.12lf ", K_matrix[i*(no_meas*2)+j]);
+      for (j = 0; j < no_meas; j++) {
+        printf("%.12lf ", K_matrix[i*(no_meas)+j]);
       }
       printf("\n");
     }
     printf("\n");
-
-    //STOPPEDD HEREEEEEE!!
-
-
+*/
     /* 8. Formulate measurement innovations using (14.102), noting that zero
-    % lever arm is assumed here  */
+    % lever arm is assumed here
+  printf("GNSS pos and vel: %lf, %lf, %lf, %lf, %lf, %lf\n",GNSS_r_eb_e[0],GNSS_r_eb_e[1],GNSS_r_eb_e[2],GNSS_v_eb_e[0], \
+  GNSS_v_eb_e[1],GNSS_v_eb_e[2]  );
 
+  printf("INS pos and vel: %lf, %lf, %lf, %lf, %lf, %lf\n",est_r_eb_e_old[0],est_r_eb_e_old[1],est_r_eb_e_old[2],est_v_eb_e_old[0], \
+est_v_eb_e_old[1],est_v_eb_e_old[2]  );
+*/
     for (i = 0; i < 3; i++) {
       delta_z[i] = GNSS_r_eb_e[i] -est_r_eb_e_old[i];
     }
@@ -2658,7 +2677,12 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     for (i = 3; i < 6; i++) {
       delta_z[i] = GNSS_v_eb_e[i-3] -est_v_eb_e_old[i-3];
     }
-
+/* Set a form for position and velocity residuals
+    for (i = 0; i < no_meas; i++) {
+      fprintf(out_KF_residuals,"%lf %2d %lf %lf\n", time,\
+      GNSS_measurements[i].sat, delta_z[i], delta_z[i+no_meas] );
+    }
+*/
 
     /* 9. Update state estimates using (3.24) */
     matmul_row("NN",15,1,6,1.0,K_matrix,delta_z,0.0,K_x_delta_z);
@@ -2675,26 +2699,32 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
 
     matmul_row("NN",15,15,15,1.0,I_less_k_x_H,P_matrix_propagated,0.0,P_matrix_new);
 
+    fprintf(out_KF_state_error,"%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf \
+    %lf %lf %lf %lf %lf\n", time,\
+    x_est_new[0],x_est_new[1],x_est_new[2],x_est_new[3],x_est_new[4],x_est_new[5],\
+    x_est_new[6],x_est_new[7],x_est_new[8],x_est_new[9],x_est_new[10],\
+    x_est_new[11],x_est_new[12],x_est_new[13],x_est_new[14],x_est_new[15]);
+
     /* CLOSED-LOOP CORRECTION */
 
-
+/*
     for(i=0;i<no_meas;i++) {
        printf("delta_z[%d]:%lf\t",i,delta_z[i]);
     }
     printf("\n");
 
    for (i=0;i<15;i++) printf("x_est_new.[%d]:%lf\n",i, x_est_new[i]);
-
+*/
 
     /* Correct attitude, velocity, and position using (14.7-9) */
 
-    /* Quaternion attitude correction */
+    /* Quaternion attitude correction
     printf("est_C_b_e_old: %lf, %lf, %lf\n%lf, %lf, %lf\n%lf, %lf, %lf\n",\
     est_C_b_e_old[0],est_C_b_e_old[1],est_C_b_e_old[2],est_C_b_e_old[3],\
     est_C_b_e_old[4],est_C_b_e_old[5],est_C_b_e_old[6],est_C_b_e_old[7],est_C_b_e_old[8]);
 
     Quaternion_attitude_errror_correction(x_est_new, est_C_b_e_old, est_C_b_e_new);
-
+   */
 
     Skew_symmetric(x_est_new, Skew_x_est_new);
 
@@ -2709,7 +2739,6 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     for (i=0;i<6;i++) est_IMU_bias_new[i] = est_IMU_bias_old[i] + x_est_new[i+9];
 
 
-
     /* Ends */
 
     /* Freeing memory */
@@ -2722,7 +2751,7 @@ void Quaternion_attitude_errror_correction(double *est_delta_Psi, \
     free(F1); free(Q1); free(K_x_delta_z);
     free(I_meas); free(R_matrix); free (K_matrix_inv);
     free(K_x_H); free(I_less_k_x_H);
-    free(H_matrix); free(Phi_transp); free(H_matrix_transp);
+    free(H_matrix);
 
 }
 
@@ -2993,7 +3022,8 @@ void Nav_equations_ECEF(double tor_i,\
 % notes  :
 *-----------------------------------------------------------------------------*/
 void Loosely_coupled_INS_GNSS(INS_measurements *INS_measurements, int no_meas,\
-  PVAT_solution *pvat_old, int no_par, float old_time, float time_last_GNSS, \
+  PVAT_solution *pvat_old, int no_par, double old_time, double time_last_GNSS, double curr_GNSS_time, \
+  double *GNSS_r_eb_e, double *GNSS_v_eb_e, \
   initialization_errors *initialization_errors, IMU_errors *IMU_errors,\
   GNSS_config *GNSS_config, LC_KF_config *LC_KF_config, PVAT_solution *pvat_new,\
   double *out_errors, double *out_IMU_bias_est, double *out_KF_SD, \
@@ -3011,7 +3041,7 @@ void Loosely_coupled_INS_GNSS(INS_measurements *INS_measurements, int no_meas,\
   double est_IMU_bias[6]={0};
   double quant_residuals[6]={0};
   double *P_matrix, *P_matrix_new;
-  float GNSS_epoch, tor_i, time, tor_s;
+  double GNSS_epoch, tor_i, time, tor_s;
   int i,j;
   double est_C_b_e_new[9], est_C_b_n_T[9], est_v_eb_e_new[3], est_r_eb_e_new[3];
   double est_IMU_bias_new[6], est_clock_new[2];
@@ -3019,10 +3049,10 @@ void Loosely_coupled_INS_GNSS(INS_measurements *INS_measurements, int no_meas,\
   double C_Transp[9]={0.0};
 
   printf("\n *****************  LC_INS/GNSS BEGINS ************************\n");
-/*
+/**/
   printf("P: %lf, %lf, %lf\n",pvat_old->latitude*R2D,pvat_old->longitude*R2D,pvat_old->height );
   printf("V: %lf, %lf, %lf\n",pvat_old->ned_velocity[0],pvat_old->ned_velocity[1],pvat_old->ned_velocity[2] );
-  printf("A: %lf, %lf, %lf\n",pvat_old->euler_angles[0],pvat_old->euler_angles[1],pvat_old->euler_angles[2] );*/
+  printf("A: %lf, %lf, %lf\n",pvat_old->euler_angles[0],pvat_old->euler_angles[1],pvat_old->euler_angles[2] );
 
   /* Initialize true navigation solution */
   time = INS_measurements->sec;
@@ -3032,6 +3062,8 @@ void Loosely_coupled_INS_GNSS(INS_measurements *INS_measurements, int no_meas,\
   for (i=0;i<3;i++) true_v_eb_n[i] = pvat_old->ned_velocity[i];
   for (i=0;i<3;i++) true_eul_nb[i] = pvat_old->euler_angles[i];
   Euler_to_CTM(true_eul_nb, true_C_b_n);
+
+  printf("true_eul_nb: %lf, %lf, %lf\n", true_eul_nb[0],true_eul_nb[1],true_eul_nb[2]);
 
   /* Transposing "true_C_b_n" (in _n_b) to actual _b_n frame*/
    for (i=0;i<3;i++){
@@ -3071,7 +3103,7 @@ void Loosely_coupled_INS_GNSS(INS_measurements *INS_measurements, int no_meas,\
     printf("ERRROS ARE NOT ZERO \n");
     for (i = 0; i < no_par; i++) {
       for (j = 0; j < no_par; j++) {
-          P_matrix[i*no_par+j]=pvat_old->P[i*17+j];
+          P_matrix[i*no_par+j]=pvat_old->P[i*no_par+j];
       }
     }
   }else{
@@ -3120,14 +3152,20 @@ printf("\n *****************  NAV_EQUATIONS ENDS **************************\n");
     /* Determine whether to update GNSS simulation and run Kalman filter */
 
    /* Only process if GNSS and INS timne differences are within 0.4 seconds */
-  if ( fabs(time_last_GNSS - INS_measurements->sec) < 0.0001 \
-   &&  no_meas>=4 && norm(LC_KF_config->init_pos_unc_ned, 2)<3.0) {
+   printf("TimeDIFF: %lf, no_meas: %d, NORM hor.pos.: %lf - time: %lf, time_last_GNSS: %lf\n",\
+   fabs(curr_GNSS_time - INS_measurements->sec),\
+    no_meas, norm(LC_KF_config->init_pos_unc_ned, 2), time, time_last_GNSS);
+
+  if ( fabs(curr_GNSS_time - INS_measurements->sec) < 0.0001 \
+      && norm(LC_KF_config->init_pos_unc_ned, 2)<3.0) {
+
+     printf("LCKF_here\n");
       /* KF time interval */
       tor_s = time - time_last_GNSS;
 
       /* Run Integration Kalman filter */
 printf("\n *******************  LC_KF_EPOCH BEGINS ************************\n");
-    /**/  LC_KF_Epoch(old_true_r_eb_e,old_true_v_eb_e,no_meas, tor_s, est_C_b_e,\
+    /**/  LC_KF_Epoch(time, GNSS_r_eb_e, GNSS_v_eb_e, no_meas, tor_s, est_C_b_e,\
             est_v_eb_e,est_r_eb_e,est_IMU_bias, P_matrix,\
             meas_f_ib_b,est_L_b,LC_KF_config, est_C_b_e_new,\
             est_v_eb_e_new, est_r_eb_e_new, est_IMU_bias_new,\
@@ -3155,7 +3193,7 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
 
       for (i = 0; i < 6; i++) out_IMU_bias_est[i]=est_IMU_bias_new[i];
 
-      fprintf(out_IMU_bias_file,"%f %lf %lf %lf %lf %lf %lf\n", time, \
+      fprintf(out_IMU_bias_file,"%lf %lf %lf %lf %lf %lf %lf\n", time, \
       est_IMU_bias_new[0],est_IMU_bias_new[1],est_IMU_bias_new[2],\
       est_IMU_bias_new[3],est_IMU_bias_new[4], est_IMU_bias_new[5]);
 
@@ -3178,6 +3216,7 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
         }
       }
 
+      pvat_new->Nav_or_KF=1;
 
     }else{
       /* Full weight matrix */
@@ -3190,6 +3229,7 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
       for (i=0;i<3;i++) est_r_eb_e_new[i]= est_r_eb_e[i];
       for (i=0;i<3;i++) est_v_eb_e_new[i]= est_v_eb_e[i];
       for (i=0;i<9;i++) est_C_b_e_new[i] = est_C_b_e[i];
+      pvat_new->Nav_or_KF=0;
 
     }
 
@@ -3228,6 +3268,8 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
 
      /* Passing Cbe from KF direclty to the next Navigation */
      for (i=0;i<9;i++) pvat_new->C_b_e[i]=est_C_b_e_new[i];
+     for (i=0;i<3;i++) pvat_new->re[i]= est_r_eb_e_new[i];
+     for (i=0;i<3;i++) pvat_new->ve[i]= est_v_eb_e_new[i];
 
 
   /* Free memory */
@@ -3445,9 +3487,30 @@ printf("\n *****************  NAV_EQUATIONS ENDS **************************\n");
 
   printf("Norm of en_uncert.: t: %lf norm: %lf\n", GNSS_measurements->sec, norm(TC_KF_config->init_pos_unc_ned, 2));
 
+  printf("GNSS.INS.Horizontal.velocities: %lf %lf \n", norm(pvagnss.v,2),norm(est_v_eb_e,2) );
+/**/
+  if ( fabs(GNSS_measurements->sec - 243340.00) <= 0.0001 || fabs(GNSS_measurements->sec - 243341.00) <= 0.0001 || \
+     fabs(GNSS_measurements->sec - 243339.00) <= 0.0001 ) {
+    GNSS_measurements[0].gdop[0] = 3.0;
+    printf("Epochs.taken.out: %lf\n",GNSS_measurements->sec );
+  }
+
+  /* Convert navigation solution to NED
+  ECEF_to_NED(est_r_eb_e, est_v_eb_e, est_C_b_e,\
+    &true_L_b,&est_lambda_b,&est_h_b,\
+    est_v_eb_n,est_C_b_n);
+    */
+
+  if (fabs(norm(pvagnss.v,2)) < 5) {
+    printf("Epochs.GNSS_Vel_Jumps: %lf\n",GNSS_measurements->sec );
+  }
+
+  //&& fabs(norm(pvagnss.v,2)-norm(est_v_eb_e,2)) < 5
+
     /* Determine whether to run Kalman filter */
   if ( fabs(GNSS_measurements->sec - INS_measurements->sec) < 0.0001 \
-   &&  GNSS_measurements[0].gdop[0]<2.5 && no_GNSS_meas>=4 && norm(TC_KF_config->init_pos_unc_ned, 2)<3.0) {   //gdops: 2.4,2.8
+   &&  GNSS_measurements[0].gdop[0]<2.5 && no_GNSS_meas>=4 && \
+   norm(TC_KF_config->init_pos_unc_ned, 2)<5.0) {   //gdops: 2.4,2.8
      //no_GNSS_meas>=4 && norm(TC_KF_config->init_pos_unc_ned, 2)<4.0 &&
 
       /* KF time interval */
@@ -3483,10 +3546,6 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
 
       for (i = 0; i < 6; i++) out_IMU_bias_est[i]=est_IMU_bias_new[i];
 
-      fprintf(out_IMU_bias_file,"%lf %lf %lf %lf %.10lf %.10lf %.10lf\n", time, \
-      out_IMU_bias_est[0],out_IMU_bias_est[1],out_IMU_bias_est[2],\
-      out_IMU_bias_est[3],out_IMU_bias_est[4], out_IMU_bias_est[5] );
-
 
       /* Generate KF uncertainty output record */
       fprintf(out_KF_SD_file,"%lf\t", time);
@@ -3510,6 +3569,12 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
       pvat_new->Nav_or_KF=1;
 
     }else{
+      if (fabs(GNSS_measurements->sec - INS_measurements->sec) < 0.0001) {
+        printf("WAS.NOT.INTEGRATED: time: %lf, DOP:%lf<2.5, GNSSmeas: %d>=4, POsunc: %lf<3.0, VEL: %lf< 5m/s \n",\
+        GNSS_measurements->sec,\
+        GNSS_measurements[0].gdop[0], no_GNSS_meas, norm(TC_KF_config->init_pos_unc_ned,2), \
+        (norm(pvagnss.v,2)-norm(est_v_eb_e,2)));
+      }
       /* Full weight matrix */
       for (i=0; i<17; i++) {
         for (j=0;j<17;j++) {
@@ -3524,6 +3589,10 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
       pvat_new->Nav_or_KF=0;
 
     }
+
+    fprintf(out_IMU_bias_file,"%lf %lf %lf %lf %.10lf %.10lf %.10lf\n", time, \
+    out_IMU_bias_est[0],out_IMU_bias_est[1],out_IMU_bias_est[2],\
+    out_IMU_bias_est[3],out_IMU_bias_est[4], out_IMU_bias_est[5] );
 
     /* Convert navigation solution to NED  */
     ECEF_to_NED(est_r_eb_e_new,est_v_eb_e_new,est_C_b_e_new,\
@@ -3553,8 +3622,6 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
 
    double q_b_n[4];
    DCM_to_quaternion(est_C_b_n, q_b_n);
-
-
    Quaternion_to_euler(q_b_n, pvat_new->euler_angles);
 
    printf("Euler from Quaternions: %lf, %lf, %lf\n",pvat_new->euler_angles[0],\
@@ -3564,6 +3631,7 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
     pvat_new->longitude = est_lambda_b;
     pvat_new->height = est_h_b;
     for (i=0;i<3;i++) pvat_new->ned_velocity[i] = est_v_eb_n[i];
+    for (i=0;i<9;i++) pvat_new->C_b_n[i]=est_C_b_n[i];
     CTM_to_Euler(pvat_new->euler_angles, est_C_b_n_T);
     pvat_new->time=time;
 
@@ -3575,6 +3643,8 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
 
     /* Passing Cbe from KF direclty to the next Navigation */
     for (i=0;i<9;i++) pvat_new->C_b_e[i]=est_C_b_e_new[i];
+    for (i=0;i<3;i++) pvat_new->re[i]= est_r_eb_e_new[i];
+    for (i=0;i<3;i++) pvat_new->ve[i]= est_v_eb_e_new[i];
 
 
   /* Free memory */
@@ -3597,7 +3667,7 @@ printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n"
 *-----------------------------------------------------------------------------*/
 //int main (void){
 //int InsGnssCore (){ LATER, WHEN LINKED TO OTHER MAIN FUNCTION USE IT THIS WAY
-extern void LC_INS_GNSS_core(double* GNSS_r_eb_e, double* gnss_xyz_ini_cov,
+extern void LC_INS_GNSS_core(double* GNSS_r_eb_e, double* gnss_xyz_ini_cov, double* gnss_ned_cov,
      double* GNSS_v_eb_e, double* gnss_xyz_vel_cov, \
      double ini_pos_time, um7pack_t *imu_data, double imu_time_diff,\
      pva_t *PVA_old, imuraw_t *imuobsp, int Tact_or_Low_IMU){
@@ -3613,7 +3683,7 @@ extern void LC_INS_GNSS_core(double* GNSS_r_eb_e, double* gnss_xyz_ini_cov,
   PVAT_solution pvat_new = {{0}};
   INS_measurements INS_meas = {0};
   double llh[3], enu_ini_vel[3], rr[3];
-  float old_time=0.0, last_GNSS_time=0.0;
+  double old_time=0.0, last_GNSS_time=0.0, curr_GNSS_time;
   int i, j, k;
 
   printf("\n *****************  LC INSGNSS CORE BEGINS ***********************\n");
@@ -3630,12 +3700,17 @@ extern void LC_INS_GNSS_core(double* GNSS_r_eb_e, double* gnss_xyz_ini_cov,
   }
 
   memset(&INS_meas, 0, sizeof(INS_measurements));
-
+/**/
   printf("IMU_data time: %f\n", imu_data->sec);
+  printf("PVA_old.A: %lf %lf %lf\n", PVA_old->A[0],PVA_old->A[1],PVA_old->A[2] );
+
 
   /* Current INS time */
   INS_meas.sec=imu_data->sec;
   INS_meas.tt = imu_time_diff;
+
+  /* Current GNSS time */
+  curr_GNSS_time=ini_pos_time;
 
   /* Last GNSS or State time and Last imu time */
   if (PVA_old->sec<=0.00) {
@@ -3647,6 +3722,9 @@ extern void LC_INS_GNSS_core(double* GNSS_r_eb_e, double* gnss_xyz_ini_cov,
     old_time=pvat_old.time=PVA_old->sec;
     last_GNSS_time = PVA_old->t_s; /* last state time */
   }
+/*
+    printf("Time: %lf  - timediff: %lf and old_time: %lf\n", imu_data->sec,imu_time_diff, old_time);
+    printf("OLDTimes: %lf  %lf\n", old_time, pvat_old.time);*/
 
   /* Initial position and velocity from GNSS or previous PVA solution */
   if (imu_time_diff<0.1) {        /* If first solution, use GNSS */
@@ -3654,23 +3732,38 @@ extern void LC_INS_GNSS_core(double* GNSS_r_eb_e, double* gnss_xyz_ini_cov,
     pvat_old.latitude = llh[0];
     pvat_old.longitude = llh[1];
     pvat_old.height = llh[2];
-    ecef2enu(llh,GNSS_v_eb_e,pvat_old.ned_velocity);
-     /* From gyrocompassing and levelling from current IMU meas. */
-     for(j=0;j<3;j++) pvat_old.euler_angles[j]=imu_data->aea[j];
-     for(j=0;j<3;j++) pvat_old.euler_angles[j]=0.0;
+    ecef2enu(llh,GNSS_v_eb_e,enu_ini_vel); /* Here is ENU! */
+    /* ENU to NED velocity from gnss solution */
+     pvat_old.ned_velocity[0]= enu_ini_vel[1];
+     pvat_old.ned_velocity[1]= enu_ini_vel[0];
+     pvat_old.ned_velocity[2]=-enu_ini_vel[2];
+
+     /* IMU bias */
+     for(i=0;i<3;i++) out_IMU_bias_est[i]=IMU_errors.b_a[i];
+     for(i=0;i<3;i++) out_IMU_bias_est[i+3]=IMU_errors.b_g[i];
+     for(i=0;i<3;i++) pvat_old.euler_angles[i]=PVA_old->A[i]; /* in _nb frame */
+     /* Type of solution */
+     PVA_old->Nav_or_KF=pvat_new.Nav_or_KF=0;
+     /* Attitude matrix */
+     for (i=0;i<9;i++) pvat_old.C_b_e[i]=PVA_old->Cbe[i];
+
   }else{                 /* Otherwise, use previous PVA solution */
-    ecef2pos(PVA_old->r,llh);
-    pvat_old.latitude = llh[0];
-    pvat_old.longitude = llh[1];
-    pvat_old.height = llh[2];
-    for(i=0;i<3;i++) pvat_old.ned_velocity[i]=PVA_old->v[i]; /*already in NED */
-    for(i=0;i<3;i++) pvat_old.euler_angles[i]=PVA_old->A[i];
+    pvat_old.latitude = PVA_old->r[0];
+    pvat_old.longitude = PVA_old->r[1];
+    pvat_old.height = PVA_old->r[2];
+  for(i=0;i<3;i++) pvat_old.ned_velocity[i]=PVA_old->v[i]; /*already in NED */
+  for(i=0;i<3;i++) pvat_old.euler_angles[i]=PVA_old->A[i]; /* in _nb frame */
 
-  }
+  /* Attitude matrix */
+  for (i=0;i<9;i++) pvat_old.C_b_e[i]=PVA_old->Cbe[i];
 
-  /* Constraining height with GNSS ones since there are no jumps */
-  ecef2pos(GNSS_r_eb_e,llh);
-  //pvat_old.height = llh[2];
+  /* IMU bias */
+  for(i=0;i<6;i++) out_IMU_bias_est[i]=PVA_old->out_IMU_bias_est[i];
+  for(i=0;i<17;i++) out_errors[i]=PVA_old->out_errors[i];
+}
+
+/* Type of preiou solution  */
+pvat_old.Nav_or_KF = PVA_old->Nav_or_KF;
 
 
   /* Current IMU measurement structure initialization */
@@ -3679,48 +3772,56 @@ extern void LC_INS_GNSS_core(double* GNSS_r_eb_e, double* gnss_xyz_ini_cov,
 
   /* IMU bias */
   for(i=0;i<6;i++) out_IMU_bias_est[i]=PVA_old->out_IMU_bias_est[i];
-  for(i=0;i<17;i++) out_errors[i]=PVA_old->out_errors[i];
+  for(i=0;i<no_par;i++) out_errors[i]=PVA_old->out_errors[i];
 
   /* Full P matrix */
-  for (i = 0; i < 17; i++) {
-    for (j = 0; j < 17; j++) {
-      pvat_old.P[i*17+j]=PVA_old->P[i*17+j];
+  for (i = 0; i < no_par; i++) {
+    for (j = 0; j < no_par; j++) {
+      pvat_old.P[i*no_par+j]=PVA_old->P[i*no_par+j];
     }
   }
 
   /* Position covariance from GNSS */
-  for (j = 0; j < 3; j++) LC_KF_config.init_pos_unc[j]=sqrt(gnss_xyz_ini_cov[j]);
+  for (j = 0; j < 3; j++) TC_KF_config.init_pos_unc[j]=sqrt(gnss_xyz_ini_cov[j]); /* For the filter */
+  for (j = 0; j < 3; j++) LC_KF_config.init_pos_unc_ned[j]=sqrt(gnss_ned_cov[j]); /* For testing the integration condition */
   for (j = 0; j < 3; j++) LC_KF_config.init_vel_unc[j]=sqrt(gnss_xyz_vel_cov[j]);
 
-
+  printf("LC_KF_config.init_pos_unc_ned[j]:%lf %lf %lf\n",LC_KF_config.init_pos_unc_ned[0],\
+LC_KF_config.init_pos_unc_ned[1], LC_KF_config.init_pos_unc_ned[2] );
 
   /* Loosely coupled ECEF Inertial navigation and GNSS integrated navigation -*/
    Loosely_coupled_INS_GNSS(&INS_meas, no_meas, &pvat_old, no_par, old_time, \
-     last_GNSS_time, &initialization_errors, &IMU_errors,\
+     last_GNSS_time, curr_GNSS_time, GNSS_r_eb_e, GNSS_v_eb_e, &initialization_errors, &IMU_errors,\
       &GNSS_config, &LC_KF_config, &pvat_new, out_errors, out_IMU_bias_est,\
       out_KF_SD, meas_f_ib_b, meas_omega_ib_b);
 
-      llh[0]=pvat_new.latitude;
-      llh[1]=pvat_new.longitude;
-      llh[2]=pvat_new.height;
-      pos2ecef(llh, PVA_old->r);
+      PVA_old->r[0]=pvat_new.latitude;
+      PVA_old->r[1]=pvat_new.longitude;
+      PVA_old->r[2]=pvat_new.height;
+      //pos2ecef(llh, PVA_old->r);
       for(i=0;i<3;i++) PVA_old->v[i]=pvat_new.ned_velocity[i];
-      for(i=0;i<3;i++) PVA_old->A[i]=pvat_new.euler_angles[i];
+      for(i=0;i<3;i++) PVA_old->A[i]=pvat_new.euler_angles[i]; /*in ?????*/
       PVA_old->sec=pvat_new.time;
 
       for (i=0;i<9;i++) PVA_old->Cbe[i]=pvat_new.C_b_e[i];
+      for (i=0;i<3;i++) PVA_old->re[i]=pvat_new.re[i];
+      for (i=0;i<3;i++) PVA_old->ve[i]=pvat_new.ve[i];
 
       /* Full weight matrix  */
-      for (i=0; i<17; i++) {
-        for (j=0;j<17;j++) {
-          PVA_old->P[i*17+j]=pvat_new.P[i*17+j];
+      for (i=0; i<no_par; i++) {
+        for (j=0;j<no_par;j++) {
+          PVA_old->P[i*no_par+j]=pvat_new.P[i*no_par+j];
         }
       }
 
       for(i=0;i<6;i++) PVA_old->out_IMU_bias_est[i]=out_IMU_bias_est[i];
-      for(i=0;i<17;i++) PVA_old->out_errors[i]=out_errors[i];
+      for(i=0;i<no_par;i++) PVA_old->out_errors[i]=out_errors[i];
 
-      PVA_old->t_s=last_GNSS_time;
+      /* Type of solution  */
+      PVA_old->Nav_or_KF=pvat_new.Nav_or_KF;
+
+
+      //PVA_old->t_s=curr_GNSS_time;
 
 
 /*
@@ -3782,7 +3883,7 @@ extern void TC_INS_GNSS_core(rtk_t *rtk, const obsd_t *obs, int n,\
   imu_data->a[0], imu_data->a[1],\
   imu_data->a[2], imu_data->g[0],imu_data->g[1], imu_data->g[2] );*/
 
-/*  printf("P: %lf, %lf, %lf\n",PVA_old->r[0],PVA_old->r[1],PVA_old->r[2] );
+/*  printf("P: %lf, %lf, %lf\n",PVA_old->re[0],PVA_old->re[1],PVA_old->re[2] );
   printf("V: %lf, %lf, %lf\n",PVA_old->v[0],PVA_old->v[1],PVA_old->v[2] );
   printf("A: %lf, %lf, %lf\n",PVA_old->A[0],PVA_old->A[1],PVA_old->A[2] );
   printf("dtr, dtrs: %lf, %lf\n", PVA_old->clock_offset_drift[0],PVA_old->clock_offset_drift[1]);*/
@@ -3811,6 +3912,9 @@ extern void TC_INS_GNSS_core(rtk_t *rtk, const obsd_t *obs, int n,\
   INS_meas.sec=imu_data->sec;
   INS_meas.tt=imu_time_diff;
 
+  printf("IMU_data time: %f\n", imu_data->sec);
+  printf("PVA_old.A: %lf %lf %lf\n", PVA_old->A[0],PVA_old->A[1],PVA_old->A[2] );
+
   /* Last GNSS or State time and Last imu time */
   if (PVA_old->sec<=0.00) {
     old_time=pvat_old.time=PVA_old->sec=INS_meas.sec-0.5; /* Initialize according to IMU rate*/
@@ -3833,9 +3937,7 @@ extern void TC_INS_GNSS_core(rtk_t *rtk, const obsd_t *obs, int n,\
      pvat_old.ned_velocity[0]= enu_ini_vel[1];
      pvat_old.ned_velocity[1]= enu_ini_vel[0];
      pvat_old.ned_velocity[2]=-enu_ini_vel[2];
-     /* From gyrocompassing and levelling from current IMU meas. */
-     for(j=0;j<3;j++) pvat_old.euler_angles[j]=imu_data->aea[j]; /* in _nb frame */
-     for(j=0;j<3;j++) pvat_old.euler_angles[j]=0.0;
+
      /* initialize clock offset and drift from gnss */
      clock_offset[0] = rtk->sol.dtr[0]*CLIGHT;//rtk->sol.dtr[0];//]x[3]; //or = rtk->sol.dtr[0];
      clock_offset[1] = rtk->sol.dtrr;
@@ -3850,10 +3952,10 @@ extern void TC_INS_GNSS_core(rtk_t *rtk, const obsd_t *obs, int n,\
      for (i=0;i<9;i++) pvat_old.C_b_e[i]=PVA_old->Cbe[i];
 
   }else{                 /* Otherwise, use previous PVA solution */
-    ecef2pos(PVA_old->r,llh);
-    pvat_old.latitude = llh[0];
-    pvat_old.longitude = llh[1];
-    pvat_old.height = llh[2];
+    //ecef2pos(PVA_old->re,PVA_old->r);
+    pvat_old.latitude = PVA_old->r[0];
+    pvat_old.longitude = PVA_old->r[1];
+    pvat_old.height = PVA_old->r[2];
     for(i=0;i<3;i++) pvat_old.ned_velocity[i]=PVA_old->v[i]; /*already in NED */
     for(i=0;i<3;i++) pvat_old.euler_angles[i]=PVA_old->A[i]; /* in _nb frame */
 
@@ -3876,12 +3978,9 @@ extern void TC_INS_GNSS_core(rtk_t *rtk, const obsd_t *obs, int n,\
   ecef2pos(rtk->sol.rr,llh);
   //pvat_old.height = llh[2];
 
-
   /* initialize clock offset and drift from gnss  */
   clock_offset[0] = rtk->sol.dtr[0]*CLIGHT;//rtk->sol.dtr[0];//]x[3]; //or = rtk->sol.dtr[0];
   clock_offset[1] = rtk->sol.dtrr;
-
-
 
   /* From gyrocompassing and levelling from current IMU meas.
   for(j=0;j<3;j++) pvat_old.euler_angles[j]=imu_data->aea[j];*/
@@ -4064,14 +4163,17 @@ for (i = 0; i < no_GNSS_meas; i++) {
       &GNSS_config, &TC_KF_config, &pvat_new, out_errors, out_IMU_bias_est,\
       out_clock, out_KF_SD, meas_f_ib_b, meas_omega_ib_b);
 
-      llh[0]=pvat_new.latitude;
-      llh[1]=pvat_new.longitude;
-      llh[2]=pvat_new.height;
-      pos2ecef(llh, PVA_old->r);
+      PVA_old->r[0]=pvat_new.latitude;
+      PVA_old->r[1]=pvat_new.longitude;
+      PVA_old->r[2]=pvat_new.height;
+      //pos2ecef(llh, PVA_old->r);
       for(i=0;i<3;i++) PVA_old->v[i]=pvat_new.ned_velocity[i];
       for(i=0;i<3;i++) PVA_old->A[i]=pvat_new.euler_angles[i]; /*in ?????*/
       PVA_old->sec=pvat_new.time;
+
       for (i=0;i<9;i++) PVA_old->Cbe[i]=pvat_new.C_b_e[i];
+      for (i=0;i<3;i++) PVA_old->re[i]=pvat_new.re[i];
+      for (i=0;i<3;i++) PVA_old->ve[i]=pvat_new.ve[i];
 
       /* Full weight matrix  */
       for (i=0; i<17; i++) {

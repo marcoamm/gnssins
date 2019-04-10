@@ -184,7 +184,9 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double height;           /* height (m) */
   double ned_velocity[3];  /* north, east, down velocity (m/s) */
   double euler_angles[3];  /* roll, pitch, yaw angle of body w.r.t NED (rad) */
+  double ve[3],re[3], ae[3]; /*states in ecef */
   double C_b_e[9];        /* Tranformation matrix from body-to-ECEF frame  */
+  double C_b_n[9];
   int Nav_or_KF;          /* Navigation sol:0 KF Integrated sol:1   */
   double P[17*17];        /* Full TC KF weight matrix (it accomodates for the LC[15*15]) */
 } PVAT_solution;

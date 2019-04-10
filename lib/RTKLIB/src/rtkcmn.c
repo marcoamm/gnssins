@@ -3291,7 +3291,7 @@ extern void dops(int ns, const double *azel, double elmin, double *dop)
         H[  4*n]=cosel*sin(azel[i*2]);
         H[1+4*n]=cosel*cos(azel[i*2]);
         H[2+4*n]=sinel;
-        H[3+4*n++]=1.0; 
+        H[3+4*n++]=1.0;
     }
     if (n<4) return;
 

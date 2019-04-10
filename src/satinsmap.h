@@ -157,6 +157,7 @@ typedef struct {        /* Position, velocity and attitude structure (PVA) */
     double v[3]; /* Velocity in n-frame {vn,ve,vd} (m/s) */
     double A[3]; /* Attitude vector xyz {roll,pitch,yaw} (rad) */
     double Cbn[9]; /* Attitude matrix {rad}*/
+    double ve[3],re[3], ae[3]; /* states in ecef */
     double Cbe[9]; /* Attitude matrix {rad}*/
     double P[17*17]; /* Full TC KF weight matrix (and LC KF P[15*15])*/
     double out_errors[17];  /*(weights) Attitude, velocity, position, acc. and gyro bias, clock offset and drift errors */
