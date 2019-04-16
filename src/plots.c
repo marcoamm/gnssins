@@ -101,7 +101,7 @@ extern void imueulerplot(char* filename){
               "set ylabel 'ATTITUDE ANGLE (deg)' \n"
 	      "set yrange [-200:200] \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s euler_angles_march3.ps'\n"
+	      "set output '%s euler_angles_march.ps'\n"
 	      "set autoscale \n"
         //"set xrange [242141.328125:244778.140625] \n"  // city collection
         //"set xrange [394477.000:397062.000] \n"  //bmo collection
@@ -124,7 +124,7 @@ extern void imuposplot(char* filename){
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s positions_march3_beginning.ps'\n"
+	      "set output '%s positions_march_obstruction.ps'\n"
         /* General view  */
         //"set yrange [45.942:45.9432] \n"  //BMO field general view
         //"set xrange [-66.6418:-66.6402] \n"
@@ -132,31 +132,32 @@ extern void imuposplot(char* filename){
         "set yrange [45.943:45.9432] \n"
         "set xrange [-66.6412:-66.6410] \n"*/
         //"set autoscale \n"
-        //"set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
-        //"set xrange [-66.675:-66.63] \n"
-        //"set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
-        //"set xrange [-66.6455:-66.6355] \n"
+        "set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
+        "set xrange [-66.675:-66.63] \n"
+        "set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
+        "set xrange [-66.6455:-66.6355] \n" 
         //"set yrange [45.93:45.94] \n"  // Highway
-        //"set xrange [-66.650:-66.66] \n"
+        //"set xrange [-66.66:-66.650] \n"
         //"set yrange [45.95:45.955] \n"  // UNB parking lot
         //"set xrange [-66.645:-66.640] \n"
         //"set yrange [45.945:45.955] \n"  // UNB parking lot 2
         //"set xrange [-66.65:-66.64] \n"
         //"set yrange [45.97:45.98] \n"  // Northside
         //"set xrange [-66.645:-66.635] \n"
-        "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
-        "set xrange [-66.6454:-66.618] \n"
+        //"set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
+        //"set xrange [-66.6454:-66.618] \n"
         "set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
         "set xrange [-66.635:-66.63] \n"
-        "set yrange [45.95:45.955] \n"  // March 21 - Beggining
-        "set xrange [-66.645:-66.64] \n"
+        //"set yrange [45.95:45.955] \n"  // March 21 - Beggining
+        //"set xrange [-66.645:-66.64] \n"
 	      "set grid \n", outpath[0]);
 
         // Obstructions: 396546.04 < $1 < , Off-road: 396838.72 - end
        // With points: w points pointtype 1.4
 /**/
-  //PPP_car_back(copy).pos  PPP_bmo(copy).pos
-  fprintf(gp,"plot '../out/PPP_march21.pos' u ($4):($3) w lp pointsize 0.4 lt 3 title \" PPP \", \
+  //PPP_car_back(copy).pos  PPP_bmo(copy).pos  PPP_march21.pos
+  fprintf(gp,"plot '../out/PPP_car_back.pos' u ($4):($3) w lp pointsize 0.4 lt 3 title \" PPP \", \
+  '../out/PPP_march21.pos' u ($4):($3) w lp pointsize 0.4 lt 3 notitle, \
   '%s' u ($3):($2) w lines lt rgb 'grey' notitle , \
    '%s' u ($3):( ($11) == 0 ? ($2):1/0 ) w points pointsize 0.08 pointtype 3 lt rgb 'red' title \" INS solution \" ,\
    '%s' u ($3):( ($11) == 1 ? ($2):1/0 ) w points pointsize 0.2 pointtype 3 lt rgb 'green' title \" INS/GNSS Integrated solution \" \n", filename, filename, filename);
@@ -204,7 +205,7 @@ extern void imuvelplot(char* filename){
 	      "set ylabel 'VELOCITIES (m/s)' \n"
 	      "set yrange [-40:40] \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s velocities_march3.ps'\n"
+	      "set output '%s velocities_march.ps'\n"
         //"set xrange [242141.328125:244778.140625] \n"  // city collection
         //"set xrange [394477.000:397062.000] \n"  //bmo collection
 	      //"set autoscale \n"

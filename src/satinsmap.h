@@ -180,6 +180,7 @@ extern FILE *out_KF_SD_file;
 extern FILE *out_KF_state_error;
 extern FILE *out_KF_residuals;
 extern FILE *imu_tactical;
+extern int zvu_counter;
 //fp_lane=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes1_XYZ_2016_ITRF08.txt","r");
        /* Lane coordinate file pointer */
 
