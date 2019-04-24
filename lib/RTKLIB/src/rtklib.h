@@ -1464,6 +1464,7 @@ extern int  init_rnxctr (rnxctr_t *rnx);
 extern void free_rnxctr (rnxctr_t *rnx);
 extern int  open_rnxctr (rnxctr_t *rnx, FILE *fp);
 extern int  input_rnxctr(rnxctr_t *rnx, FILE *fp);
+extern int addobsdata(obs_t *obs, const obsd_t *data);
 
 /* ephemeris and clock functions ---------------------------------------------*/
 extern double eph2clk (gtime_t time, const eph_t  *eph);

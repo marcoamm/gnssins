@@ -20,7 +20,13 @@ lane_t lane;
 imuraw_t imu_obs_global={{0}};
 pva_t pva_global={{0}};
 pva_t pvagnss={{0}};
-int zvu_counter=0;
+insgnss_opt_t insgnssopt={0};
+sol_t *solw;         /* gnss solution structure buffer */
+obsb_t obsw={0};          /* observation data buffer */
+ins_states_t *insw;   /* ins states buffer */
+int zvu_counter = 0;
+int gnss_meas_w = 0;
+int ins_meas_w = 0;
 
 char *outpath1[] = {"../out/"};  
 FILE *out_PVA;
@@ -1787,7 +1793,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
      if (check==NULL) {
          /* end of file */
           printf("END OF INS FILE: %s\n", check);
-          rewind(imu_tactical);
+          //rewind(imu_tactical);
          return;
        }else{imu_curr_meas.status=1;} 
         
@@ -2162,6 +2168,310 @@ if ( norm(ned_ini_vel,3) <= 0.000001 && norm(PVA_prev_sol.v,3) <= 0.000001) {
  printf("\n *****************  CORE ENDS ***********************\n");
 }
 
+/* input imu measurement data-------------------------------------------------*/
+static int inputimu(ins_states_t *ins){
+  char check, str[150];
+  um7pack_t imu_curr_meas={0};
+  int i;
+
+  if(ins->Tact_or_Low){
+    /* Tactical KVH input */
+    // For March experiments: 2,1,0 - For previous: 2, 0, 1
+    check=fgets(str, 150, imu_tactical);
+    sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &ins->time, &ins->data.fb0[2],\
+    &ins->data.fb0[1],&ins->data.fb0[0], &ins->data.wibb0[2],&ins->data.wibb0[1],\
+    &ins->data.wibb0[0]);
+
+    if (check==NULL) {
+      /* end of file */
+      printf("END OF INS FILE: %s\n", check);
+      //rewind(imu_tactical);
+      return 0;
+    }else{
+      imu_curr_meas.status=1;
+      return 1;
+      }
+
+  }else{
+    /* Low cost IMU um7 input*/
+   while(imu_curr_meas.status!=1){
+     if(!fgets(str, 150, fimu)) {
+       printf("END OF FILE?\n");
+       check=NULL;
+       return 0;
+       }
+      parseimudata(str,&imu_curr_meas);
+
+    // Fixing imu time
+   imu_curr_meas.sec=imu_curr_meas.sec+ \
+   ((double)imu_curr_meas.internal_time\
+   -floor((double)imu_curr_meas.internal_time));
+   }
+   ins->time=imu_curr_meas.sec;
+   for (i=0;i<3;i++) ins->data.fb0[i]=imu_curr_meas.a[i];
+   for (i=0;i<3;i++) ins->data.wibb0[i]=imu_curr_meas.g[i]; 
+
+   return 1;
+  } 
+    
+}
+
+/* Stores gnss measurement and observation to structure buffer by time */
+void gnssbuffer(sol_t *sol, obsd_t *data, int n){
+  int i, j, stat=0;
+  printf("GNSS_meas: iter: %d window: %d\n", gnss_meas_w, insgnssopt.gnssw);
+
+  if(gnss_meas_w >= insgnssopt.gnssw ){
+     for(i=0;i<insgnssopt.gnssw-1;i++){
+      solw[i]=solw[i+1];
+    }
+     for (i=0;i<n;i++) obsw.data0[j]=obsw.data1[j];
+     obsw.n0=obsw.n1;
+     for (i=0;i<n;i++) obsw.data1[i]=obsw.data2[i];
+     obsw.n1=obsw.n2;
+     for (i=0;i<n;i++) obsw.data2[i]=data[i];
+     obsw.n2=n;
+    solw[insgnssopt.gnssw-1]=*sol;
+  }else{
+    solw[gnss_meas_w]=*sol;
+    if(gnss_meas_w==0) {for (i=0;i<n;i++) obsw.data0[i]=data[i];
+       obsw.n0=n;}
+    else if(gnss_meas_w==1) {for (i=0;i<n;i++) obsw.data1[i]=data[i];
+    obsw.n1=n;}
+    else {for (i=0;i<n;i++) obsw.data2[i]=data[i]; 
+    obsw.n2=n;}
+  }
+}
+
+
+/* Stores ins measurement to structure buffer by time */
+void insbuffer(ins_states_t *insc){
+  int i;
+  printf("INS_meas: iter: %d window: %d\n", ins_meas_w, insgnssopt.insw);
+  if(ins_meas_w >= insgnssopt.insw ){
+    for(i=0;i<insgnssopt.insw-1;i++){
+      insw[i]=insw[i+1];
+    }
+    insw[insgnssopt.insw-1]=*insc;    
+  }else{
+    insw[ins_meas_w]=*insc;
+  }
+}
+
+/* Core function -------------------------------------------------------------
+* Description: Receive raw GNSS and INS data and determine a PVA solution
+* args:
+* rtk_t *rtk  IO
+* const obsd_t *obs I
+* int n I
+* const nav_t *nav  I
+* return:
+* obs.: this function is ran inside rtkpos function of RTKlib
+------------------------------------------------------------------------------*/
+extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
+  ins_states_t insc={{0}};
+  int i, j;
+  double gnss_time;
+  insc.Tact_or_Low=1; /* Tactical=1 and Low grade=0*/
+  insc.mode=1; /* TC:1 and LC=0 */
+
+
+  printf("\n *****************  CORE BEGINS ***********************\n");
+
+  /* Initialize time from GNSS */
+  gnss_time=time2gpst(rtk->sol.time,NULL);
+
+  /* initial ins states */
+  // Here it's where the PVA initialization with the alignment is done
+  //if (insw[0].ptime <= 0.0) init_ins(rtk->sol, insc); //*******TO DO
+   
+  
+  /* Feed gnss solution and measurement buffers */
+  gnssbuffer(&rtk->sol, obs, n);
+
+
+  /* Ins and integration loop
+  Processing window - integrates when GNSS and INS mea. are closer by 0.1s
+  The do while takes care when INS or GNSS is too ahead from each other         */ 
+  do {
+       
+    /* input ins */
+    if(!inputimu(&insc)) {printf("End of imu file\n"); break;}
+
+    printf("HERE s4\n");
+
+     //printf("INSBUFFER TIMES: %lf %lf %lf\n",insw[insgnssopt.insw-1].time,\
+     insw[insgnssopt.insw-2].time, insw[insgnssopt.insw-3].time);
+
+    /* If INS time is ahead of GNSS exit INS loop */ 
+    if (gnss_time-insc.time < -0.01) {// for tactical, -1.65 for consumer
+   
+      /* Back INS file reader */
+      rewind(imu_tactical);
+
+      break; 
+    }else{
+
+      /* Interpolate INS measurement to match GNSS time  */
+      if (insc.ptime>0.0) {
+        if (gnss_time < insc.time && gnss_time > insc.ptime) {
+          printf("INTERPOLATE INS MEAS TO GNSS TIME \n");
+          /* insc is modified  */
+         // IMU_meas_interpolation(insc.ptime, insc.time, gnss_time, \
+          &insc, &insw[ins_meas_w-1]);
+          /* Return imu file pointer to process the imu_curr in the next epoch */
+          //imufileback();
+      }
+     }
+
+     
+     
+     /* Tightly or Loosley-coupled integration 
+     // If enough GNSS measurements uses Tightly otherwise Loosley-coupled
+     if (insgnss_opt.mode) {
+       // Tightly coupled INS/GNSS 
+       if(insw[ins_meas_w-1].time > 0.0){
+         printf("Coarse.************************************ First NAV. solution\n");
+         TC_INS_GNSS_core(rtk, obs, n, nav, &insc, (double)insc.time\
+         - insc.ptime, gnss_ned_cov, gnss_vel_ned_cov, &PVA_prev_sol, \
+         insgnss_opt.Tact_or_Low, insgnss_opt.mode);
+        }else{
+           for (j=0;j<3;j++) PVA_prev_sol.re[j]=xyz_ini_pos[j];
+           ecef2pos(PVA_prev_sol.re,PVA_prev_sol.r);
+           for (j=0;j<3;j++) PVA_prev_sol.v[j]=ned_ini_vel[j];
+           for (j=0;j<3;j++) PVA_prev_sol.A[j]=insc.aea[j];
+           PVA_prev_sol.clock_offset_drift[0]=rtk->sol.dtr[0]*CLIGHT;
+           PVA_prev_sol.clock_offset_drift[1]=rtk->sol.dtrr;
+           PVA_prev_sol.sec=insc.sec;
+           PVA_prev_sol.time=insc.time;
+           }
+       }else{
+        // Loosley-coupled INS/GNSS 
+        if(imu_obs_prev.sec > 0.0){
+          //insgnssLC
+          LC_INS_GNSS_core(xyz_ini_pos, gnss_xyz_ini_cov, gnss_ned_cov, ned_ini_vel, gnss_vel_ned_cov, gnss_time, \
+          &insc, (double)insc.sec - imu_obs_prev.sec,\
+          &PVA_prev_sol, &imu_obs_prev, insgnss_opt.Tact_or_Low, insgnss_opt.mode);
+         }else{
+            for (j=0;j<3;j++) PVA_prev_sol.re[j]=xyz_ini_pos[j];
+            ecef2pos(PVA_prev_sol.re,PVA_prev_sol.r);
+            for (j=0;j<3;j++) PVA_prev_sol.v[j]=ned_ini_vel[j];
+            for (j=0;j<3;j++) PVA_prev_sol.A[j]=insc.aea[j];
+            PVA_prev_sol.clock_offset_drift[0]=rtk->sol.dtr[0]*CLIGHT;
+            PVA_prev_sol.clock_offset_drift[1]=rtk->sol.dtrr;
+            PVA_prev_sol.sec=insc.sec;
+            PVA_prev_sol.time=insc.time;
+            }
+       }
+
+       if(imu_obs_prev.sec > 0.0 ){
+         // Non-holonomic constraints  
+         nhc(&PVA_prev_sol, &insc, 17);
+         }
+
+       // Static detection
+       // Zero velocity update
+       if (zvu_counter++>10) {
+           printf("ZVU UPDATE: counter: %d", zvu_counter);
+           zvu(&PVA_prev_sol, &insc, 17);
+           zvu_counter=0;
+         }else{
+           zvu_counter=0;
+           }
+           
+        
+       // Output PVA solution 
+       if (PVA_prev_sol.sec<0.0) {
+        }else{
+          fprintf(out_PVA,"%lf %.12lf %.12lf %lf %lf %lf %lf %lf %lf %lf %d\n",\
+          PVA_prev_sol.sec, PVA_prev_sol.r[0]*R2D, PVA_prev_sol.r[1]*R2D, PVA_prev_sol.r[2],\
+          PVA_prev_sol.v[0], PVA_prev_sol.v[1], PVA_prev_sol.v[2],
+          PVA_prev_sol.A[0]*R2D,PVA_prev_sol.A[1]*R2D,PVA_prev_sol.A[2]*R2D, PVA_prev_sol.Nav_or_KF );
+         }
+
+      // Update measurements 
+      for (j=0;j<3;j++){
+        imu_obs_prev.fb[j]=insc.a[j];
+        imu_obs_prev.wibb[j]=insc.g[j];
+        }
+      imu_obs_prev.sec=insc.sec;
+      imu_obs_prev.time=insc.time;
+       */
+
+     } // end if else If INS time is ahead of GNSS exit INS loop condition
+
+     /* Add current ins measurement and solution to buffer */
+     insbuffer(&insc);
+ 
+     //printf("INSBUFFER TIMES: %lf %lf %lf %lf\n",insw[insgnssopt.insw-1].data.fb0[0],\
+     insw[insgnssopt.insw-2].data.fb0[0], insw[insgnssopt.insw-3].data.fb0[0], insw[insgnssopt.insw-4].data.fb0[0]);
+
+       if (ins_meas_w == 15)
+     {
+       //exit(0);
+     }
+
+     ins_meas_w++;    
+
+
+     /* Loop conditions */
+     if (gnss_time-insc.time<0.0001) {
+      printf("UPDATE INS AND GNSS \n");
+      break;
+     }else{
+       if (gnss_time-insc.time<-0.0001) {
+       printf("UPDATE INS AND GNSS \n");
+       break;
+       }else{
+         printf("KEEP UPDATING INS \n");
+        }
+      }
+
+  } while(gnss_time-insc.time > 0.0001 || \ 
+   gnss_time-insc.time > -0.0001 );
+
+   printf("GPSt: %lf, IMUt: %lf, dt: %lf\n", gnss_time, insc.time, gnss_time-insc.time); 
+
+
+   /* Initialize position from GNSS SPP */
+
+   /* Update */
+   printf("HERE 4\n");
+    /**/
+    printf("Length: %d\n", sizeof(obsw) );
+    printf("GNSSOBS N: %d %d %d\n", obsw.n0, \
+    obsw.n1,obsw.n2 );
+
+       //printf("GNSSOBS Sat: %d %d\n",obsw[0].data[0].sat, sizeof(obsw[0].data));
+       /*printf("GNSSOBS SNR: %lf \n",obsw[2]->data[0].P[0]);*/
+
+      if (gnss_meas_w >2)
+     {
+       printf("GNSSOBS TIMES: %lf %lf %lf\n",time2gpst(obsw.data0[0].time, NULL),\
+     time2gpst(obsw.data1[0].time, NULL), time2gpst(obsw.data2[0].time, NULL));
+        printf("GNSSOBS Sat: %d %d %d\n",obsw.data0[0].sat,\
+     obsw.data1[0].sat, obsw.data2[0].sat);
+       printf("GNSSOBS P: %lf %lf %lf\n",obsw.data0[0].P[0],\
+     obsw.data1[0].P[0], obsw.data2[0].P[0]);
+       
+     }
+
+     ins_meas_w++;
+    
+   
+
+    printf("GNSSSOL TIMES: %lf %lf %lf\n",time2gpst(solw[insgnssopt.gnssw-1].time, NULL),\
+    time2gpst(solw[insgnssopt.gnssw-2].time, NULL), time2gpst(solw[insgnssopt.gnssw-3].time, NULL));
+
+    printf("GNSSSOL dtr: %lf %lf %lf\n", solw[insgnssopt.gnssw-1].dtrr,\
+    solw[insgnssopt.gnssw-2].dtrr, solw[insgnssopt.gnssw-3].dtrr);
+
+   /* Global gnss and ins buffer counters */ 
+   gnss_meas_w++;
+
+ printf("\n *****************  CORE ENDS ***********************\n");
+}
+
 int main(void){
 /* Variables declaration =====================================================*/
 prcopt_t prcopt=prcopt_default;
@@ -2187,9 +2497,18 @@ char tracefname[]="../out/trace.txt"; //trace file
 int l=0,c;
 int argc; // Size of file or options?
 
+/* Global structures initialization */
+insgnssopt.mode = 1; /* Tightly=1, or Loosley=0 coupled solution */
+insgnssopt.Tact_or_Low = 1;       /* Type of inertial, tact=1, low=0 */ 
+insgnssopt.gnssw = 3; 
+insgnssopt.insw = 10;
+solw=(sol_t*)malloc(sizeof(sol_t)*insgnssopt.gnssw);  /* gnss solution structure window size allocation */
+insw=(ins_states_t*)malloc(sizeof(ins_states_t)*insgnssopt.insw);   /* ins states window size allocation */
+
+
 strcpy(filopt.trace,tracefname);
 
-/* Global TC_KF_INS_GNSS output files  
+/* Global TC_KF_INS_GNSS output files  */
 out_PVA=fopen("../out/out_PVA.txt","w");
 out_clock_file=fopen("../out/out_clock_file.txt","w");
 out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
@@ -2199,7 +2518,7 @@ out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
 //imu_tactical=fopen("../data/imu_ascii_new_1.txt", "r");
 imu_tactical=fopen("../data/imu_ascii_new_timesync2.txt", "r");
-fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");      */       
+fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");            
 
 /* Declarations from rnx2rtkp source code program */
 //clk93stream.rtcm3  CLK930600.rtcm3
@@ -2347,13 +2666,15 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
 /* Start rnx2rtkp processing  ----------------------------------- --*/
 /* Processing ------------------------------------------------------*/
- //ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
- //if (!ret) fprintf(stderr,"%40s\r","");
+ ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
+ if (!ret) fprintf(stderr,"%40s\r","");
+ 
+ free(solw); free(insw);
 
  /* ins navigation only */
  //imu_tactical_navigation(imu_tactical);
 
- /* Closing global files       
+ /* Closing global files       */
   //fclose(fp_lane);
   //fclose (fimu);
   fclose(out_PVA);
@@ -2364,7 +2685,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   fclose(imu_tactical);
   fclose(out_KF_state_error); 
   fclose(out_KF_residuals);  
-  fclose(fimu);               */
+  fclose(fimu);               
 
 /*
   char posfile[]="../out/out_PVA.txt";
@@ -2375,7 +2696,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 /* Other function call after processing ------------------------------*/ 
 
 
-/* INS/GNSS plots  */
+/* INS/GNSS plots  
 char gyrofile[]="../out/out_PVA.txt"; 
 imueulerplot(gyrofile);
 char velfile[]="../out/out_PVA.txt";
@@ -2399,7 +2720,7 @@ KF_state_errors_plot_accb(KF_states);
 KF_state_errors_plot_gyrb(KF_states);
 KF_state_errors_plot_clk(KF_states);
 char imu_KF_res[]="../out/out_KF_residuals.txt";
-KF_residuals_plot(imu_KF_res);
+KF_residuals_plot(imu_KF_res);                          */
 
 
 /* Plot IMU ra measurements

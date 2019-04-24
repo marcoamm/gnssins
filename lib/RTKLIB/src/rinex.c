@@ -801,7 +801,7 @@ static void restslips(unsigned char slips[][NFREQ], obsd_t *data)
     }
 }
 /* add obs data --------------------------------------------------------------*/
-static int addobsdata(obs_t *obs, const obsd_t *data)
+extern int addobsdata(obs_t *obs, const obsd_t *data)
 {
     obsd_t *obs_data;
     

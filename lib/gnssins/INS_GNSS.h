@@ -191,6 +191,7 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double P[17*17];        /* Full TC KF weight matrix (it accomodates for the LC[15*15]) */
 } PVAT_solution;
 
+
 typedef struct {      /* Position velocity and attitude solution structure */
   unsigned char sat;            /* Satellite number */
   gtime_t time;       /* receiver sampling time (GPST) */

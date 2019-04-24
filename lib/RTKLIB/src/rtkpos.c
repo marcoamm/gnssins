@@ -1854,7 +1854,8 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
       printf("DOPS RTKLIB_clk_off_drift:1 %lf (m) %lf (s/s)\n",rtk->sol.dtr[0], \
         rtk->sol.dtrr );
 
-      core(rtk, obs, n, nav);
+      //core(rtk, obs, n, nav);
+      core1(rtk, obs, n, nav);
 
       if (cdiff < 300000 && rtk->tt >= 0.0 ) {
          rtk->sol.dtr[0]=rtk->sol.dtr[0]*CLIGHT;

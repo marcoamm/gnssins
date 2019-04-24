@@ -108,7 +108,7 @@ extern void imueulerplot(char* filename){
 	      "set grid \n", outpath[0]);
 
   /* printing Euler angles */
-  fprintf(gp,"plot '%s' u ($1):($10) w l title \"yaw(z)\" ,\
+  fprintf(gp,"plot '%s' u ($1):($10<0.0?$10+360:$10) w l title \"yaw(z)\" ,\
          '%s' u ($1):($8) w l title \"roll(x)\" ,\
          '%s' u ($1):($9) w l title \"pitch(y)\" \n", filename, filename, filename);
 

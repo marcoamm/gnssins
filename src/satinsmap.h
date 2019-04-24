@@ -134,18 +134,17 @@ typedef struct {        /* UM7 sensor package records */
 typedef struct {        /* IMU sensor measurements */
     double sec;		/* amount of time in seconds since the sensor was on		*/
     gtime_t time;	/* GPS UTC time	*/
-    double wibb[3];	/* rate-gyro b-frame {wx,wy,wz} (deg/sec)	*/
-    double stdw[3];	/* rate-gyro stds */
-    double fb[3];	/* Specific-force b-frame {fx,fy,fz} (g or m/s^2)	*/
-    double stdf [3];	/* specific-force stds */
-    double ba[6]; /* Accelerometer bias and drift {bax,bay,baz,dbax,dbay,dbaz} */
-    double stdba[3];	/* Acc. bias stds */
-    double bg[6]; /* Gyroscope bias and drift {bgx,bgy,bgz,dbgx,dbgy,dbgz} */
-    double stdbg[3];	/* Gyro. bias stds */
-    double sma[6]; /* Accelerometer scale factors and cross-coupling {sax,say,saz,max,may,maz} */
-    double stdsma[6];	/* Acc. scale factors bias stds */
-    double smg[6]; /* Gyroscope scale factors and cross-coupling {sgx,sgy,sgz,mgx,mgy,mgz} */
-    double stdsmg[6];	/* Gyro. scale factors bias stds */
+    double ba[3],bg[3];     /* accelemeter-bias and gyro-bias */
+    double Ma[9];           /* non-orthogonal between sensor axes and body frame for accelerometers
+                             *    | sax    ra_xy  ra_xz |      | sgx    rg_xy  rg_xz |
+                             * Ma=| ra_yx  say    ra_yz |   Mg=| rg_yx  sgy    rg_yz |
+                             *    | ra_zx  ra_zy  saz   |      | rg_zx  rg_zy  sgz   |
+                             * */
+    double Mg[9];           /* non-orthogonal between sensor axes and body frame for gyroscopes */
+    double Gg[9];           /* g-dependent bias for a gyro triad */
+    double fb0[3],wibb0[3]; /* uncorrected specific-force (b-frame)/angular rate (b-frame) */
+    double fb[3],wibb[3];   /* corrected specific-force (b-frame)/angular rate (b-frame) */
+    float  stdba[3], stdbg[3]; /* acc and gyro stds */
 } imuraw_t;
 
 typedef struct {        /* Position, velocity and attitude structure (PVA) */
@@ -165,6 +164,49 @@ typedef struct {        /* Position, velocity and attitude structure (PVA) */
     int Nav_or_KF;          /* Navigation sol:0 KF Integrated sol:1   */
 } pva_t;
 
+typedef struct {      /* Position velocity and attitude solution structure */
+  double time;             /* time (sec) */
+  double dt;              /* time difference of previous ins update and current time */
+  double vn[3],rn[3], an[3]; /*states in navigation frame */
+  double ve[3],re[3], ae[3]; /*states in ecef frame */
+  double Cbe[9];        /* Tranformation matrix from body-to-ECEF frame  */
+  double Cbn[9];        /* Tranformation matrix from body-to-navigation frame  */
+  double dtr[6];          /* receiver clock bias to time systems (s) */
+  double dtrr;            /* receiver clock‐drift (m/s) */
+  int Tact_or_Low;       /* Type of inertial, tact=1, low=0 */
+  imuraw_t data;       /* current epoch imu measurements */
+  imuraw_t pdata;      /* previous epoch imu measurements */
+  double lever[3];        /* lever arm for body to ant. (m) */
+  int nx,nb;              /* numbers of estimated states/fixed states (except phase bias) */
+  double *x,*P;           /* ekf estimated states/covariance matrix */
+  double *xa,*Pa;         /* estimated states and covariance for ins-gnss loosely coupled */
+  double *xb,*Pb;         /* fixed states and covariance (except phase bias) */
+  double *P0,*F;          /* predict error states correction and its covariance matrix/transmit matrix */
+  double ptime;             /* previous time (sec) */
+  double pre[3],pve[3],pCbe[9]; /* ins states (position/velocity/acceleration/attitude) of precious epoch in ecef-frame */
+  double age,ratio;       /* age of differential of ins and gnss (s)/ambiguity fix ratio */
+  int stat,gstat,pose;    /* ins updates stat,gnss updates status and pose fusion status */
+  int ns;                 /* numbers valid satellite for loosely coupled */
+  int Nav_or_KF;          /* Type of solution: Navigation sol:0 KF Integrated sol:1   */
+  int mode;               /* Tightly=1, or Loosley=0 coupled solution */
+} ins_states_t;
+
+typedef struct {  /* GNSS/INS processing options */
+  int mode;               /* Tightly=1, or Loosley=0 coupled solution */
+  int Tact_or_Low;       /* Type of inertial, tact=1, low=0 */
+  int Nav_or_KF;          /* Type of solution: Navigation sol:0 KF Integrated sol:1   */
+  int gnssw, insw;         /* GNSS and INS measurement window sizes */
+} insgnss_opt_t;
+
+typedef struct {        /* observation data buffer */
+    int n0,n1,n2;         /* number of obervation data/allocated */
+    obsd_t data0[MAXSAT];       /* observation data records */
+    obsd_t data1[MAXSAT];
+    obsd_t data2[MAXSAT];
+} obsb_t;
+
+
+
 /* global variables ----------------------------------------------------------*/
 extern lane_t lane;
 extern imuraw_t imu_obs_global;
@@ -181,6 +223,12 @@ extern FILE *out_KF_state_error;
 extern FILE *out_KF_residuals;
 extern FILE *imu_tactical;
 extern int zvu_counter;
+extern int gnss_meas_w;
+extern int ins_meas_w;
+extern sol_t *solw;
+extern obsb_t obsw;
+extern ins_states_t *insw;
+extern insgnss_opt_t insgnssopt;
 //fp_lane=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes1_XYZ_2016_ITRF08.txt","r");
        /* Lane coordinate file pointer */
 
