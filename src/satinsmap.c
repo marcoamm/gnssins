@@ -2174,7 +2174,7 @@ static int inputimu(ins_states_t *ins){
   um7pack_t imu_curr_meas={0};
   int i;
 
-  if(ins->Tact_or_Low){
+  if(insgnssopt.Tact_or_Low){
     /* Tactical KVH input */
     // For March experiments: 2,1,0 - For previous: 2, 0, 1
     check=fgets(str, 150, imu_tactical);
@@ -2218,14 +2218,14 @@ static int inputimu(ins_states_t *ins){
 
 /* Stores gnss measurement and observation to structure buffer by time */
 void gnssbuffer(sol_t *sol, obsd_t *data, int n){
-  int i, j, stat=0;
+  int i, stat=0;
   printf("GNSS_meas: iter: %d window: %d\n", gnss_meas_w, insgnssopt.gnssw);
 
   if(gnss_meas_w >= insgnssopt.gnssw ){
      for(i=0;i<insgnssopt.gnssw-1;i++){
       solw[i]=solw[i+1];
     }
-     for (i=0;i<n;i++) obsw.data0[j]=obsw.data1[j];
+     for (i=0;i<n;i++) obsw.data0[i]=obsw.data1[i];
      obsw.n0=obsw.n1;
      for (i=0;i<n;i++) obsw.data1[i]=obsw.data2[i];
      obsw.n1=obsw.n2;
@@ -2269,48 +2269,46 @@ void insbuffer(ins_states_t *insc){
 * obs.: this function is ran inside rtkpos function of RTKlib
 ------------------------------------------------------------------------------*/
 extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
-  ins_states_t insc={{0}};
   int i, j;
   double gnss_time;
-  insc.Tact_or_Low=1; /* Tactical=1 and Low grade=0*/
-  insc.mode=1; /* TC:1 and LC=0 */
+  ins_states_t insc={0};
 
 
   printf("\n *****************  CORE BEGINS ***********************\n");
 
   /* Initialize time from GNSS */
   gnss_time=time2gpst(rtk->sol.time,NULL);
-
-  /* initial ins states */
-  // Here it's where the PVA initialization with the alignment is done
-  //if (insw[0].ptime <= 0.0) init_ins(rtk->sol, insc); //*******TO DO
-   
   
   /* Feed gnss solution and measurement buffers */
   gnssbuffer(&rtk->sol, obs, n);
-
 
   /* Ins and integration loop
   Processing window - integrates when GNSS and INS mea. are closer by 0.1s
   The do while takes care when INS or GNSS is too ahead from each other         */ 
   do {
-       
     /* input ins */
     if(!inputimu(&insc)) {printf("End of imu file\n"); break;}
-
-    printf("HERE s4\n");
-
-     //printf("INSBUFFER TIMES: %lf %lf %lf\n",insw[insgnssopt.insw-1].time,\
-     insw[insgnssopt.insw-2].time, insw[insgnssopt.insw-3].time);
 
     /* If INS time is ahead of GNSS exit INS loop */ 
     if (gnss_time-insc.time < -0.01) {// for tactical, -1.65 for consumer
    
-      /* Back INS file reader */
+      /* Back INS file reader up */
       rewind(imu_tactical);
 
+      insc.stat=-1;
       break; 
     }else{
+      /* INS Navigation or INS/GNSS Integration */
+
+      /* Add current ins measurement to buffer */
+      insbuffer(&insc);
+    
+      printf("INSBUFFER TIMES: %lf %lf %lf\n",insw[insgnssopt.insw-1].time,\
+      insw[insgnssopt.insw-2].time, insw[insgnssopt.insw-3].time);
+
+      /* initial ins states */
+      // Here it's where the PVA initialization with the alignment is done
+      //if (insw[0].ptime <= 0.0) init_ins(rtk->sol, insc); //*******TO DO
 
       /* Interpolate INS measurement to match GNSS time  */
       if (insc.ptime>0.0) {
@@ -2399,9 +2397,6 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
        */
 
      } // end if else If INS time is ahead of GNSS exit INS loop condition
-
-     /* Add current ins measurement and solution to buffer */
-     insbuffer(&insc);
  
      //printf("INSBUFFER TIMES: %lf %lf %lf %lf\n",insw[insgnssopt.insw-1].data.fb0[0],\
      insw[insgnssopt.insw-2].data.fb0[0], insw[insgnssopt.insw-3].data.fb0[0], insw[insgnssopt.insw-4].data.fb0[0]);
@@ -2455,8 +2450,6 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
      obsw.data1[0].P[0], obsw.data2[0].P[0]);
        
      }
-
-     ins_meas_w++;
     
    
 
@@ -2504,7 +2497,6 @@ insgnssopt.gnssw = 3;
 insgnssopt.insw = 10;
 solw=(sol_t*)malloc(sizeof(sol_t)*insgnssopt.gnssw);  /* gnss solution structure window size allocation */
 insw=(ins_states_t*)malloc(sizeof(ins_states_t)*insgnssopt.insw);   /* ins states window size allocation */
-
 
 strcpy(filopt.trace,tracefname);
 

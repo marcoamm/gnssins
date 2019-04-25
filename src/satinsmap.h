@@ -173,7 +173,6 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double Cbn[9];        /* Tranformation matrix from body-to-navigation frame  */
   double dtr[6];          /* receiver clock bias to time systems (s) */
   double dtrr;            /* receiver clock‐drift (m/s) */
-  int Tact_or_Low;       /* Type of inertial, tact=1, low=0 */
   imuraw_t data;       /* current epoch imu measurements */
   imuraw_t pdata;      /* previous epoch imu measurements */
   double lever[3];        /* lever arm for body to ant. (m) */
@@ -186,9 +185,8 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double pre[3],pve[3],pCbe[9]; /* ins states (position/velocity/acceleration/attitude) of precious epoch in ecef-frame */
   double age,ratio;       /* age of differential of ins and gnss (s)/ambiguity fix ratio */
   int stat,gstat,pose;    /* ins updates stat,gnss updates status and pose fusion status */
+                          /* stat: -1: no valid solution, 0: Navigated, 1: Integrated */
   int ns;                 /* numbers valid satellite for loosely coupled */
-  int Nav_or_KF;          /* Type of solution: Navigation sol:0 KF Integrated sol:1   */
-  int mode;               /* Tightly=1, or Loosley=0 coupled solution */
 } ins_states_t;
 
 typedef struct {  /* GNSS/INS processing options */
