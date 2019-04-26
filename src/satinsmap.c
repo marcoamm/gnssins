@@ -2176,10 +2176,10 @@ if ( norm(ned_ini_vel,3) <= 0.000001 && norm(PVA_prev_sol.v,3) <= 0.000001) {
 }
 
 /* input imu measurement data-------------------------------------------------*/
-static int inputimu(ins_states_t *ins){
+static int inputimu(ins_states_t *ins, int week){
   char check, str[150];
   um7pack_t imu_curr_meas={0};
-  int i;
+  int i, j;
 
   if(insgnssopt.Tact_or_Low){
     /* Tactical KVH input */
@@ -2188,6 +2188,12 @@ static int inputimu(ins_states_t *ins){
     sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &ins->time, &ins->data.fb0[2],\
     &ins->data.fb0[1],&ins->data.fb0[0], &ins->data.wibb0[2],&ins->data.wibb0[1],\
     &ins->data.wibb0[0]);
+
+    ins->data.time=gpst2time(week, ins->time);
+
+    /* raw acc. to m/s*s and rate ve locity from degrees to radians  */
+    for (j= 0;j<3;j++) ins->data.fb0[j]=ins->data.fb0[j]*Gcte;
+    for (j=0;j<3;j++) ins->data.wibb0[j]=ins->data.wibb0[j]*D2R;
 
     if (check==NULL) {
       /* end of file */
@@ -2216,7 +2222,8 @@ static int inputimu(ins_states_t *ins){
    }
    ins->time=imu_curr_meas.sec;
    for (i=0;i<3;i++) ins->data.fb0[i]=imu_curr_meas.a[i];
-   for (i=0;i<3;i++) ins->data.wibb0[i]=imu_curr_meas.g[i]; 
+   for (i=0;i<3;i++) ins->data.wibb0[i]=imu_curr_meas.g[i];
+   ins->data.time=gpst2time(week, imu_curr_meas.sec);
 
    return 1;
   } 
@@ -2383,6 +2390,63 @@ extern void gapv2ipv(const double *pos,const double *vel,const double *Cbe,
     }
 }
 
+/* give gps antenna position/velocity to initialize ins states when static ---
+ * args    :  gtime_t time     I  time of antenna position/velocity
+ *            double *rr       I  gps antenna position (ecef)
+ *            double *vr       I  gps antenna velocity (ecef)
+ *            ins_states_t *insc  O  initialed ins states
+ * return  : 1 (ok) or 0 (fail)
+ * --------------------------------------------------------------------------*/
+extern int coarse_align(gtime_t time,const double *rr,const double *vr,
+                     ins_states_t *insc)
+{
+    double llh[3],vn[3],C[9],rpy[3]={0}, sineyaw, coseyaw;
+    int i;
+
+    trace(3,"coarse_align: time=%s\n",time_str(time,4));
+
+    /* velocity in navigation frame */
+    ecef2pos(rr,llh);
+    ned2xyz(llh,C);
+    matmul("TN",3,1,3,1.0,C,vr,0.0,vn);
+
+    matcpy(insc->rn,llh,1,3);
+    matcpy(insc->vn,vn ,1,3);
+
+    /* Levelling from Groves (2013) */
+    rpy[0]= atan2(-insc->data.fb0[1],-insc->data.fb0[2]); /* roll - phi angle */  
+    rpy[1]= atan (insc->data.fb0[0]/sqrt(insc->data.fb0[1]*insc->data.fb0[1]+insc->data.fb0[2]*insc->data.fb0[2])); /* pitch - theta angle */
+
+    /* Gyrocompasing by Groves(2013,page 199)  */
+    /* yaw - psi angle */
+    sineyaw=-insc->data.wibb0[1]*cos(rpy[0])+insc->data.wibb0[2]*sin(rpy[0]);
+    coseyaw= insc->data.wibb0[0]*cos(rpy[1])+insc->data.wibb0[1]*sin(rpy[0])*sin(rpy[1])+\
+    insc->data.wibb0[2]*cos(rpy[0])*sin(rpy[1]);
+    rpy[2]=atan2(sineyaw,coseyaw);  /* yaw */
+
+    for(i=0;i<3;i++) insc->an[i]=rpy[i];
+
+    rpy2dcm(rpy,C);
+    /* Row to column order Or matrix transpose */
+    row_to_column_order(C,3,3,insc->Cbn);
+
+    ned2xyz(llh,C);
+    matmul("NN",3,3,3,1.0,C,insc->Cbn,0.0,insc->Cbe);
+
+    /* find closest imu measurement index */
+    if (&insc->data) {
+      if (fabs(timediff(time,insc->data.time))>0.005) { // DTTOL:tolerance of time difference
+          printf("Time tolerance limit error: %lf \n", fabs(timediff(time,insc->data.time)));
+         return 0;
+      }
+    } 
+
+    /* initial ins position */
+    gapv2ipv(rr,vr,insc->Cbe,insgnssopt.lever,&insc->data, \
+             insc->re,insc->ve);
+    return 1;
+}
+
 /* give gps antenna position/velocity to initial ins states-----------------
  * args    :  gtime_t time     I  time of antenna position/velocity
  *            double *rr       I  gps antenna position (ecef)
@@ -2408,6 +2472,8 @@ extern int ant2inins(gtime_t time,const double *rr,const double *vr,
 
     rpy[2]=vel2head(vn); /* yaw */
 
+    for(i=0;i<3;i++) insc->an[i]=rpy[i];
+
     rpy2dcm(rpy,C);
     /* Row to column order Or matrix transpose */
     row_to_column_order(C,3,3,insc->Cbn);
@@ -2415,15 +2481,17 @@ extern int ant2inins(gtime_t time,const double *rr,const double *vr,
     ned2xyz(llh,C);
     matmul("NN",3,3,3,1.0,C,insc->Cbn,0.0,insc->Cbe);
 
-    
-
     /* find closest imu measurement index */
     if (&insc->data) {
+
       if (fabs(timediff(time,insc->data.time))>0.005) { // DTTOL:tolerance of time difference
+         printf("Time tolerance limit error: %lf \n", fabs(timediff(time,insc->data.time)));
          return 0;
       } 
       /* align imu measurement data */
-      if (norm(insc->data.wibb0,3)>(10*D2R)) return 0; //MAXROT: 10*D2R max rotation of vehicle when velocity matching alignment */
+      if (norm(insc->data.wibb0,3)>(10*D2R)) {
+        printf("Car rotating: %lf \n", norm(insc->data.wibb0,3));
+        return 0;} //MAXROT: 10*D2R max rotation of vehicle when velocity matching alignment */
     }
     /* initial ins position */
     gapv2ipv(rr,vr,insc->Cbe,insgnssopt.lever,&insc->data,  //**********ADICIONAR lever no insgnss_opt_t structure!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2438,33 +2506,43 @@ extern int ant2inins(gtime_t time,const double *rr,const double *vr,
  *           insgnssopt_t ingssopt I ins/gnss options
  * return : 1 (ok) or 0 (fail)
  * --------------------------------------------------------------------------*/
-init_inspva(sol_t *solw, ins_states_t *insc){
+int init_inspva(sol_t *sol, ins_states_t *insc){
   int i,j, k, n=insgnssopt.gnssw;
-  double dt[n],rr[3],vr[3];
+  double dt[n-1],rr[3],vr[3];
 
   for (i=0;i<n-1;i++){
-    dt[i]=timediff(solw[i+1].time,solw[i].time);
+    dt[i]=timediff(sol[i+1].time,sol[i].time);
   }
   /* check time continuity */
-  if (norm(dt,n-1)>SQRT(n-1)
+  if (norm(dt,n-1)>SQRT(n-1)+0.1
     ||norm(dt,n-1)==0.0) {
     return 0;
   }
   k=(n-1)/2;
-  matcpy(rr,solw[k+1].rr+0,1,3);
-  matcpy(vr,solw[k+1].rr+3,1,3);
+  matcpy(rr,sol[k+1].rr+0,1,3);
+  matcpy(vr,sol[k+1].rr+3,1,3);
   if (norm(vr,3)==0.0) {
     for (i=0;i<3;i++) {
-      vr[i]=(solw[k+1].rr[i]-solw[k].rr[i])/dt[k];
+      vr[i]=(sol[k+1].rr[i]-sol[k].rr[i])/dt[k];
     }
   }
   if (norm(vr,3)<5.0) { // 5.0: min velocity for ins velocity match alignment
-    return 0;
+      printf("Velocity error: %lf\n", norm(vr,3));
+
+      if (!coarse_align(sol[k+1].time,rr,vr,insc)) {
+        printf("coarse_align error\n");
+        return 0;
+      }else{
+        return 1;
+      }
   }
+  printf("GNSSSOL: %lf %lf %lf\n",time2gpst(sol[k+1].time, NULL));
   /* initial ins state use single positioning */
-  if (!ant2inins(solw[k+1].time,rr,vr,insc)) {
+  if (!ant2inins(sol[k+1].time,rr,vr,insc)) {
+      printf("ant2inins error\n");
      return 0;
-  }             
+  }
+  return 1;             
                         
                     
 }
@@ -2480,7 +2558,7 @@ init_inspva(sol_t *solw, ins_states_t *insc){
 * obs.: this function is ran inside rtkpos function of RTKlib
 ------------------------------------------------------------------------------*/
 extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
-  int i, j;
+  int i, j, week;
   double gnss_time;
   ins_states_t insc={0};
 
@@ -2488,7 +2566,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   printf("\n *****************  CORE BEGINS ***********************\n");
 
   /* Initialize time from GNSS */
-  gnss_time=time2gpst(rtk->sol.time,NULL);
+  gnss_time=time2gpst(rtk->sol.time,&week);
   
   /* Feed gnss solution and measurement buffers */
   gnssbuffer(&rtk->sol, obs, n);
@@ -2498,7 +2576,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   The do while takes care when INS or GNSS is too ahead from each other         */ 
   do {
     /* input ins */
-    if(!inputimu(&insc)) {printf("End of imu file\n"); break;}
+    if(!inputimu(&insc, week)) {printf("End of imu file\n"); break;}
 
     /* If INS time is ahead of GNSS exit INS loop */ 
     if (gnss_time-insc.time < -0.01) {// for tactical, -1.65 for consumer
@@ -2519,9 +2597,22 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
       /* initial ins states */
       // Here it's where the PVA initialization with the alignment is done
-      if (insw[0].ptime <= 0.0 && gnss_meas_w>2){
-        init_inspva(solw, &insc);
-      }else return;       
+      if (gnss_meas_w>2){ //insw[0].ptime <= 0.0
+        printf("Ins intialization\n");
+        if(init_inspva(solw, &insc)){
+          printf("ins re: %lf %lf %lf\n", insc.re[0],insc.re[1], insc.re[2]);
+          printf("ins ve: %lf %lf %lf\n", insc.ve[0],insc.ve[1], insc.ve[2]);
+          printf("ins vn: %lf %lf %lf\n", insc.vn[0],insc.vn[1], insc.vn[2]);
+          printf("ins an: %lf %lf %lf\n", insc.an[0],insc.an[1], insc.an[2]);
+          
+          printf("ins Cbe: %lf %lf %lf\n%lf %lf %lf\n%lf %lf %lf\n", \
+          insc.Cbe[0],insc.Cbe[3], insc.Cbe[6], insc.Cbe[1],insc.Cbe[4], insc.Cbe[7], \
+          insc.Cbe[2],insc.Cbe[5], insc.Cbe[8]);
+        }
+      }//else return;
+
+      
+
 
       /* Interpolate INS measurement to match GNSS time  */
       if (insc.ptime>0.0) {
@@ -2644,7 +2735,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    /* Initialize position from GNSS SPP */
 
    /* Update */
-   printf("HERE 4\n");
+   
     /**/
     printf("Length: %d\n", sizeof(obsw) );
     printf("GNSSOBS N: %d %d %d\n", obsw.n0, \
@@ -2669,6 +2760,8 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
     printf("GNSSSOL dtr: %lf %lf %lf\n", solw[insgnssopt.gnssw-1].dtrr,\
     solw[insgnssopt.gnssw-2].dtrr, solw[insgnssopt.gnssw-3].dtrr);
+    printf("GNSSSOL pos: %lf %lf %lf\n", solw[insgnssopt.gnssw-1].rr[0],\
+    solw[insgnssopt.gnssw-1].rr[1], solw[insgnssopt.gnssw-1].rr[2]);
 
    /* Global gnss and ins buffer counters */ 
    gnss_meas_w++;

@@ -33,6 +33,7 @@ extern "C" {
  (if buffsize/2=WBS(m)/SPC(m)*s), to convert into vector positions*/
 
 /* Earth parameters ----------------------------------------------------------*/
+#define Gcte  9.80665
 #define e_2 ((2*FE_WGS84)-(FE_WGS84*FE_WGS84))
 #define RN(lat) (RE_WGS84/sqrt(1-e_2*(sin(lat)*sin(lat)))) /* Prime vertical radii */
 #define RM(lat) ( RE_WGS84*(1-e_2) / pow( 1-e_2*( sin(lat)*sin(lat) ),(3/2) ) ) /* Merdidian radius of curvature */
@@ -175,7 +176,6 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double dtrr;            /* receiver clock‐drift (m/s) */
   imuraw_t data;       /* current epoch imu measurements */
   imuraw_t pdata;      /* previous epoch imu measurements */
-  double lever[3];        /* lever arm for body to ant. (m) */
   int nx,nb;              /* numbers of estimated states/fixed states (except phase bias) */
   double *x,*P;           /* ekf estimated states/covariance matrix */
   double *xa,*Pa;         /* estimated states and covariance for ins-gnss loosely coupled */
@@ -194,6 +194,7 @@ typedef struct {  /* GNSS/INS processing options */
   int Tact_or_Low;       /* Type of inertial, tact=1, low=0 */
   int Nav_or_KF;          /* Type of solution: Navigation sol:0 KF Integrated sol:1   */
   int gnssw, insw;         /* GNSS and INS measurement window sizes */
+  int lever[3];           /* lever arm from gps antenna to ins center */
 } insgnss_opt_t;
 
 typedef struct {        /* observation data buffer */

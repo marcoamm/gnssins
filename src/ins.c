@@ -142,7 +142,7 @@ void coarseAlign(double *acc, double *gyr, double *vel, double *gan, double *eul
 
  /* Levelling from Groves (2013) */
  /* roll - phi angle */
- euler_angles[0]= atan2(-acc[1],-acc[2]); /* CORRECT IT LATER*/
+ //euler_angles[0]= atan2(-acc[1],-acc[2]); /* CORRECT IT LATER*/
 
  /* The pitch(y(theta)) and heading(z(psi)) angles using velocities */
  euler_angles[1]= atan(vel[2]/sqrt(vel[0]*vel[0]+vel[1]*vel[1]));
