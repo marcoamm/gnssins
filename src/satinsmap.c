@@ -12,6 +12,10 @@
 #include "satinsmap.h"
 //#include "INS_GNSS.h"
 
+
+/* Definitions ---------------------------------------------------------------*/
+#define SQRT(x)     ((x)<=0.0||(x)!=(x)?0.0:sqrt(x))
+
 /* global variables ----------------------------------------------------------*/
 FILE *fp_lane;       /* Lane coordinate file pointer */
 FILE *fimu;          /* Imu datafile pointer  */
@@ -27,6 +31,9 @@ ins_states_t *insw;   /* ins states buffer */
 int zvu_counter = 0;
 int gnss_meas_w = 0;
 int ins_meas_w = 0;
+
+/* global variable -----------------------------------------------------------*/
+extern const double Omge[9]={0,OMGE,0,-OMGE,0,0,0,0,0}; /* (5.18) */
 
 char *outpath1[] = {"../out/"};  
 FILE *out_PVA;
@@ -2258,6 +2265,210 @@ void insbuffer(ins_states_t *insc){
   }
 }
 
+/* conversion matrix of ned frame to ecef frame--------------------------------
+ * conversion matrix of ned to ecef
+ * args   : double *pos     I   position {lat,lon,height} (rad/m)
+ *          double *Cne     O   convertion matrix between frame
+ * return : none
+ * --------------------------------------------------------------------------*/
+extern void ned2xyz(const double *pos,double *Cne)
+{
+    double sinp=sin(pos[0]),cosp=cos(pos[0]),sinl=sin(pos[1]),cosl=cos(pos[1]);
+
+    Cne[0]=-sinp*cosl; Cne[3]=-sinl; Cne[6]=-cosp*cosl;
+    Cne[1]=-sinp*sinl; Cne[4]= cosl; Cne[7]=-cosp*sinl;
+    Cne[2]=      cosp; Cne[5]= 0.0;  Cne[8]=-sinp;
+}
+
+/* estimate heading using the navigation frame velocity-----------------------
+ * args   :  double *vel  I  velocity in navigation frame (ned-frame)
+ * return :  heading (rad)
+ * --------------------------------------------------------------------------*/
+extern double vel2head(const double *vel)
+{
+    return atan2(vel[1],fabs(vel[0])<1E-4?1E-4:vel[0]);
+}
+
+/* ned frame to body frame---------------------------------------------------
+ * args    : double rpy      I  attitude {roll,picth,yaw} (rad)
+ *           double Cnb      O  matrix of ned to body frame
+ * return  : none
+ * -------------------------------------------------------------------------*/
+extern void rpy2dcm(const double *rpy,double *Cnb)
+{
+    double sin_phi=sin(rpy[0]),cos_phi=cos(rpy[0]),
+           sin_theta=sin(rpy[1]),cos_theta=cos(rpy[1]),
+           sin_psi=sin(rpy[2]),cos_psi=cos(rpy[2]);
+    Cnb[0]= cos_theta*cos_psi;
+    Cnb[3]= cos_theta*sin_psi;
+    Cnb[6]=-sin_theta;
+    Cnb[1]=-cos_phi*sin_psi+sin_phi*sin_theta*cos_psi;
+    Cnb[4]= cos_phi*cos_psi+sin_phi*sin_theta*sin_psi;
+    Cnb[7]= sin_phi*cos_theta;
+    Cnb[2]= sin_phi*sin_psi+cos_phi*sin_theta*cos_psi;
+    Cnb[5]=-sin_phi*cos_psi+cos_phi*sin_theta*sin_psi;
+    Cnb[8]= cos_phi*cos_theta;
+}
+
+/* multiply 3d matries -------------------------------------------------------*/
+extern void matmul3(const char *tr, const double *A, const double *B, double *C)
+{
+    matmul(tr,3,3,3,1.0,A,B,0.0,C);
+}
+/* multiply 3d matrix and vector ---------------------------------------------*/
+extern void matmul3v(const char *tr, const double *A, const double *b, double *c)
+{
+    char t[]="NN";
+    t[0]=tr[0];
+    matmul(t,3,1,3,1.0,A,b,0.0,c);
+}
+/* 3d skew symmetric matrix --------------------------------------------------*/
+extern void skewsym3(const double *ang, double *C)
+{
+    C[0]=0.0;     C[3]=-ang[2]; C[6]=ang[1];
+    C[1]=ang[2];  C[4]=0.0;     C[7]=-ang[0];
+    C[2]=-ang[1]; C[5]=ang[0];  C[8]=0.0;
+}
+/* 3d skew symmetric matrix --------------------------------------------------*/
+extern void skewsym3x(double x,double y,double z,double *C)
+{
+    C[0]=0.0; C[3]=-z;  C[6]=y;
+    C[1]=z;   C[4]=0.0; C[7]=-x;
+    C[2]=-y;  C[5]=x;   C[8]=0.0;
+}
+/* set all matrix elements to zero ------------------------------------------*/
+extern void setzero(double *A,int n,int m)
+{
+    int i,j;
+    for (i=0;i<n;i++) for (j=0;j<m;j++) A[i*m+j]=0.0;
+}
+/* D=A*B*C---------------------------------------------------------------------*/
+extern void matmul33(const char *tr,const double *A,const double *B,const double *C,
+                     int n,int p,int q,int m,double *D)
+{
+    char tr_[8];
+    double *T=mat(n,q);
+    matmul(tr,n,q,p,1.0,A,B,0.0,T);
+    sprintf(tr_,"N%c",tr[2]);
+    matmul(tr_,n,m,q,1.0,T,C,0.0,D); free(T);
+}
+
+/* gnss antenna position/velecity transform to ins position/velecity---------
+ * args  :  double *pos    I  position of gnss antenna (ecef)
+ *          double *vel    I  velecity of gnss antenna (ecef)
+ *          double *Cbe    I  transform matrix of body-frame to ecef-frame
+ *          double *lever  I  arm lever
+ *          imud_t *imu    I  imu measurement data
+ *          double *posi   O  ins position (ecef) (NULL :no output)
+ *          double *veli   O  ins velecity (ecef) (NULL :no output)
+ * return : none
+ * -------------------------------------------------------------------------*/
+extern void gapv2ipv(const double *pos,const double *vel,const double *Cbe,
+                     const double *lever,const imuraw_t *imu,double *posi,
+                     double *veli)
+{
+    int i; double T[9],TT[9];
+
+    if (posi) {
+        matcpy(posi,pos,3,1);
+        matmul("NN",3,1,3,-1.0,Cbe,lever,1.0,posi);
+    }
+    if (veli) {
+        skewsym3(imu->wibb0,T);
+        matmul("NN",3,1,3,1.0,T,lever,0.0,TT);
+        matmul("NN",3,1,3,1.0,Cbe,TT,0.0,T);
+
+        matmul33("NNN",Omge,Cbe,lever,3,3,3,1,TT);
+        for (i=0;i<3;i++) veli[i]=vel[i]-T[i]+TT[i];
+    }
+}
+
+/* give gps antenna position/velocity to initial ins states-----------------
+ * args    :  gtime_t time     I  time of antenna position/velocity
+ *            double *rr       I  gps antenna position (ecef)
+ *            double *vr       I  gps antenna velocity (ecef)
+ *            ins_states_t *insc  O  initialed ins states
+ * return  : 1 (ok) or 0 (fail)
+ * --------------------------------------------------------------------------*/
+extern int ant2inins(gtime_t time,const double *rr,const double *vr,
+                     ins_states_t *insc)
+{
+    double llh[3],vn[3],C[9],rpy[3]={0};
+    int i;
+
+    trace(3,"ant2inins: time=%s\n",time_str(time,4));
+
+    /* velocity in navigation frame */
+    ecef2pos(rr,llh);
+    ned2xyz(llh,C);
+    matmul("TN",3,1,3,1.0,C,vr,0.0,vn);
+
+    matcpy(insc->rn,llh,1,3);
+    matcpy(insc->vn,vn ,1,3);
+
+    rpy[2]=vel2head(vn); /* yaw */
+
+    rpy2dcm(rpy,C);
+    /* Row to column order Or matrix transpose */
+    row_to_column_order(C,3,3,insc->Cbn);
+
+    ned2xyz(llh,C);
+    matmul("NN",3,3,3,1.0,C,insc->Cbn,0.0,insc->Cbe);
+
+    
+
+    /* find closest imu measurement index */
+    if (&insc->data) {
+      if (fabs(timediff(time,insc->data.time))>0.005) { // DTTOL:tolerance of time difference
+         return 0;
+      } 
+      /* align imu measurement data */
+      if (norm(insc->data.wibb0,3)>(10*D2R)) return 0; //MAXROT: 10*D2R max rotation of vehicle when velocity matching alignment */
+    }
+    /* initial ins position */
+    gapv2ipv(rr,vr,insc->Cbe,insgnssopt.lever,&insc->data,  //**********ADICIONAR lever no insgnss_opt_t structure!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+             insc->re,insc->ve);
+    return 1;
+}
+
+
+/* use rtk solutions to initial ins states ------------------------------------
+ * args   :  sol_t *solw      I  solution buffer
+ *           insstates_t *ins IO ins states
+ *           insgnssopt_t ingssopt I ins/gnss options
+ * return : 1 (ok) or 0 (fail)
+ * --------------------------------------------------------------------------*/
+init_inspva(sol_t *solw, ins_states_t *insc){
+  int i,j, k, n=insgnssopt.gnssw;
+  double dt[n],rr[3],vr[3];
+
+  for (i=0;i<n-1;i++){
+    dt[i]=timediff(solw[i+1].time,solw[i].time);
+  }
+  /* check time continuity */
+  if (norm(dt,n-1)>SQRT(n-1)
+    ||norm(dt,n-1)==0.0) {
+    return 0;
+  }
+  k=(n-1)/2;
+  matcpy(rr,solw[k+1].rr+0,1,3);
+  matcpy(vr,solw[k+1].rr+3,1,3);
+  if (norm(vr,3)==0.0) {
+    for (i=0;i<3;i++) {
+      vr[i]=(solw[k+1].rr[i]-solw[k].rr[i])/dt[k];
+    }
+  }
+  if (norm(vr,3)<5.0) { // 5.0: min velocity for ins velocity match alignment
+    return 0;
+  }
+  /* initial ins state use single positioning */
+  if (!ant2inins(solw[k+1].time,rr,vr,insc)) {
+     return 0;
+  }             
+                        
+                    
+}
+
 /* Core function -------------------------------------------------------------
 * Description: Receive raw GNSS and INS data and determine a PVA solution
 * args:
@@ -2308,7 +2519,9 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
       /* initial ins states */
       // Here it's where the PVA initialization with the alignment is done
-      //if (insw[0].ptime <= 0.0) init_ins(rtk->sol, insc); //*******TO DO
+      if (insw[0].ptime <= 0.0 && gnss_meas_w>2){
+        init_inspva(solw, &insc);
+      }else return;       
 
       /* Interpolate INS measurement to match GNSS time  */
       if (insc.ptime>0.0) {
@@ -2451,8 +2664,6 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
        
      }
     
-   
-
     printf("GNSSSOL TIMES: %lf %lf %lf\n",time2gpst(solw[insgnssopt.gnssw-1].time, NULL),\
     time2gpst(solw[insgnssopt.gnssw-2].time, NULL), time2gpst(solw[insgnssopt.gnssw-3].time, NULL));
 
