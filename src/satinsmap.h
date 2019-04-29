@@ -168,8 +168,8 @@ typedef struct {        /* Position, velocity and attitude structure (PVA) */
 typedef struct {      /* Position velocity and attitude solution structure */
   double time;             /* time (sec) */
   double dt;              /* time difference of previous ins update and current time */
-  double vn[3],rn[3], an[3]; /*states in navigation frame */
-  double ve[3],re[3], ae[3]; /*states in ecef frame */
+  double vn[3],rn[3],an[3]; /*states in navigation frame */
+  double ve[3],re[3],ae[3]; /*states in ecef frame */
   double Cbe[9];        /* Tranformation matrix from body-to-ECEF frame  */
   double Cbn[9];        /* Tranformation matrix from body-to-navigation frame  */
   double dtr[6];          /* receiver clock bias to time systems (s) */
@@ -182,7 +182,12 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double *xb,*Pb;         /* fixed states and covariance (except phase bias) */
   double *P0,*F;          /* predict error states correction and its covariance matrix/transmit matrix */
   double ptime;             /* previous time (sec) */
-  double pre[3],pve[3],pCbe[9]; /* ins states (position/velocity/acceleration/attitude) of precious epoch in ecef-frame */
+  double pre[3],pve[3],pae[3]; /* ins states (position/velocity/attitude) of previous epoch in ecef-frame */
+  double prn[3],pvn[3],pan[3]; /* ins states (position/velocity/attitude) of previous epoch in navigation-frame */
+  double pCbe[9];        /* Previous tranformation matrix from body-to-ECEF frame  */
+  double pCbn[9];        /* Previous tranformation matrix from body-to-navigation frame  */
+  double pdtr[6];          /* previous receiver clock bias to time systems (s) */
+  double pdtrr;            /* previou receiver clock‐drift (m/s) */
   double age,ratio;       /* age of differential of ins and gnss (s)/ambiguity fix ratio */
   int stat,gstat,pose;    /* ins updates stat,gnss updates status and pose fusion status */
                           /* stat: -1: no valid solution, 0: Navigated, 1: Integrated */
