@@ -1286,7 +1286,7 @@ extern void row_to_column_order(const double *A,int m,int n, double *B)
  *            int isr,isc I   start row and col to asign matrix
  * return  : none
  * ----------------------------------------------------------------------*/
-void asi_blk_mat(double *A,int m,int n,const double *B,int p ,int q,
+extern void asi_blk_mat(double *A,int m,int n,const double *B,int p ,int q,
                         int isr,int isc)
 {
     int i,j; for (i=isr;i<isr+p;i++) {
@@ -2331,14 +2331,14 @@ extern void matmul3v(const char *tr, const double *A, const double *b, double *c
     t[0]=tr[0];
     matmul(t,3,1,3,1.0,A,b,0.0,c);
 }
-/* 3d skew symmetric matrix --------------------------------------------------*/
+/* 3d skew symmetric matrix --------------------------------------------------*/ 
 extern void skewsym3(const double *ang, double *C)
 {
     C[0]=0.0;     C[3]=-ang[2]; C[6]=ang[1];
     C[1]=ang[2];  C[4]=0.0;     C[7]=-ang[0];
     C[2]=-ang[1]; C[5]=ang[0];  C[8]=0.0;
 }
-/* 3d skew symmetric matrix --------------------------------------------------*/
+/* 3d skew symmetric matrix --------------------------------------------------*/ 
 extern void skewsym3x(double x,double y,double z,double *C)
 {
     C[0]=0.0; C[3]=-z;  C[6]=y;
@@ -2574,6 +2574,7 @@ void insupdt(ins_states_t *ins){
  
    /* Measurements update*/
    ins->pdata=ins->data;
+   
 }
 
 /* Interpolate INS measurement to match GNSS time  -------------------------
@@ -2581,7 +2582,7 @@ void insupdt(ins_states_t *ins){
 int interp_ins2gpst(double gnss_time, ins_states_t *ins)
 {
   if (ins->ptime>0.0) {
-   if (gnss_time < ins->time && gnss_time > ins->ptime) {
+   if (gnss_time <= ins->time && gnss_time > ins->ptime) {
       printf("INTERPOLATE INS MEAS TO GNSS TIME \n"); 
       /* insc is modified  */
       IMU_meas_interpolation(ins->ptime, ins->time, gnss_time, \
@@ -2590,11 +2591,49 @@ int interp_ins2gpst(double gnss_time, ins_states_t *ins)
       //imufileback(); //only for low-cost imu
       return 1;
     }else return 0;
-  }else return 0;
+  }else return 0; 
 
 }
 
+/* initialize ins control ------------------------------------------------------
+* initialize rtk control struct
+* args   : rtk_t    *rtk    IO  rtk control/result struct
+*          prcopt_t *opt    I   positioning options (see rtklib.h)
+* return : none
+*-----------------------------------------------------------------------------*/
+extern void insinit(ins_states_t *ins, insgnss_opt_t *insopt, prcopt_t *opt) 
+{
+    int i;
 
+    trace(3,"insinit :\n");
+
+    ins->nx=insgnssopt.mode<1?15:ppptcnx(opt);
+   // ins->nb=opt->mode<=PMODE_FIXED?NR(opt):0; //what is its use??  
+    ins->dt=0.0;
+    ins->x=zeros(ins->nx,1);
+    ins->P=zeros(ins->nx,ins->nx);
+    ins->xa=zeros(ins->nb,1); 
+    ins->Pa=zeros(ins->nb,ins->nb);
+    insopt->scalePN=1; /* use extended Process noise model */
+
+    
+}
+
+/* free ins control ------------------------------------------------------------
+* free memory for ins control struct
+* args   : ins_states_t    *ins    IO  ins control/result struct
+* return : none
+*-----------------------------------------------------------------------------*/
+extern void insfree(ins_states_t *ins)
+{
+    trace(3,"insfree :\n");
+
+    ins->nx=ins->nb=0;
+    free(ins->x ); ins->x =NULL;
+    free(ins->P ); ins->P =NULL;
+    free(ins->xa); ins->xa=NULL;
+    free(ins->Pa); ins->Pa=NULL;
+}
 
 /* Core function -------------------------------------------------------------
 * Description: Receive raw GNSS and INS data and determine a PVA solution
@@ -2606,50 +2645,67 @@ int interp_ins2gpst(double gnss_time, ins_states_t *ins)
 * return:
 * obs.: this function is ran inside rtkpos function of RTKlib
 ------------------------------------------------------------------------------*/
-extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
+extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){ 
   int i, j, week, flag;
   double gnss_time;
   ins_states_t insc={0};
+  prcopt_t *opt = &rtk->opt; 
 
 
   printf("\n *****************  CORE BEGINS ***********************\n");
 
+  /* initialize ins state */
+  printf("XnX: %d\n", xnX(opt));
+  insinit(&insc, &insgnssopt, opt);
+  
+ 
+ 
+  /* initialize ins/gnss parameter default uncertainty */
+  ig_paruncinit(&insgnssopt);
+printf("Insc.nx inside 1: %d\n", insc.nx);
   /* Initialize time from GNSS */
   gnss_time=time2gpst(rtk->sol.time,&week);
-
-  /* Initialize ins states with previous state from ins buffer */
-  if(ins_w_counter>insgnssopt.insw-1){
-    insc=insw[insgnssopt.insw-1];
-  }else insc=insw[ins_w_counter];
+printf("Insc.nx inside 2: %d\n", insc.nx);
   
+  printf("Insc.nx inside 3: %d\n", insc.nx);
   /* Feed gnss solution and measurement buffers */
   gnssbuffer(&rtk->sol, obs, n);
-
+printf("Insc.nx inside 4: %d\n", insc.nx);
   /* Ins and integration loop
   Processing window - integrates when GNSS and INS mea. are closer by 0.1s
-  The do while takes care when INS or GNSS is too ahead from each other         */ 
+  The do while takes care when INS or GNSS is too ahead from each other         */  
   do {
+    /* Initialize ins states with previous state from ins buffer */
+      if(ins_w_counter>insgnssopt.insw-1){
+       insc=insw[insgnssopt.insw-1];
+      }else if(ins_w_counter>1) insc=insw[ins_w_counter];
+
     /* input ins */
     if(!inputimu(&insc, week)) {printf("End of imu file\n"); break;}
+printf("Insc.nx inside 5: %d\n", insc.nx);
+    if (ins_w_counter >= 2){
+      insc.dt = insc.time - insc.ptime;
+    }
 
     /* If INS time is ahead of GNSS exit INS loop */ 
     if (gnss_time-insc.time < -0.01) {// for tactical, -1.65 for consumer
+        printf("Ins time ahead gps time: inst:%lf, gpst:%lf\n", insc.time,gnss_time); 
    
       /* Back INS file reader up */
       rewind(imu_tactical);
+
+      printf("Insc.nx inside if: %d\n", insc.nx);
 
       insc.stat=-1;
       break; 
     }else{
       /* INS Navigation and/or INS/GNSS Integration */
 
-      /* Add current ins measurement to buffer */
-      insbuffer(&insc);
 
       /* initial ins states */
       // Here it's where the PVA initialization with the alignment is done
       if (gnss_w_counter>2 && ins_w_counter<150){ 
-        //150 means 1s of ins data, thus perform initialization only in the beginning
+        //150 means 1s of ins data, thus perform initialization only in the beginning 
         if(init_inspva(solw, &insc)){
           printf("Ins initialization ok: %lf\n", insc.time);
         }else{
@@ -2660,62 +2716,47 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       /* Check if ins and gps observations match for integration */
       flag=interp_ins2gpst(gnss_time, &insc);
 
-      if (flag){
-        /* Integration */
-        if (insgnssopt.mode){ // Add condition: if less than four satellites mode=0;
-          /* Tightly-coupled ins/gnss */
-          TC_INS_GNSS_core(rtk, obs, n, nav, &insc, (double)insc.time\
-         - insc.ptime, gnss_ned_cov, gnss_vel_ned_cov, &PVA_prev_sol, \
-         insgnss_opt.Tact_or_Low, insgnss_opt.mode);
-
-        }else{
-          /* Loosley-coupled ins/gnss */
-          LC_INS_GNSS_core(xyz_ini_pos, gnss_xyz_ini_cov, gnss_ned_cov, ned_ini_vel, gnss_vel_ned_cov, gnss_time, \
-          &insc, (double)insc.sec - imu_obs_prev.sec,\
-          &PVA_prev_sol, &imu_obs_prev, insgnss_opt.Tact_or_Low, insgnss_opt.mode);
-
-        }
+      /* Integration */
+      if (insgnssopt.mode){ // Add condition: if less than four satellites mode=0;
+         /* Tightly-coupled ins/gnss */
+          printf("Insc.nx: %d\n", insc.nx);
+         TC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
       }else{
-        /* Inertial Navigation only */
-
+         /* Loosley-coupled ins/gnss */
+         LC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
       }
       
       /* Non-holonomic constraints */
-      if(imu_obs_prev.sec > 0.0 ){
-        nhc(&PVA_prev_sol, &insc, 17);
+      if(insc.pdata.sec > 0.0 ){
+        //nhc(&PVA_prev_sol, &insc, 17);
       }
       /* Static detection */
       if (zvu_counter++>10) {
         printf("ZVU UPDATE: counter: %d", zvu_counter);
         /* Zero-velocity constraints */
-        zvu(&PVA_prev_sol, &insc, 17);
+        //zvu(&PVA_prev_sol, &insc, 17);
         zvu_counter=0;
       }else{
         zvu_counter=0;
       }
       
       /* Output PVA solution  */ 
-      if (PVA_prev_sol.sec<0.0) {
-       }else{
+      if (insc.ptime>0.0) {
          fprintf(out_PVA,"%lf %.12lf %.12lf %lf %lf %lf %lf %lf %lf %lf %d\n",\
-         PVA_prev_sol.sec, PVA_prev_sol.r[0]*R2D, PVA_prev_sol.r[1]*R2D, PVA_prev_sol.r[2],\
-         PVA_prev_sol.v[0], PVA_prev_sol.v[1], PVA_prev_sol.v[2],
-         PVA_prev_sol.A[0]*R2D,PVA_prev_sol.A[1]*R2D,PVA_prev_sol.A[2]*R2D, PVA_prev_sol.Nav_or_KF );
+         insc.time, insc.rn[0]*R2D, insc.rn[1]*R2D, insc.rn[2],\
+         insc.vn[0], insc.vn[1], insc.vn[2],
+         insc.an[0]*R2D,insc.an[1]*R2D,insc.an[2]*R2D, insgnssopt.Nav_or_KF);
       }
 
-      /* Update measurements  */ 
-      for (j=0;j<3;j++){
-        imu_obs_prev.fb[j]=insc.a[j];
-        imu_obs_prev.wibb[j]=insc.g[j];
-        }
-      imu_obs_prev.sec=insc.sec;
-      imu_obs_prev.time=insc.time;
       
 
     } // end If INS time ahead of GNSS condition
 
      /* Update ins states and measurements */
      insupdt(&insc);
+
+     /* Add current ins measurement to buffer */
+     insbuffer(&insc);
 
      /* Global ins counter */
      ins_w_counter++;
@@ -2772,6 +2813,9 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
    /* Global gnss counters */ 
    gnss_w_counter++;
+
+   /* Free memory */
+   insfree(&insc);
 
  printf("\n *****************  CORE ENDS ***********************\n");
 }

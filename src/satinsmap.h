@@ -32,8 +32,11 @@ extern "C" {
 #define BUFFSIZE	25 /* (WBS/SPC/2) Buffer search half size of vector
  (if buffsize/2=WBS(m)/SPC(m)*s), to convert into vector positions*/
 
+
 /* Earth parameters ----------------------------------------------------------*/
 #define Gcte  9.80665
+#define Mg2M        9.80665E-6          /* micro-g to meters per second squared */
+
 #define e_2 ((2*FE_WGS84)-(FE_WGS84*FE_WGS84))
 #define RN(lat) (RE_WGS84/sqrt(1-e_2*(sin(lat)*sin(lat)))) /* Prime vertical radii */
 #define RM(lat) ( RE_WGS84*(1-e_2) / pow( 1-e_2*( sin(lat)*sin(lat) ),(3/2) ) ) /* Merdidian radius of curvature */
@@ -191,8 +194,38 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double age,ratio;       /* age of differential of ins and gnss (s)/ambiguity fix ratio */
   int stat,gstat,pose;    /* ins updates stat,gnss updates status and pose fusion status */
                           /* stat: -1: no valid solution, 0: Navigated, 1: Integrated */
-  int ns;                 /* numbers valid satellite for loosely coupled */
+  int ns;                 /* numbers valid satellite */
 } ins_states_t;
+
+typedef struct {            /* PSD for ins-gnss ekf states */
+    double gyro;            /* gyro noise PSD (rad^2/s) */
+    double accl;            /* accelerometer noise PSD (m^2 s^-3) */
+    double ba;              /* accelerometer bias random walk PSD (m^2 s^-5) */
+    double bg;              /* gyro bias random walk PSD (rad^2 s^-3) */
+    double dt;              /* time synchronization error noise PSD */
+    double sg;              /* residual scale factors of gyroscopes noise PSD */
+    double sa;              /* residual scale factors of accl noise PSD */
+    double ra;              /* non-orthogonal between sensor axes for accl noise PSD */
+    double rg;              /* non-orthogonal between sensor axes for gyro noise PSD */
+    double clk;             /* receiver clock phase-drift PSD (m^2/s) */
+    double clkr;            /* receiver clock drift PSD */
+} psd_t;
+
+typedef struct {            /* initial uncertainty for ins-gnss coupled */
+    double att;             /* initial attitude uncertainty per axis (rad) (ecef) */
+    double vel;             /* initial velocity uncertainty per axis (m/s) (ecef) */
+    double pos;             /* initial position uncertainty per axis (m) (ecef) */
+    double ba;              /* initial accl bias uncertainty (m/s^2) */
+    double bg;              /* initial gyro bias uncertainty (rad/s) */
+    double dt;              /* initial time synchronization error uncertainty (m^2) */
+    double sg;              /* initial residual scale factors of gyroscopes uncertainty */
+    double sa;              /* initial residual scale factors of accl uncertainty */
+    double ra;              /* initial non-orthogonal between sensor axes for accl uncertainty */
+    double rg;              /* initial non-orthogonal between sensor axes for gyro uncertainty */
+    double lever;           /* initial lever arm for body to ant. uncertainty (m) */
+    double rc;              /* initial receiver clock uncertainty (m) */
+    double rr;              /* initial receiver clock drift uncertainty (s/s) */
+} unc_t;
 
 typedef struct {  /* GNSS/INS processing options */
   int mode;               /* Tightly=1, or Loosley=0 coupled solution */
@@ -200,6 +233,9 @@ typedef struct {  /* GNSS/INS processing options */
   int Nav_or_KF;          /* Type of solution: Navigation sol:0 KF Integrated sol:1   */
   int gnssw, insw;         /* GNSS and INS measurement window sizes */
   int lever[3];           /* lever arm from gps antenna to ins center */
+  int scalePN;            /* Scale process noise for irregular dt */
+  psd_t psd;              /* PSD for ins-gnss loosely coupled ekf states */
+  unc_t unc;              /* initial uncertainty for ins-gnss loosely coupled */
 } insgnss_opt_t;
 
 typedef struct {        /* observation data buffer */
@@ -277,6 +313,12 @@ extern void insgnssLC (double* gnss_xyz_ini_pos, double* gnss_xyz_ini_cov,\
    double* gnss_enu_vel, double ini_pos_time, um7pack_t *imu, pva_t *pvap, imuraw_t *imuobsp);
 extern void insmap ();
 extern void ins_LC (double* gnss_xyz_ini_pos, double* gnss_xyz_ini_cov, double* gnss_enu_vel, double ini_pos_time, um7pack_t *imu, pva_t *pvap, imuraw_t *imuobsp);
+extern int ppptcnx(const prcopt_t *opt);
+extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,\
+ins_states_t *insc, insgnss_opt_t *ig_opt, int nav_or_int);
+extern int LC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,\
+ins_states_t *insc, insgnss_opt_t *ig_opt, int nav_or_int);
+extern void ig_paruncinit(insgnss_opt_t *insopt);
 
 /* plot functions ------------------------------------------------------------*/
 extern void mapmatchplot ();
