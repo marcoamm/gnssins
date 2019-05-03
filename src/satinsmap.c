@@ -13,15 +13,12 @@
 //#include "INS_GNSS.h"
 
 
-/* Definitions ---------------------------------------------------------------*/
-#define SQRT(x)     ((x)<=0.0||(x)!=(x)?0.0:sqrt(x))
-
 /* global variables ----------------------------------------------------------*/
 FILE *fp_lane;       /* Lane coordinate file pointer */
 FILE *fimu;          /* Imu datafile pointer  */
 FILE *imu_tactical; /* Imu datafile pointer */
 lane_t lane;
-imuraw_t imu_obs_global={{0}};
+imuraw_t imu_obs_global={{0}}; 
 pva_t pva_global={{0}};
 pva_t pvagnss={{0}};
 insgnss_opt_t insgnssopt={0};
@@ -31,9 +28,7 @@ ins_states_t *insw;   /* ins states buffer */
 int zvu_counter = 0;
 int gnss_w_counter = 0;
 int ins_w_counter = 0;
-
-/* global variable -----------------------------------------------------------*/
-extern const double Omge[9]={0,OMGE,0,-OMGE,0,0,0,0,0}; /* (5.18) */
+const double Omge[9]={0,OMGE,0,-OMGE,0,0,0,0,0}; /* (5.18) */
 
 char *outpath1[] = {"../out/"};  
 FILE *out_PVA;
@@ -44,6 +39,16 @@ FILE *out_KF_state_error;
 FILE *out_raw_fimu;
 FILE *out_KF_residuals;
 
+/* global states index -------------------------------------------------------*/
+int IA = 0, NA = 0;   /* index and number of attitude states */
+int IV = 0, NV = 0;   /* index and number of velocity states */
+int IP = 0, NP = 0;   /* index and number of position states */
+int iba = 0, nba = 0; /* index and number of accl bias states */
+int ibg = 0, nbg = 0; /* index and number of gyro bias states */
+int irc = 0, nrc = 0; /* index and number of receiver clock state */
+int irr = 0, nrr = 0; /* index and number of receiver clock drift state */
+int IT = 0, NT = 0;   /* index and number of tropo state */
+int IN = 0, NN = 0;   /* index and number of ambiguities state */
 
 /* extract substrings from string ---------------------------------------------
 * extract unsigned/signed bits from input string and modify and return res
@@ -56,7 +61,6 @@ extern void getstr1(const char *input, int offset, int len, char *res)
 {
         strncpy(res, input + offset, len); 
 }
-
 
 /* Summation of matrix diagonal ------------------------------------------------
 * compute summation of the square root of the diagonal elements of a squared matrix
@@ -2428,14 +2432,14 @@ extern int coarse_align(gtime_t time,const double *rr,const double *vr,
     insc->data.wibb0[2]*cos(rpy[0])*sin(rpy[1]);
     rpy[2]=atan2(sineyaw,coseyaw);  /* yaw */
 
-    for(i=0;i<3;i++) insc->an[i]=rpy[i];
+    for(i=0;i<3;i++) insc->pan[i]=rpy[i];
 
     rpy2dcm(rpy,C);
     /* Row to column order Or matrix transpose */
-    row_to_column_order(C,3,3,insc->Cbn);
+    row_to_column_order(C,3,3,insc->pCbn);
 
     ned2xyz(llh,C);
-    matmul("NN",3,3,3,1.0,C,insc->Cbn,0.0,insc->Cbe);
+    matmul("NN",3,3,3,1.0,C,insc->pCbn,0.0,insc->pCbe);
 
     /* find closest imu measurement index */
     if (&insc->data) {
@@ -2448,8 +2452,8 @@ extern int coarse_align(gtime_t time,const double *rr,const double *vr,
     } 
 
     /* initial ins position */
-    gapv2ipv(rr,vr,insc->Cbe,insgnssopt.lever,&insc->data, \
-             insc->re,insc->ve);
+    gapv2ipv(rr,vr,insc->pCbe,insgnssopt.lever,&insc->data, \
+             insc->pre,insc->pve);
     return 1;
 }
 
@@ -2473,19 +2477,19 @@ extern int ant2inins(gtime_t time,const double *rr,const double *vr,
     ned2xyz(llh,C);
     matmul("TN",3,1,3,1.0,C,vr,0.0,vn);
 
-    matcpy(insc->rn,llh,1,3);
-    matcpy(insc->vn,vn ,1,3);
+    matcpy(insc->prn,llh,1,3);
+    matcpy(insc->pvn,vn ,1,3);
 
     rpy[2]=vel2head(vn); /* yaw */
 
-    for(i=0;i<3;i++) insc->an[i]=rpy[i];
+    for(i=0;i<3;i++) insc->pan[i]=rpy[i];
 
     rpy2dcm(rpy,C);
     /* Row to column order Or matrix transpose */
-    row_to_column_order(C,3,3,insc->Cbn);
+    row_to_column_order(C,3,3,insc->pCbn);
 
     ned2xyz(llh,C);
-    matmul("NN",3,3,3,1.0,C,insc->Cbn,0.0,insc->Cbe);
+    matmul("NN",3,3,3,1.0,C,insc->pCbn,0.0,insc->pCbe);
 
     /* find closest imu measurement index */
     if (&insc->data) {
@@ -2503,8 +2507,8 @@ extern int ant2inins(gtime_t time,const double *rr,const double *vr,
         //MAXROT: 10*D2R max rotation of vehicle velocity matching alignment */
     }
     /* initial ins position */
-    gapv2ipv(rr,vr,insc->Cbe,insgnssopt.lever,&insc->data,\ 
-             insc->re,insc->ve);
+    gapv2ipv(rr,vr,insc->pCbe,insgnssopt.lever,&insc->data,\ 
+             insc->pre,insc->pve);
     return 1;
 }
 
@@ -2612,9 +2616,16 @@ extern void insinit(ins_states_t *ins, insgnss_opt_t *insopt, prcopt_t *opt)
     ins->dt=0.0;
     ins->x=zeros(ins->nx,1);
     ins->P=zeros(ins->nx,ins->nx);
-    ins->xa=zeros(ins->nb,1); 
+    ins->P0=zeros(ins->nx,ins->nx);
+    ins->xa=zeros(ins->nb,1);
+    ins->F =eye  (ins->nx); 
     ins->Pa=zeros(ins->nb,ins->nb);
-    insopt->scalePN=1; /* use extended Process noise model */
+
+    /* initialize parameter indices */
+    initPNindex(opt);
+
+    getP0(insopt, ins->P, ins->nx);
+    //getP0(insopt, ins->Pa, ins->nx);    
 
     
 }
@@ -2631,7 +2642,9 @@ extern void insfree(ins_states_t *ins)
     ins->nx=ins->nb=0;
     free(ins->x ); ins->x =NULL;
     free(ins->P ); ins->P =NULL;
+    free(ins->P0); ins->P0 =NULL;
     free(ins->xa); ins->xa=NULL;
+    free(ins->F ); ins->F =NULL;
     free(ins->Pa); ins->Pa=NULL;
 }
 
@@ -2646,7 +2659,7 @@ extern void insfree(ins_states_t *ins)
 * obs.: this function is ran inside rtkpos function of RTKlib
 ------------------------------------------------------------------------------*/
 extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){ 
-  int i, j, week, flag;
+  int i, j, week, flag, core_count=0;
   double gnss_time;
   ins_states_t insc={0};
   prcopt_t *opt = &rtk->opt; 
@@ -2655,34 +2668,49 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   printf("\n *****************  CORE BEGINS ***********************\n");
 
   /* initialize ins state */
-  printf("XnX: %d\n", xnX(opt));
-  insinit(&insc, &insgnssopt, opt);
-  
- 
- 
+    printf("XnX: %d\n", xnX(opt));
+    insinit(&insc, &insgnssopt, opt);
+
   /* initialize ins/gnss parameter default uncertainty */
   ig_paruncinit(&insgnssopt);
-printf("Insc.nx inside 1: %d\n", insc.nx);
+  printf("Insc.nx inside 1: %d\n", insc.nx);
   /* Initialize time from GNSS */
   gnss_time=time2gpst(rtk->sol.time,&week);
-printf("Insc.nx inside 2: %d\n", insc.nx);
-  
-  printf("Insc.nx inside 3: %d\n", insc.nx);
+
   /* Feed gnss solution and measurement buffers */
   gnssbuffer(&rtk->sol, obs, n);
-printf("Insc.nx inside 4: %d\n", insc.nx);
+  printf("Insc.nx inside 4: %d\n", insc.nx);
   /* Ins and integration loop
   Processing window - integrates when GNSS and INS mea. are closer by 0.1s
   The do while takes care when INS or GNSS is too ahead from each other         */  
   do {
+    if(core_count>0){
+      memset(&insc, 0, sizeof(insc));
+    }    
+
+     printf("insw.re: %lf %lf %lf\n", insw[ins_w_counter-1].re[0],insw[ins_w_counter-1].re[1],insw[ins_w_counter-1].re[2] );
+     printf("insw.ve: %lf %lf %lf\n", insw[ins_w_counter-1].ve[0],insw[ins_w_counter-1].ve[1],insw[ins_w_counter-1].ve[2] );
+
     /* Initialize ins states with previous state from ins buffer */
       if(ins_w_counter>insgnssopt.insw-1){
        insc=insw[insgnssopt.insw-1];
-      }else if(ins_w_counter>1) insc=insw[ins_w_counter];
+      }else {if(ins_w_counter>1) insc=insw[ins_w_counter-1];printf("Passing values here\n");}
+
+     printf("ins.re1: %lf %lf %lf\n", insc.pre[0],insc.pre[1],insc.pre[2] );
+     printf("ins.ve1: %lf %lf %lf\n", insc.pve[0],insc.pve[1],insc.pve[2] );
+     
+    for (i = 0; i < 3; i++)
+     {
+       for (j = 0; j < 3; j++)
+          {
+      printf("%lf, ", insc.pCbe[i * 3 + j]); /* code */
+          }
+               printf("];\n");
+    }
 
     /* input ins */
     if(!inputimu(&insc, week)) {printf("End of imu file\n"); break;}
-printf("Insc.nx inside 5: %d\n", insc.nx);
+    printf("Insc.nx inside 5: %d\n", insc.nx);
     if (ins_w_counter >= 2){
       insc.dt = insc.time - insc.ptime;
     }
@@ -2698,18 +2726,19 @@ printf("Insc.nx inside 5: %d\n", insc.nx);
 
       insc.stat=-1;
       break; 
-    }else{
+    }else{ 
       /* INS Navigation and/or INS/GNSS Integration */
 
-
+      
       /* initial ins states */
       // Here it's where the PVA initialization with the alignment is done
-      if (gnss_w_counter>2 && ins_w_counter<150){ 
+      if (gnss_w_counter>2 && ins_w_counter<500){ 
         //150 means 1s of ins data, thus perform initialization only in the beginning 
         if(init_inspva(solw, &insc)){
-          printf("Ins initialization ok: %lf\n", insc.time);
+          printf("Ins initialization ok: %lf\n", insc.time); 
         }else{
-          printf("Ins initialization error\n");
+          printf("Ins initialization error: %lf\n", insc.time);
+          continue;
         }
       }
 
@@ -2725,10 +2754,26 @@ printf("Insc.nx inside 5: %d\n", insc.nx);
          /* Loosley-coupled ins/gnss */
          LC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
       }
+
+     /* printf("P: \n");
+      for (i = 0; i < insc.nx; i++)
+      {
+        for (j = 0; j < insc.nx; j++)
+        {
+          printf("%lf ", insc.P[i*insc.nx+j]); 
+        }
+        printf("\n");
+      }
+*/
+      if (ins_w_counter > 500) 
+      {
+          exit(0);
+      }
+      
       
       /* Non-holonomic constraints */
       if(insc.pdata.sec > 0.0 ){
-        //nhc(&PVA_prev_sol, &insc, 17);
+        //nhc(&PVA_prev_sol, &insc, 17); 
       }
       /* Static detection */
       if (zvu_counter++>10) {
@@ -2754,12 +2799,39 @@ printf("Insc.nx inside 5: %d\n", insc.nx);
 
      /* Update ins states and measurements */
      insupdt(&insc);
+     printf("ins.re: %lf %lf %lf\n", insc.re[0],insc.re[1],insc.re[2] );
+     printf("ins.ve: %lf %lf %lf\n", insc.ve[0],insc.ve[1],insc.ve[2] );
+     printf("ins->Cbe=[");
+    for (i = 0; i < 3; i++)
+     {
+       for (j = 0; j < 3; j++)
+          {
+      printf("%lf, ", insc.Cbe[i * 3 + j]); /* code */
+          }
+               printf("];\n");
+    }
+     printf("ins.pre: %lf %lf %lf\n", insc.pre[0],insc.pre[1],insc.pre[2] );
+     printf("ins.pve: %lf %lf %lf\n", insc.pve[0],insc.pve[1],insc.pve[2] );
+     printf("ins->pCbe=[");
+    for (i = 0; i < 3; i++) 
+     {
+       for (j = 0; j < 3; j++)
+          {
+      printf("%lf, ", insc.pCbe[i * 3 + j]); /* code */
+          }
+               printf("];\n");
+    }
 
      /* Add current ins measurement to buffer */
      insbuffer(&insc);
 
+     printf("insbuffer nx: %d\n", insw[0].nx);
+
      /* Global ins counter */
      ins_w_counter++;
+     core_count++;
+
+     printf("\nEND IMU LOOP ITERATION\n");
 
      /* Loop conditions */
      if (gnss_time-insc.time<0.0001) {
@@ -2847,9 +2919,16 @@ int argc; // Size of file or options?
 
 /* Global structures initialization */
 insgnssopt.mode = 1; /* Tightly=1, or Loosley=0 coupled solution */
-insgnssopt.Tact_or_Low = 1;       /* Type of inertial, tact=1, low=0 */ 
+insgnssopt.Tact_or_Low = 1;       /* Type of inertial, tact=1, low=0 */
+insgnssopt.scalePN = 1;             /* use extended Process noise model */
 insgnssopt.gnssw = 3; 
 insgnssopt.insw = 10;
+insgnssopt.exphi = 1;             /* use precise system propagate matrix for ekf */
+/* ins sthocastic process noises: */
+insgnssopt.baproopt=INS_RANDOM_WALK;
+insgnssopt.bgproopt=INS_RANDOM_WALK;
+insgnssopt.saproopt=INS_RANDOM_WALK;
+insgnssopt.sgproopt=INS_RANDOM_WALK;
 solw=(sol_t*)malloc(sizeof(sol_t)*insgnssopt.gnssw);  /* gnss solution structure window size allocation */
 insw=(ins_states_t*)malloc(sizeof(ins_states_t)*insgnssopt.insw);   /* ins states window size allocation */
 
@@ -2865,7 +2944,9 @@ out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
 //imu_tactical=fopen("../data/imu_ascii_new_1.txt", "r");
 imu_tactical=fopen("../data/imu_ascii_new_timesync2.txt", "r");
-fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");            
+fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");
+
+rewind(imu_tactical);
 
 /* Declarations from rnx2rtkp source code program */
 //clk93stream.rtcm3  CLK930600.rtcm3

@@ -13,24 +13,8 @@
 #include "../../src/satinsmap.h"
 
 /* constants  */
+#define MAXDT       3600.0                 /* max time difference for ins-gnss coupled */
 #define MAXVAR 1E10 /* max variance for reset covariance matrix */
-
-#define UNC_ATT (10.0 * D2R)         /* default initial attitude variance */
-#define UNC_VEL (30.0)               /* default initial velocity variance */
-#define UNC_POS (30.0)               /* default initial position variance */
-#define UNC_BA (1000.0 * Mg2M)       /* default initial accl bias variance */
-#define UNC_BG (10.0 * D2R / 3600.0) /* default initial gyro bias uncertainty \
-                                      * per instrument (deg/hour, converted to rad/sec) */
-#define UNC_DT (0.5)                 /* default initial time synchronization error variance (s) */
-#define UNC_SG (1E-4)                /* default initial residual scale factors of gyroscopes variance */
-#define UNC_SA (1E-4)                /* default initial residual scale factors of gyroscopes variance */
-#define UNC_RG (1E-4)                /* default initial non-orthogonal between sensor axes for gyro */
-#define UNC_RA (1E-4)                /* default initial non-orthogonal between sensor axes for accl */
-#define UNC_LEVER (1.0)              /* default initial lever arm for body to ant. uncertainty (m) */
-
-#define UNC_CLK (100.0) /* default initial receiver clock uncertainty (m) */
-#define UNC_CLKR (10.0) /* default initial receiver clock drift uncertainty (/s) */
-
 #define STD_POS 2.5 /* pos-std-variance of gnss positioning (m)*/
 #define STD_VEL 0.1 /* vel-std-variance of gnss positioning (m/s) */
 
@@ -63,22 +47,13 @@
 #define INBA (NNAC + NNGY)        /* index of accl bias process noise */
 #define INBG (NNAC + NNGY + NNBA) /* index of gyro bias process noise */
 
-
+#define CORRETIME       360.0              /* correlation time for gauss-markov process */
+#define ORDERS        10           /* orders of approximate exponential of matrix */
 
 /* struct declaration -------------------------------------------------------*/
 
-/* global states index -------------------------------------------------------*/
-static int IA = 0, NA = 0;   /* index and number of attitude states */
-static int IV = 0, NV = 0;   /* index and number of velocity states */
-static int IP = 0, NP = 0;   /* index and number of position states */
-static int iba = 0, nba = 0; /* index and number of accl bias states */
-static int ibg = 0, nbg = 0; /* index and number of gyro bias states */
-static int irc = 0, nrc = 0; /* index and number of receiver clock state */
-static int irr = 0, nrr = 0; /* index and number of receiver clock drift state */
-static int IT = 0, NT = 0; /* index and number of tropo state */
-static int IN = 0, NN = 0; /* index and number of ambiguities state */
 
-/* Functions declaration  -------------------------------------*/ 
+/* Functions declaration  -------------------------------------*/
 
 /* number of estimated insppptc states ------------------------------------------------*/
 extern int ppptcnx(const prcopt_t *opt)
@@ -91,23 +66,30 @@ extern int ppptcnx(const prcopt_t *opt)
  *          insstate_t *ins  IO ins states
  * return : none
  * note   : it also can initial ins tightly coupled
- * --------------------------------------------------------------------------*/ 
+ * --------------------------------------------------------------------------*/
 extern void initPNindex(const prcopt_t *opt)
 {
-    trace(3,"iniPNindex:\n");
+  trace(3, "iniPNindex:\n");
 
-    /* initial global states index and numbers */
-    IA=xiA  (); NA=xnA  ();
-    IV=xiV  (); NV=xnV  ();
-    IP=xiP  (); NP=xnP  ();
-    iba=xiBa(); nba=xnBa();
-    ibg=xiBg(); nbg=xnBg();
-    irc=xiRc(); nrc=xnRc(opt);
-    irr=xiRr(opt); nrr=xnRr();
-    IT=xiTr(opt); NT=xnT(opt);
-    IN=xiBs(opt,1);NN=xnB();
-
-
+  /* initial global states index and numbers */
+  IA = xiA();
+  NA = xnA();
+  IV = xiV();
+  NV = xnV();
+  IP = xiP();
+  NP = xnP();
+  iba = xiBa();
+  nba = xnBa();
+  ibg = xiBg();
+  nbg = xnBg();
+  irc = xiRc();
+  nrc = xnRc(opt);
+  irr = xiRr(opt);
+  nrr = xnRr();
+  IT = xiTr(opt);
+  NT = xnT(opt);
+  IN = xiBs(opt, 1);
+  NN = xnB();
 }
 
 /* Utility ----------------------------------------------------------*/
@@ -5896,6 +5878,7 @@ static void getQ(const insgnss_opt_t *opt, double dt, double *Q)
   int nx = xnX(opt);
 
   trace(3, "getQ:\n");
+  printf("getQ:\n");
 
   setzero(Q, nx, nx);
 
@@ -5905,7 +5888,6 @@ static void getQ(const insgnss_opt_t *opt, double dt, double *Q)
   sysQ(ibg, nbg, nx, opt->psd.bg, dt, Q);
   sysQ(irc, nrc, nx, opt->psd.clk, dt, Q);
   sysQ(irr, nrr, nx, opt->psd.clkr, dt, Q);
-
 }
 /* process noise gain matrix-------------------------------------------------*/
 static void getGn(const insgnss_opt_t *opt, const ins_states_t *ins, const double dt,
@@ -5957,6 +5939,229 @@ extern void getP0(const insgnss_opt_t *opt, double *P0, int nx)
   initP(irc, nrc, nx, opt->unc.rc, UNC_CLK, P0);
   initP(irr, nrr, nx, opt->unc.rr, UNC_CLKR, P0);
 }
+/* geocentric radius---------------------------------------------------------*/
+extern double georadi(const double *pos)
+{
+    return RE_WGS84/sqrt(1.0-SQR(e_exc*sin(pos[0])))*\
+           sqrt(SQR(cos(pos[0]))+SQR(1.0-SQR(e_exc))*SQR(sin(pos[0])));                                                                       //returns a vector
+}
+/* propagate matrix for stochastic parameters--------------------------------*/
+static void stochasticPhi(int opt,int ix,int nix,int nx,double dt,double *phi)
+{
+    int i; if (nix<=0) return;
+    for (i=ix;i<ix+nix;i++) {
+        if (opt==INS_RANDOM_CONS ) phi[i+i*nx]=1.0;
+        if (opt==INS_RANDOM_WALK ) phi[i+i*nx]=1.0;
+        if (opt==INS_GAUSS_MARKOV) phi[i+i*nx]=exp(-fabs(dt)/CORRETIME);
+    }
+}
+/* system matrix for accl-bias,gyro-bias,sg,sa and so on --------------------*/
+static void stochasticF(int opt,int ix,int nix,int nx,double *F)
+{
+    int i; if (nix<=0) return;
+    for (i=ix;i<ix+nix;i++) {
+        if (opt==INS_RANDOM_CONS ) F[i+i*nx]=1E-10;
+        if (opt==INS_RANDOM_WALK ) F[i+i*nx]=1E-10;
+        if (opt==INS_GAUSS_MARKOV) F[i+i*nx]=-1.0/CORRETIME;
+    }
+}
+/* system matrix of ins states propagate in ecef-frame-----------------------*/
+static void getF(const insgnss_opt_t *opt,const double *Cbe,const double *pos,
+                 const double *omgb,const double *fib,double *F)
+{
+    int i,j,nx=xnX(opt);
+    double F21[9],F23[9],I[9]={1,0,0,0,1,0,0,0,1},omega[3],rn[3],ge[3],re;
+    double W[18]={0},WC[18]={0};
+
+    trace(3,"getF:\n");
+
+    setzero(F,nx,nx);
+
+    matmul3("NN",Cbe,fib,omega);
+    skewsym3(omega,F21);
+
+    ecef2pos(pos,rn);
+    Gravity_ECEF(pos, ge); //=pregrav(pos,ge);
+    re=georadi(rn);
+    matmul("NT",3,3,1,-2.0/(re*norm(pos,3)),ge,pos,0.0,F23);
+
+    /* ins attitude system matrix */
+    W[0 ]=omgb[1]; W[3 ]=omgb[2];
+    W[7 ]=omgb[0]; W[10]=omgb[2];
+    W[14]=omgb[0]; W[17]=omgb[1];
+    matmul("NN",3,6,3,1.0,Cbe,W,0.0,WC);
+    for (i=IA;i<IA+NA;i++) {
+        for (j=IA; j<IA+NA;  j++) F[i+j*nx]=-Omge[i-IA+(j-IA )*3];
+        for (j=ibg;j<ibg+nbg;j++) F[i+j*nx]= Cbe [i-IA+(j-ibg)*3];
+        //for (j=isg;j<isg+nsg;j++) F[i+j*nx]= Cbe [i-IA+(j-isg)*3]*omgb[j-isg];
+        //for (j=irg;j<irg+nrg;j++) F[i+j*nx]= WC  [i-IA+(j-irg)*3];
+    }
+    /* ins velocity system matrix */
+    W[0 ]=fib[1]; W[3] =fib[2];
+    W[7 ]=fib[0]; W[10]=fib[2];
+    W[14]=fib[0]; W[17]=fib[1];
+    matmul("NN",3,6,3,1.0,Cbe,W,0.0,WC);
+    
+    for (i=IV;i<IV+NV;i++) {
+        for (j=IA; j<IA+NA;  j++) F[i+j*nx]=-F21[i-IV+(j-IA )*3];
+        for (j=IV; j<IV+NV;  j++) F[i+j*nx]=-2.0*Omge[i-IV+(j-IV )*3];
+        for (j=IP; j<IP+NP;  j++) F[i+j*nx]= F23[i-IV+(j-IP )*3];
+        for (j=iba;j<iba+nba;j++) F[i+j*nx]= Cbe[i-IV+(j-iba)*3];
+        //for (j=isa;j<isa+nsa;j++) F[i+j*nx]= Cbe[i-IV+(j-isa)*3]*fib[j-isa];
+        //for (j=ira;j<ira+nra;j++) F[i+j*nx]= WC [i-IV+(j-ira)*3];
+    }
+    
+    /* ins position system matrix */
+    for (i=IP;i<IP+NP;i++) {
+        for (j=IV;j<IV+NV;j++) F[i+j*nx]=I[i-IP+(j-IV)*3];
+    }
+    /* stochastic parameters system matrix */
+    stochasticF(opt->baproopt,iba,nba,nx,F);
+    stochasticF(opt->bgproopt,ibg,nbg,nx,F);
+
+}
+/* set matrix to eye-matrix--------------------------------------------------*/
+extern void seteye(double* A,int n)
+{
+    int i,j; for (i=0;i<n;i++) for (j=0;j<n;j++) A[i+j*n]=(i==j?1.0:0.0);
+}
+/* factorial operation-------------------------------------------------------*/
+static double factorial(int n)
+{
+    if (n==0) return 1; return n*factorial(n-1);
+}
+/* exponential of a matrix----------------------------------------------------
+ * args  :  double *A  I  a input matrix (nxn)
+ *          int n      I  rows and cols of matrix A
+ *          double *E  O  exponential of a matrix
+ * return: none
+ * --------------------------------------------------------------------------*/
+extern void expmat(const double *A,int n,double *E)
+{
+    double s,*B,*C;
+    int i,j,k;
+
+    trace(3,"expmat:\n");
+
+    C=mat(n,n); B=mat(n,n); seteye(E,n);
+    seteye(B,n);
+
+    for (i=0;i<ORDERS;i++) {
+
+        s=1.0/factorial(i+1);
+        matmul("NN",n,n,n,s,B,A,0.0,C);
+
+        for (j=0;j<n;j++) {
+            for (k=0;k<n;k++) E[j+k*n]+=C[j+k*n];
+        }
+        matcpy(B,C,n,n);
+    }
+    free(B); free(C);
+}
+/* precise system propagate matrix-------------------------------------------*/
+static void precPhi(const insgnss_opt_t *opt,double dt,const double *Cbe,
+                    const double *pos,const double *omgb,const double *fib,
+                    double *Phi)
+{
+    int i,nx=xnX(opt);
+    double *F=zeros(nx,nx),*FF=zeros(nx,nx);
+    double *FFF=zeros(nx,nx),*I=eye(nx);
+
+    getF(opt,Cbe,pos,omgb,fib,F);
+
+    /* third-order approx */
+    for (i=0;i<nx*nx;i++) F[i]*=dt;
+#if 0
+    matmul("NN",nx,nx,nx,1.0,F,F,0.0,FF);
+    matmul33("NNN",F,F,F,nx,nx,nx,nx,FFF);
+
+    for (i=0;i<nx*nx;i++) {
+        Phi[i]=I[i]+F[i]+0.5*FF[i]+1.0/6.0*FFF[i];
+    }
+#else
+    expmat(F,nx,Phi);
+#endif
+    free(F); free(FF);
+    free(FFF); free(I);
+}
+/* determine transition matrix(first-order approx: Phi=I+F*dt)---------------*/
+static void getPhi1(const insgnss_opt_t *opt, double dt, const double *Cbe,
+                    const double *pos, const double *omgb, const double *fib,
+                    double *phi)
+{
+    int i,j,nx=xnX(opt);
+    double omega[3]={0},T[9],ge[3],re,rn[3],W[18]={0},WC[18]={0},Cbv[9];
+
+    trace(3,"getPhi1:\n");
+
+    if (fabs(dt)>MAXDT) {
+        trace(3,"large time difference between ins and gnss measurements\n");
+    }
+    /* initial phi to unit matrix */
+    seteye(phi,nx);
+    seteye(Cbv,3 );
+
+    /* attitude transmit matrix */
+    W[0 ]=omgb[1]; W[3] =omgb[2];
+    W[7 ]=omgb[0]; W[10]=omgb[2];
+    W[14]=omgb[0]; W[17]=omgb[1];
+    matmul("NN",3,6,3,1.0,Cbe,W,0.0,WC);
+    for (i=IA;i<IA+NA;i++) {
+        for (j= IA;j<IA+NA  ;j++) phi[i+j*nx]-=Omge[i-IA+(j-IA )*3]*dt;
+        for (j=ibg;j<ibg+nbg;j++) phi[i+j*nx] =Cbe [i-IA+(j-ibg)*3]*dt;
+        //for (j=isg;j<isg+nsg;j++) phi[i+j*nx] =Cbe [i-IA+(j-isg)*3]*omgb[j-isg]*dt;
+        //for (j=irg;j<irg+nrg;j++) phi[i+j*nx] =WC  [i-IA+(j-irg)*3]*dt;
+    }
+    /* velocity transmit matrix */
+    matmul3("NN",Cbe,fib,omega);
+    skewsym3(omega,T); ecef2pos(pos,rn);
+    Gravity_ECEF(pos, ge); re=georadi(rn);
+
+    W[0 ]=fib[1]; W[3] =fib[2];
+    W[7 ]=fib[0]; W[10]=fib[2];
+    W[14]=fib[0]; W[17]=fib[1];
+    matmul("NN",3,6,3,1.0,Cbe,W,0.0,WC);
+
+    for (i=IV;i<IV+NV;i++) {
+        for (j=IV; j<IV+NV;  j++) phi[i+j*nx]-=2.0*Omge[i-IV+(j-IV)*3]*dt;
+        for (j=IA; j<IA+NA;  j++) phi[i+j*nx] =-T[i-IV+(j-IA)*3]*dt;
+        for (j=IP; j<IP+NP;  j++) phi[i+j*nx] =-2.0*dt/(re*norm(pos,3))*ge[i-IV]*pos[j-IP];
+        for (j=iba;j<iba+nba;j++) phi[i+j*nx] =Cbe[i-IV+(j-iba)*3]*dt;
+        //for (j=isa;j<isa+nsa;j++) phi[i+j*nx] =Cbe[i-IV+(j-isa)*3]*fib[j-isa]*dt;
+        //for (j=ira;j<ira+nra;j++) phi[i+j*nx] =WC [i-IV+(j-ira)*3]*dt;
+    }
+    /* position transmit matrix */
+    for (i=IP;i<IP+NP;i++) {
+        for (j=IV;j<IV+NV;j++) phi[i+j*nx]=(i-IP)==(j-IV)?dt:0.0;
+    }
+    /* propagate matrix for stochastic parameters */
+    stochasticPhi(opt->baproopt,iba,nba,nx,dt,phi);
+    stochasticPhi(opt->bgproopt,ibg,nbg,nx,dt,phi);
+}
+/* propagate state estimation error covariance-------------------------------*/
+static void propP(const insgnss_opt_t *opt,const double *Q,const double *phi,
+                  const double *P0,double *P)
+{
+    int i,j,nx=xnX(opt);
+    double *PQ=mat(nx,nx),*Phi2=mat(nx,nx);
+
+    for (i=0;i<nx;i++) {
+        for (j=0;j<nx;j++) PQ[i+j*nx]=P0[i+j*nx]+0.5*Q[i+j*nx];
+    }
+    matmul33("NNT",phi,PQ,phi,nx,nx,nx,nx,Phi2);
+    for (i=0;i<nx;i++) {
+        for (j=0;j<nx;j++) P[i+j*nx]=Phi2[i+j*nx]+0.5*Q[i+j*nx];
+    }
+    /* initialize every epoch for clock (white noise) */
+    initP(irc,nrc,nx,opt->unc.rc,UNC_CLK,P);
+    free(PQ); free(Phi2);
+}
+/* propagate state estimates noting that all states are zero due to closed-loop
+ * correction----------------------------------------------------------------*/
+static void propx(const insgnss_opt_t *opt,const double *x0,double *x)
+{
+    int i; for (i=0;i<xnCl();i++) x[i]=1E-20;
+}
 /* updates phi,P,Q of ekf------------------------------------------------------- STTOPED HERE*********/
 static void updstat(const insgnss_opt_t *opt, ins_states_t *ins, const double dt,
                     const double *x0, const double *P0, double *phi, double *P,
@@ -5965,21 +6170,21 @@ static void updstat(const insgnss_opt_t *opt, ins_states_t *ins, const double dt
   /* determine approximate system noise covariance matrix */
   opt->scalePN ? getprn(ins, opt, dt, Q) : getQ(opt, dt, Q);
 
-   int i,j;
-  printf("Q matrix \n");
-  for ( i = 0; i < ins->nx; i++){
-    for ( j = 0; j < ins->nx; j++)
-    {
-      printf("%lf ", Q[i*ins->nx+j]);
-    }
-    printf("\n");
-  }
-
   /* determine transition matrix
      * using last epoch ins states (first-order approx) */
-  //  opt->exphi?precPhi(opt,dt,ins->Cbe,ins->re,ins->omgb,ins->fb,phi):
-  //            getPhi1(opt,dt,ins->Cbe,ins->re,ins->omgb,ins->fb,phi);
-
+  opt->exphi?precPhi(opt,dt,ins->Cbe,ins->re,ins->data.wibb,ins->data.fb,phi):
+              getPhi1(opt,dt,ins->Cbe,ins->re,ins->data.wibb,ins->data.fb,phi);
+ /* int i,j;
+    printf("Phi: \n");
+      for (i = 0; i < ins->nx; i++)
+      {
+        for (j = 0; j < ins->nx; j++)
+        {
+          printf("%lf ", phi[i*ins->nx+j]); 
+        }
+        printf("\n");
+      }
+*/
 #if UPD_IN_EULER
   getphi_euler(opt, dt, ins->Cbe, ins->re, ins->omgb, ins->fb, phi);
 #endif
@@ -5990,12 +6195,12 @@ static void updstat(const insgnss_opt_t *opt, ins_states_t *ins, const double dt
   }
   else
   {
-   // propP(opt, Q, phi, P0, P);
+    printf("PROP P\n");
+    propP(opt, Q, phi, P0, P);
   }
   /* propagate state estimates noting that
      * all states are zero due to close-loop correction */
-  //if (x)
-//    propx(opt, x0, x);
+  if (x) propx(opt, x0, x);
 
   /* predict info. */
   if (ins->P0)
@@ -6038,7 +6243,7 @@ extern void ig_paruncinit(insgnss_opt_t *insopt)
 
   trace(3, "ig_paruncernit :\n");
 
-  insopt->unc.att = (UNC_ATT);
+  insopt->unc.att = UNC_ATT;
   insopt->unc.vel = UNC_VEL;
   insopt->unc.pos = UNC_POS;
   insopt->unc.ba = UNC_BA;
@@ -6195,15 +6400,12 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
 
   /* propagate ins states */
   printf("Prop ins\n");
-  printf("Indexes: nx: %d - %d, %d, %d %d xNx: %d\n", nx, xnRx(opt),xnB(), xnRc(opt), xnT(opt),xnX(opt));
-  printf("Number of att: %d, vel: %d, pos: %d, ba: %d, bg: %d, dtr: %d, dtrr: %d, Trp: %d, N: %d\n"\
-  , NA, NV, NP, nba, nbg, nrc, nrr, NT, NN);
-    printf("Indices: att: %d, vel: %d, pos: %d, ba: %d, bg: %d, dtr: %d, dtrr: %d, Trp: %d, N: %d\n"\
-  , IA, IV, IP, iba, ibg, irc, irr, IT, IN);
+  printf("Indexes: nx: %d - %d, %d, %d %d xNx: %d\n", nx, xnRx(opt), xnB(), xnRc(opt), xnT(opt), xnX(opt));
+  printf("Number of att: %d, vel: %d, pos: %d, ba: %d, bg: %d, dtr: %d, dtrr: %d, Trp: %d, N: %d\n", NA, NV, NP, nba, nbg, nrc, nrr, NT, NN);
+  printf("Indices: att: %d, vel: %d, pos: %d, ba: %d, bg: %d, dtr: %d, dtrr: %d, Trp: %d, N: %d\n", IA, IV, IP, iba, ibg, irc, irr, IT, IN);
   propinss(insc, ig_opt, insc->dt, insc->x, insc->P); /* UPDATING HERE !!!!!!!!!!!!!!!!!!!!!!!!*/
   printf("Prop ins end\n");
 
-  exit(0);
 
   /* Checking input values
   printf("POS: %lf, %lf %lf\n",rtk->sol.rr[0],rtk->sol.rr[1], rtk->sol.rr[2] );
@@ -6274,41 +6476,41 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
     for (i = 0; i < 3; i++)
       out_IMU_bias_est[i + 3] = IMU_errors.b_g[i];
     //for (i = 0; i < 3; i++)
-     // pvat_old.euler_angles[i] = PVA_old->A[i]; /* in _nb frame */
+    // pvat_old.euler_angles[i] = PVA_old->A[i]; /* in _nb frame */
     /* Type of solution */
-   // PVA_old->Nav_or_KF = pvat_new.Nav_or_KF = 0;
+    // PVA_old->Nav_or_KF = pvat_new.Nav_or_KF = 0;
     /* Attitude matrix */
     //for (i = 0; i < 9; i++)
-   //   pvat_old.C_b_e[i] = PVA_old->Cbe[i];
+    //   pvat_old.C_b_e[i] = PVA_old->Cbe[i];
   }
   else
   { /* Otherwise, use previous PVA solution */
     //ecef2pos(PVA_old->re,PVA_old->r);
-   // pvat_old.latitude = PVA_old->r[0];
-   // pvat_old.longitude = PVA_old->r[1];
-   // pvat_old.height = PVA_old->r[2];
+    // pvat_old.latitude = PVA_old->r[0];
+    // pvat_old.longitude = PVA_old->r[1];
+    // pvat_old.height = PVA_old->r[2];
     //for (i = 0; i < 3; i++)
     //  pvat_old.ned_velocity[i] = PVA_old->v[i]; /*already in NED */
     //for (i = 0; i < 3; i++)
     //  pvat_old.euler_angles[i] = PVA_old->A[i]; /* in _nb frame */
 
     /* initialize clock offset and drift from previous PVAT */
-   // clock_offset[0] = PVA_old->clock_offset_drift[0];
-   // clock_offset[1] = PVA_old->clock_offset_drift[1];
+    // clock_offset[0] = PVA_old->clock_offset_drift[0];
+    // clock_offset[1] = PVA_old->clock_offset_drift[1];
 
     /* Attitude matrix */
-   // for (i = 0; i < 9; i++)
-     // pvat_old.C_b_e[i] = PVA_old->Cbe[i];
+    // for (i = 0; i < 9; i++)
+    // pvat_old.C_b_e[i] = PVA_old->Cbe[i];
 
     /* IMU bias */
-  // for (i = 0; i < 6; i++)
-     // out_IMU_bias_est[i] = PVA_old->out_IMU_bias_est[i];
+    // for (i = 0; i < 6; i++)
+    // out_IMU_bias_est[i] = PVA_old->out_IMU_bias_est[i];
     //for (i = 0; i < 17; i++)
-     // out_errors[i] = PVA_old->out_errors[i];
+    // out_errors[i] = PVA_old->out_errors[i];
   }
 
   /* Type of preiou solution  */
- // pvat_old.Nav_or_KF = PVA_old->Nav_or_KF;
+  // pvat_old.Nav_or_KF = PVA_old->Nav_or_KF;
 
   /* Constraining height with GNSS ones since there are no jumps */
   ecef2pos(rtk->sol.rr, llh);
@@ -6322,16 +6524,16 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
   for(j=0;j<3;j++) pvat_old.euler_angles[j]=imu_data->aea[j];*/
 
   /* Current IMU measurement structure initialization */
- // for (j = 0; j < 3; j++)
+  // for (j = 0; j < 3; j++)
   //  INS_meas.omega_ib_b[j] = imu_data->g[j];
   //for (j = 0; j < 3; j++)
-   // INS_meas.f_ib_b[j] = imu_data->a[j];
+  // INS_meas.f_ib_b[j] = imu_data->a[j];
 
   /* IMU bias */
- // for (i = 0; i < 6; i++)
-   // out_IMU_bias_est[i] = PVA_old->out_IMU_bias_est[i];
+  // for (i = 0; i < 6; i++)
+  // out_IMU_bias_est[i] = PVA_old->out_IMU_bias_est[i];
   //for (i = 0; i < 17; i++)
-   // out_errors[i] = PVA_old->out_errors[i];
+  // out_errors[i] = PVA_old->out_errors[i];
 
   /* Full P matrix */
   for (i = 0; i < 17; i++)
@@ -6342,237 +6544,19 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
     }
   }
 
-  /* Receiver position */
-  for (i = 0; i < 3; i++)
-    rr[i] = rtk->sol.rr[i];
-  //dtr=rtk->sol.dtr[0]; //(sec).
-  ecef2pos(rr, llh);
-
-  /* satellite positions and clocks */
-  /* rs[(0:2)+i*6] {x,y,z} is the satellite position in ECEF
-     rs[(3:5)+i*6]= obs[i] sat velocity {vx,vy,vz} (m/s)
-     dts[(0:1)+i*2] are the sat clock {bias,drift} (s|s/s)*/
-  satposs(obs[0].time, obs, n, nav, rtk->opt.sateph, rs, dts, var, svh);
-  m = 0;
-
-  printf("Number of sat: %d and valid: %d\n", n, rtk->sol.ns);
-  for (i = 0; i < n && i < MAXOBS; i++)
-  {
-
-    azel[i * 2] = azel[1 + i * 2] = 0.0;
-    lam_L1 = nav->lam[obs[i].sat - 1][0];
-
-    if (!(sys = satsys(obs[i].sat, NULL)))
-    {
-      flag[i] = 0;
-      m++;
-      printf("SYST. ERROR\n");
-      continue;
-    }
-
-    /* reject duplicated observation data */
-    if (i < n - 1 && i < MAXOBS - 1 && obs[i].sat == obs[i + 1].sat)
-    {
-      printf("duplicated observation data %s sat=%2d\n",
-             time_str(obs[i].time, 3), obs[i].sat);
-      i++;
-      flag[i] = 0;
-      m++;
-      continue;
-    }
-
-    /* geometric distance/azimuth/elevation angle */
-    //printf("geodist: %lf, %lf, %lf\n", geodist(rs+i*6,rr,e), satazel(llh,e,azel+i*2), opt.elmin );
-    if ((r = geodist(rs + i * 6, rr, e)) <= 0.0 ||
-        satazel(llh, e, azel + i * 2) < opt->elmin)
-    {
-      printf("ERROR GEOM.\n");
-      flag[i] = 0;
-      m++;
-      continue;
-    }
-
-    /* psudorange with code bias correction   -> IT IS FOR P3
-    if ((P=prange(obs+i,nav,azel+i*2,iter,opt,&vmeas))==0.0) continue;*/
-
-    /* excluded satellite? */
-    if (satexclude(obs[i].sat, svh[i], &opt))
-    {
-      flag[i] = 0;
-      m++;
-      printf("EXC. SAT. ERROR\n");
-      continue;
-    }
-
-    /* ionospheric corrections */
-    if (!ionocorr(obs[i].time, nav, obs[i].sat, llh, azel + i * 2,
-                  IONOOPT_BRDC, &dion, &vion))
-    {
-      printf("ERROR IONO!\n");
-      flag[i] = 0;
-      m++;
-      continue;
-    } //opt.ionoopt
-
-    /* GPS-L1 -> L1/B1 */
-    if ((lam_L1 = nav->lam[obs[i].sat - 1][0]) > 0.0)
-    {
-      dion *= (lam_L1 / lam_carr[0]) * (lam_L1 / lam_carr[0]);
-    }
-
-    /* tropospheric corrections */
-    if (!tropcorr(obs[i].time, nav, llh, azel + i * 2,
-                  TROPOPT_SAAS, &dtrp, &vtrp))
-    { //opt.tropopt
-
-      printf("ERROR TROPO!\n");
-      flag[i] = 0;
-      m++;
-      continue;
-    }
-    dtrp = prectrop(obs[i].time, llh, azel + i * 2, &opt, x, dtdx, &vtrp);
-    printf("Tropo values: %lf\n", dtrp);
-
-    if (obs[i].P[0] <= 0.0 || fabs(obs[i].D[0]) <= 0.0 || obs[i].L[0] <= 0.0)
-    {
-      printf("OBS BUG ERROR\n");
-      flag[i] = 0;
-      m++;
-      continue;
-    }
-
-    /* pseudorange residual
-      printf("Pres: %lf\n", obs[i].P[0]-(r+CLIGHT*rtk->sol.dtr[0]-CLIGHT*dts[i*2]+dion+dtrp));
-      printf("Dres: %lf\n", -obs[i].D[j]*lam_L1+CLIGHT*dts[1+i*2]);
-      //printf("RANGE: %lf, ION: %lf, Tropo: %lf, SAT clock: %lf, REC clk: %lf \
-      REC.POS: %lf, %lf, %lf, Azel: %lf, PVA_oldpos: %lf,  %lf, %lf\n ", r, dion, dtrp, CLIGHT*dts[i*2], \
-      CLIGHT*rtk->sol.dtr[0], llh[0], llh[1],llh[2],azel[i*2], PVA_old->r[0],PVA_old->r[1],PVA_old->r[2]);
-      */
-    //  printf("Pres: %lf\n", obs[i].P[j]-dion-dtrp+CLIGHT*dts[i*2]);
-    //  printf("Dres: %lf\n", -obs[i].D[j]*lam_L1+CLIGHT*dts[1+i*2]);
-    printf("RHO: %lf corected and uncorrected: %lf \n", r + CLIGHT * rtk->sol.dtr[0], r);
-    printf("Pres: %lf\n", obs[i].P[0] - (r + CLIGHT * rtk->sol.dtr[0] - CLIGHT * dts[i * 2] + dion + dtrp));
-
-    flag[i] = 1;
-    GNSS_measurements[i].sat = obs[i].sat;
-    GNSS_measurements[i].time = obs[i].time;
-    for (j = 0; j < 2; j++)
-      GNSS_measurements[i].P[j] = obs[i].P[j] - dion - dtrp + CLIGHT * dts[i * 2]; //-dion-dtrp//-clock_offset[0];
-    for (j = 0; j < 2; j++)
-      GNSS_measurements[i].L[j] = obs[i].L[j];
-    for (j = 0; j < 2; j++)
-      GNSS_measurements[i].D[j] = -obs[i].D[j] * lam_L1 + CLIGHT * dts[1 + i * 2]; //-clock_offset[1]; /* hz to m/s (radial velocity)*/
-    for (j = 0; j < 3; j++)
-      GNSS_measurements[i].Sat_r_eb_e[j] = rs[i * 6 + j];
-    for (j = 0; j < 3; j++)
-      GNSS_measurements[i].Sat_v_eb_e[j] = rs[i * 6 + (j + 3)];
-  }
-
-  /* Re-arranging GNSS_measurements structure to eliminate invalid  satellites */
-  k = 0;
-  for (i = 0; i < n; i++)
-  {
-    if (flag[i])
-    {
-      /* Valid satellite values */
-      GNSS_measurements[i - k].sat = GNSS_measurements[i].sat;
-      GNSS_measurements[i - k].time = GNSS_measurements[i].time;
-      for (j = 0; j < 2; j++)
-        GNSS_measurements[i - k].P[j] = GNSS_measurements[i].P[j];
-      for (j = 0; j < 2; j++)
-        GNSS_measurements[i - k].L[j] = GNSS_measurements[i].L[j];
-      for (j = 0; j < 2; j++)
-        GNSS_measurements[i - k].D[j] = GNSS_measurements[i].D[j]; /* hz to m/s (radial velocity)*/
-      for (j = 0; j < 3; j++)
-        GNSS_measurements[i - k].Sat_r_eb_e[j] = GNSS_measurements[i].Sat_r_eb_e[j];
-      for (j = 0; j < 3; j++)
-        GNSS_measurements[i - k].Sat_v_eb_e[j] = GNSS_measurements[i].Sat_v_eb_e[j];
-    }
-    else
-    {
-      /*Skip position - invalid satelite*/
-      k++;
-    }
-  }
-
-  /* Put zeros on the invalid positions?? */
-  if (m > 0)
-  {
-    for (i = 1; i <= m; i++)
-    {
-      GNSS_measurements[n - i].sat = 0;
-      for (j = 0; j < 2; j++)
-        GNSS_measurements[n - i].P[j] = 0.0;
-      for (j = 0; j < 2; j++)
-        GNSS_measurements[n - i].L[j] = 0.0;
-      for (j = 0; j < 2; j++)
-        GNSS_measurements[n - i].D[j] = 0.0;
-      for (j = 0; j < 3; j++)
-        GNSS_measurements[n - i].Sat_r_eb_e[j] = 0.0;
-      for (j = 0; j < 3; j++)
-        GNSS_measurements[n - i].Sat_v_eb_e[j] = 0.0;
-    }
-  }
-
-  /* Number of valid satellites */
-  no_GNSS_meas = n - m;
-  printf("Number of sat: after loop %d \n", no_GNSS_meas);
-
-  /* Passing DOPS to the first satellite */
-  for (i = 0; i < 4; i++)
-    GNSS_measurements[0].gdop[i] = rtk->sol.gdop[i];
-  /**/
-  for (i = 0; i < no_GNSS_meas; i++)
-  {
-    printf("SAT: %2d, P: %lf, D: %lf, L: %lf\n", GNSS_measurements[i].sat,
-           GNSS_measurements[i].P[0], GNSS_measurements[i].D[0], GNSS_measurements[i].L[0]);
-  }
-
-  /* Load GNSS and INS errors and noises from configuration file -------------*/
-
-  /* Position and velocity covariance from GNSS */
-  if (rtk->sol.qr[0] > 100.0 || rtk->sol.qr[1] > 100.0 || rtk->sol.qr[2] > 100.0)
-  {
-    /* FLAG TO CONTINUE INS NAVIGATION ONLY!! */
-  }
-  else
-  {
-    for (j = 0; j < 3; j++)
-      TC_KF_config.init_pos_unc[j] = sqrt(rtk->sol.qr[j]);
-  }
-
-  if (rtk->sol.qrv[0] > 100.0 || rtk->sol.qrv[1] > 100.0 || rtk->sol.qrv[2] > 100.0 ||
-      rtk->sol.qrv[0] <= 0.0 || rtk->sol.qrv[1] <= 0.0 || rtk->sol.qrv[2] <= 0.0)
-  {
-    /* FLAG TO CONTINUE INS NAVIGATION ONLY!! */
-  }
-  else
-  {
-    for (j = 0; j < 3; j++)
-      TC_KF_config.init_vel_unc[j] = sqrt(rtk->sol.qrv[j]);
-  }
-
-  //for (j = 0; j < 3; j++)
-  //  TC_KF_config.init_pos_unc_ned[j] = sqrt(gnss_ned_cov[j]);
-
-  /**/
-  TC_KF_config.init_clock_offset_unc = sqrt(rtk->sol.qdtr); // It is in s should be in m ?
-  TC_KF_config.init_clock_drift_unc = sqrt(rtk->sol.qdtrr); // In (s/s) it should be in m/s?
-                                                            /**/
-
   /* Tightly coupled ECEF Inertial navigation and GNSS integrated navigation -*/
-  Tightly_coupled_INS_GNSS(&INS_meas, &GNSS_measurements, no_GNSS_meas,
+  /*Tightly_coupled_INS_GNSS(&INS_meas, &GNSS_measurements, no_GNSS_meas,
                            obs, nav,
                            &pvat_old, no_par, old_time, last_GNSS_time, clock_offset, &initialization_errors, &IMU_errors,
                            &GNSS_config, &TC_KF_config, &pvat_new, out_errors, out_IMU_bias_est,
                            out_clock, out_KF_SD, meas_f_ib_b, meas_omega_ib_b);
-
+*/
   //PVA_old->r[0] = pvat_new.latitude;
   //PVA_old->r[1] = pvat_new.longitude;
   //PVA_old->r[2] = pvat_new.height;
   //pos2ecef(llh, PVA_old->r);
   //for (i = 0; i < 3; i++)
-    //PVA_old->v[i] = pvat_new.ned_velocity[i];
+  //PVA_old->v[i] = pvat_new.ned_velocity[i];
   //for (i = 0; i < 3; i++)
   //  PVA_old->A[i] = pvat_new.euler_angles[i]; /*in ?????*/
   //PVA_old->sec = pvat_new.time;

@@ -32,12 +32,20 @@ extern "C" {
 #define BUFFSIZE	25 /* (WBS/SPC/2) Buffer search half size of vector
  (if buffsize/2=WBS(m)/SPC(m)*s), to convert into vector positions*/
 
+/* math functions */
+#define SQR(x)      ((x)*(x))
+#define SQRT(x)     ((x)<=0.0||(x)!=(x)?0.0:sqrt(x))
+#define MIN(x,y)    ((x)<=(y)?(x):(y))
+#define MAX(x,y)    ((x)>=(y)?(x):(y))
+#define ROUND(x)    (int)floor((x)+0.5)
+
 
 /* Earth parameters ----------------------------------------------------------*/
 #define Gcte  9.80665
 #define Mg2M        9.80665E-6          /* micro-g to meters per second squared */
 
 #define e_2 ((2*FE_WGS84)-(FE_WGS84*FE_WGS84))
+#define e_exc sqrt(e_2) /*WGS84 eccentricity                        */
 #define RN(lat) (RE_WGS84/sqrt(1-e_2*(sin(lat)*sin(lat)))) /* Prime vertical radii */
 #define RM(lat) ( RE_WGS84*(1-e_2) / pow( 1-e_2*( sin(lat)*sin(lat) ),(3/2) ) ) /* Merdidian radius of curvature */
 #define reeS(lat) (RN(lat)*sqrt(cos(lat)*cos(lat)+(1-e_2)*(1-e_2)*sin(lat)*sin(lat))) /* Geocentric radius at the surface*/
@@ -49,6 +57,27 @@ extern "C" {
 #define	a5gn	0.0000000043977311
 #define	a6gn	0.0000000000007211
 #define gn(lat,h) ( a1gn*(1+a2gn*(sin(lat)*sin(lat))+a3gn*(sin(lat)*sin(lat)*sin(lat)*sin(lat))) + h*(a4gn+a5gn*(sin(lat)*sin(lat))) + a6gn*h*h   ) /* Normal gravity on the ellipsoidal surface WGS84 - Defense Mapping Agency */
+
+/* ins/gnss quantities  */
+#define UNC_ATT (10.0 * D2R)         /* default initial attitude variance */
+#define UNC_VEL (30.0)               /* default initial velocity variance */
+#define UNC_POS (30.0)               /* default initial position variance */
+#define UNC_BA (1000.0 * Mg2M)       /* default initial accl bias variance */
+#define UNC_BG (10.0 * D2R / 3600.0) /* default initial gyro bias uncertainty \
+                                      * per instrument (deg/hour, converted to rad/sec) */
+#define UNC_DT (0.5)                 /* default initial time synchronization error variance (s) */
+#define UNC_SG (1E-4)                /* default initial residual scale factors of gyroscopes variance */
+#define UNC_SA (1E-4)                /* default initial residual scale factors of gyroscopes variance */
+#define UNC_RG (1E-4)                /* default initial non-orthogonal between sensor axes for gyro */
+#define UNC_RA (1E-4)                /* default initial non-orthogonal between sensor axes for accl */
+#define UNC_LEVER (1.0)              /* default initial lever arm for body to ant. uncertainty (m) */
+
+#define UNC_CLK (100.0) /* default initial receiver clock uncertainty (m) */
+#define UNC_CLKR (10.0) /* default initial receiver clock drift uncertainty (/s) */
+
+#define INS_RANDOM_WALK    1            /* stochastic process settings: random walk */
+#define INS_RANDOM_CONS    2            /* stochastic process settings: random const */
+#define INS_GAUSS_MARKOV   3            /* stochastic process settings: gauss-markov */
 
 /* coordinate rotation matrices (Jekeli, 2001; Shin, 2001)--------------------*/
 /* Earth-Centered Inertial to Earth-Centered Fixed (i to e-frame)
@@ -234,8 +263,16 @@ typedef struct {  /* GNSS/INS processing options */
   int gnssw, insw;         /* GNSS and INS measurement window sizes */
   int lever[3];           /* lever arm from gps antenna to ins center */
   int scalePN;            /* Scale process noise for irregular dt */
+  int exphi;              /* use precise system propagate matrix for ekf */
   psd_t psd;              /* PSD for ins-gnss loosely coupled ekf states */
   unc_t unc;              /* initial uncertainty for ins-gnss loosely coupled */
+  int baproopt;           /* accl. bias stochastic process settings (INS_RANDOM_WALK,...) */
+  int bgproopt;           /* gryo. bias stochastic process settings (INS_RANDOM_WALK,...) */
+  int sgproopt;           /* residual scale factors of gyroscopes stochastic process settings (INS_RANDOM_WALK,...) */
+  int saproopt;           /* residual scale factors of accl. stochastic process settings (INS_RANDOM_WALK,...) */
+  int dtproopt;           /* ins-gnss time synchronization error stochastic process setting (INS_RANDOM_WALK) */
+  int rgproopt;           /* non-orthogonal between sensor axes for gyro stochastic process setting */
+  int raproopt;           /* non-orthogonal between sensor axes for accl stochastic process setting */
 } insgnss_opt_t;
 
 typedef struct {        /* observation data buffer */
@@ -269,6 +306,19 @@ extern sol_t *solw;
 extern obsb_t obsw;
 extern ins_states_t *insw;
 extern insgnss_opt_t insgnssopt;
+extern const double Omge[9]; /* earth rotation matrix in i/e-frame (5.18) */
+
+/* global states index -------------------------------------------------------*/
+extern int IA, NA;   /* index and number of attitude states */
+extern int IV, NV;   /* index and number of velocity states */
+extern int IP, NP;   /* index and number of position states */
+extern int iba, nba; /* index and number of accl bias states */
+extern int ibg, nbg; /* index and number of gyro bias states */
+extern int irc, nrc; /* index and number of receiver clock state */
+extern int irr, nrr; /* index and number of receiver clock drift state */
+extern int IT, NT;   /* index and number of tropo state */
+extern int IN, NN;   /* index and number of ambiguities state */
+
 //fp_lane=fopen("/home/emerson/Desktop/Connected_folders/SatInsMap/data/Lanes1_XYZ_2016_ITRF08.txt","r");
        /* Lane coordinate file pointer */
 

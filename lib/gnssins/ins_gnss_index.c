@@ -24,6 +24,11 @@ extern int xnP() {return 3;}
 /* get number of accl/gyro bias states---------------------------------------*/
 extern int xnBa() {return 3;}
 extern int xnBg() {return 3;}
+/* get number of close-loop correction states--------------------------------*/
+extern int xnCl()
+{
+    return xnP ()+xnV ()+xnA ()+xnBa()+xnBg();
+}
 
 /* get number of receiver clock bias (non-close-loop correction states)------*/
 extern int xnRc(const prcopt_t* opt)
