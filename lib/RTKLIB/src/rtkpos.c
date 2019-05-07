@@ -1784,8 +1784,8 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     //f1=fopen("/home/emerson/Desktop/SatInsMap/out/SPP_exit_check.pos","a");
     double pos[3], vel[3];
 
-    trace(3,"rtkpos  : time=%s n=%d\n",time_str(obs[0].time,3),n);
-    trace(4,"obs=\n"); traceobs(4,obs,n);
+    printf("rtkpos  : time=%s n=%d\n",time_str(obs[0].time,3),n);
+    printf("obs=\n"); traceobs(4,obs,n);
     /*trace(5,"nav=\n"); tracenav(5,nav);*/
 
     /* set base staion position */
@@ -1797,7 +1797,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     for (nr=0;nu+nr<n&&obs[nu+nr].rcv==2;nr++) ;
 
     time=rtk->sol.time; /* previous epoch */
-
+   printf("Rtkpos here1\n");
     /* rover position by single point positioning */
     if (!pntpos(obs,nu,nav,&rtk->opt,&rtk->sol,NULL,rtk->ssat,msg)) {
         errmsg(rtk,"point pos error (%s)\n",msg);
@@ -1813,8 +1813,8 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
 
     /* INS/GNSS with MAP constrains - HERE BECAUSE I AM PROCESSING ONLY SPP UNTIL SP3 ARRIVES*/
     //core(rtk, obs, n, nav);
-
-    printf("RTKLIB_clk_off_drift: %lf (m) %lf (s/s)\n",rtk->sol.dtr[0]*CLIGHT, rtk->sol.dtrr );
+    
+    core1(rtk, obs, n, nav);
 
     /* single point positioning */
     if (opt->mode==PMODE_SINGLE) {
@@ -1823,8 +1823,10 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     }
     /* precise point positioning */
     if (opt->mode>=PMODE_PPP_KINEMA) {
+   
         pppos(rtk,obs,nu,nav);
-
+        
+   
       //pppos1(rtk,obs,nu,nav); /* PPP-modified*/
 
        /* INS/GNSS with MAP constrains
@@ -1835,9 +1837,6 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
          rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
        }*/
 
-      printf("DOPS RTKLIB_clk_off_drift:0 %lf (m) %lf (s/s),rtk->sol.prevclk: %lf\n",rtk->sol.dtr[0], \
-         rtk->sol.dtrr, rtk->sol.prevclk );
-
       double cdiff=(double)fabs((rtk->sol.prevclk + rtk->sol.prevdrf*rtk->tt)-(rtk->sol.dtr[0]));
 
       if (cdiff < 300000 && rtk->tt >= 0.0 ) {
@@ -1847,15 +1846,8 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
           rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
         }
       }
-      printf("Cdiff, tt: %lf %lf %lf\n",cdiff, rtk->tt);
-
-      printf("DOPS %lf, %lf, %lf, %lf\n", rtk->sol.gdop[0],rtk->sol.gdop[1],rtk->sol.gdop[2],rtk->sol.gdop[3]);
-
-      printf("DOPS RTKLIB_clk_off_drift:1 %lf (m) %lf (s/s)\n",rtk->sol.dtr[0], \
-        rtk->sol.dtrr );
-
+      
       //core(rtk, obs, n, nav);
-      core1(rtk, obs, n, nav);
 
       if (cdiff < 300000 && rtk->tt >= 0.0 ) {
          rtk->sol.dtr[0]=rtk->sol.dtr[0]*CLIGHT;
@@ -1911,6 +1903,8 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     relpos(rtk,obs,nu,nr,nav);
     outsolstat(rtk);
     //fclose(f1);
+
+    printf("Rtkpos end\n");
 
     return 1;
 }

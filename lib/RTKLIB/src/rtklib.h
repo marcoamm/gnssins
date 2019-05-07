@@ -204,6 +204,7 @@ extern "C" {
 #define MAXDTOE_SBS 360.0               /* max time difference to SBAS Toe (s) */
 #define MAXDTOE_S   86400.0             /* max time difference to ephem toe (s) for other */
 #define MAXGDOP     300.0               /* max GDOP */
+#define MAX_ITER    1
 
 #define INT_SWAP_TRAC 86400.0           /* swap interval of trace file (s) */
 #define INT_SWAP_STAT 86400.0           /* swap interval of solution status file (s) */
@@ -811,6 +812,7 @@ typedef struct {        /* navigation data type */
     double ion_qzs[8];  /* QZSS iono model parameters {a0,a1,a2,a3,b0,b1,b2,b3} */
     double ion_cmp[8];  /* BeiDou iono model parameters {a0,a1,a2,a3,b0,b1,b2,b3} */
     int leaps;          /* leap seconds (s) */
+    double rbias[MAXRCV][2][3]; /* receiver dcb (0:p1-p2,1:p1-c1,2:p2-c2) (m) */
     double lam[MAXSAT][NFREQ]; /* carrier wave lengths (m) */
     double cbias[MAXSAT][3];   /* code bias (0:p1-p2,1:p1-c1,2:p2-c2) (m) */
     double wlbias[MAXSAT];     /* wide-lane bias (cycle) */
@@ -1108,6 +1110,7 @@ typedef struct {        /* satellite status type */
     unsigned int rejc [NFREQ]; /* reject counter */
     double  gf;         /* geometry-free phase L1-L2 (m) */
     double  gf2;        /* geometry-free phase L1-L5 (m) */
+    double  mw;         /* MW-LC (m) */
     double  phw;        /* phase windup (cycle) */
     gtime_t pt[2][NFREQ]; /* previous carrier-phase time */
     double  ph[2][NFREQ]; /* previous carrier-phase observable (cycle) */
@@ -1662,7 +1665,6 @@ extern void rtkclosestat(void);
 
 /* precise point positioning -------------------------------------------------*/
 extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav);
-extern void pppos1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav);
 extern int pppamb(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav,
                   const double *azel);
 extern int pppnx(const prcopt_t *opt);

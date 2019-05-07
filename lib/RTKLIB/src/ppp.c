@@ -50,6 +50,7 @@ static const char rcsid[]="$Id:$";
 #define GMS         1.327124E+20    /* sun gravitational constant */
 #define GMM         4.902801E+12    /* moon gravitational constant */
 
+#define THRES_MW_JUMP 10.0
                                     /* initial variances */
 #define VAR_POS     SQR(100.0)      /*   receiver position (m^2) */
 #define VAR_CLK     SQR(100.0)      /*   receiver clock (m^2) */
@@ -420,7 +421,7 @@ static void testeclipse(const obsd_t *obs, int n, const nav_t *nav, double *rs)
     }
 }
 /* measurement error variance ------------------------------------------------*/
-static double varerr(int sat, int sys, double el, int type, const prcopt_t *opt)
+extern double varerr(int sat, int sys, double el, int type, const prcopt_t *opt)
 {
     double a,b,a2,b2,fact=1.0;
     double sinel=sin(el);
@@ -457,7 +458,7 @@ static double varerr(int sat, int sys, double el, int type, const prcopt_t *opt)
     return a*a+b*b/sinel/sinel;
 }
 /* initialize state and covariance -------------------------------------------*/
-static void initx(rtk_t *rtk, double xi, double var, int i)
+static initx(rtk_t *rtk, double xi, double var, int i)
 {
     int j;
     rtk->x[i]=xi;
@@ -521,6 +522,7 @@ static int ifmeas(const obsd_t *obs, const nav_t *nav, const double *azel,
         if (dants) meas[k]-=c1*dants[i]+c2*dants[j];
         if (dantr) meas[k]-=c1*dantr[i]+c2*dantr[j];
     }
+    printf("Ifmeas: P: %lf, L:%lf\n",  meas[0], meas[1]);
     return 1;
 }
 /* get tgd parameter (m) -----------------------------------------------------*/
@@ -567,7 +569,7 @@ static int corr_ion(gtime_t time, const nav_t *nav, int sat, const double *pos,
     return 1;
 }
 /* ionosphere and antenna corrected measurements -----------------------------*/
-static int corrmeas(const obsd_t *obs, const nav_t *nav, const double *pos,
+extern int corrmeas(const obsd_t *obs, const nav_t *nav, const double *pos,
                     const double *azel, const prcopt_t *opt,
                     const double *dantr, const double *dants, double phw,
                     double *meas, double *var, int *brk)
@@ -704,7 +706,7 @@ static void udtrop_ppp(rtk_t *rtk)
     }
 }
 /* detect cycle slip by LLI --------------------------------------------------*/
-static void detslp_ll(rtk_t *rtk, const obsd_t *obs, int n)
+extern void detslp_ll(rtk_t *rtk, const obsd_t *obs, int n)
 {
     int i,j;
 
@@ -719,7 +721,7 @@ static void detslp_ll(rtk_t *rtk, const obsd_t *obs, int n)
     }
 }
 /* detect cycle slip by geometry free phase jump -----------------------------*/
-static void detslp_gf(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
+extern void detslp_gf(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
 {
     double g0,g1;
     int i,j;
@@ -739,6 +741,41 @@ static void detslp_gf(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
             trace(3,"detslip_gf: slip detected sat=%2d gf=%8.3f->%8.3f\n",
                   obs[i].sat,g0,g1);
 
+            for (j=0;j<rtk->opt.nf;j++) rtk->ssat[obs[i].sat-1].slip[j]|=1;
+        }
+    }
+}
+/* Melbourne-Wubbena linear combination --------------------------------------*/
+static double mwmeas(const obsd_t *obs, const nav_t *nav)
+{
+    const double *lam=nav->lam[obs->sat-1];
+    int i=(satsys(obs->sat,NULL)&(SYS_GAL|SYS_SBS))?2:1;
+    
+    if (lam[0]==0.0||lam[i]==0.0||obs->L[0]==0.0||obs->L[i]==0.0||
+        obs->P[0]==0.0||obs->P[i]==0.0) return 0.0;
+    return lam[0]*lam[i]*(obs->L[0]-obs->L[i])/(lam[i]-lam[0])-
+           (lam[i]*obs->P[0]+lam[0]*obs->P[i])/(lam[i]+lam[0]);
+}
+/* detect slip by Melbourne-Wubbena linear combination jump ------------------*/
+extern void detslp_mw(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
+{
+    double w0,w1;
+    int i,j;
+    
+    trace(3,"detslp_mw: n=%d\n",n);
+    
+    for (i=0;i<n&&i<MAXOBS;i++) {
+        if ((w1=mwmeas(obs+i,nav))==0.0) continue;
+        
+        w0=rtk->ssat[obs[i].sat-1].mw;
+        rtk->ssat[obs[i].sat-1].mw=w1;
+        
+        trace(4,"detslip_mw: sat=%2d mw0=%8.3f mw1=%8.3f\n",obs[i].sat,w0,w1);
+        
+        if (w0!=0.0&&fabs(w1-w0)>THRES_MW_JUMP) {
+            trace(3,"detslip_mw: slip detected sat=%2d mw=%8.3f->%8.3f\n",
+                  obs[i].sat,w0,w1);
+            
             for (j=0;j<rtk->opt.nf;j++) rtk->ssat[obs[i].sat-1].slip[j]|=1;
         }
     }
@@ -829,7 +866,7 @@ static void udstate_ppp(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     udbias_ppp(rtk,obs,n,nav);
 }
 /* satellite antenna phase center variation ----------------------------------*/
-static void satantpcv(const double *rs, const double *rr, const pcv_t *pcv,
+extern void satantpcv(const double *rs, const double *rr, const pcv_t *pcv,
                       double *dant)
 {
     double ru[3],rz[3],eu[3],ez[3],nadir,cosa;
@@ -876,347 +913,347 @@ static double prectrop(gtime_t time, const double *pos, const double *azel,
     return m_h*zhd+m_w*(x[0]-zhd);
 }
 /* phase and code residuals --------------------------------------------------*/
-static int res_ppp1(int iter, const obsd_t *obs, int n, const double *rs,
-                   const double *dts, const double *vare, const int *svh,
-                   const nav_t *nav, const double *x, rtk_t *rtk, double *v,
-                   double *H, double *R, double *azel,double *mmpos)
-{
-    prcopt_t *opt=&rtk->opt;
-    double r,rr[3],disp[3],pos[3],e[3],meas[2],dtdx[3],dantr[NFREQ]={0};
-    double dants[NFREQ]={0},var[MAXOBS*2],dtrp=0.0,vart=0.0,varm[2]={0};
-    int i,j,k,sat,sys,nv=0,nx=rtk->nx,brk,tideopt;
+//static int res_ppp1(int iter, const obsd_t *obs, int n, const double *rs,
+//                   const double *dts, const double *vare, const int *svh,
+//                   const nav_t *nav, const double *x, rtk_t *rtk, double *v,
+//                   double *H, double *R, double *azel,double *mmpos)
+// {
+//     prcopt_t *opt=&rtk->opt;
+//     double r,rr[3],disp[3],pos[3],e[3],meas[2],dtdx[3],dantr[NFREQ]={0};
+//     double dants[NFREQ]={0},var[MAXOBS*2],dtrp=0.0,vart=0.0,varm[2]={0};
+//     int i,j,k,sat,sys,nv=0,nx=rtk->nx,brk,tideopt;
 
-    double r1=0.0, mmcand[BUFFSIZE*2*3],*candsat;
-    double epoch[6],xaux,yaux,zaux;
-    int count=0,ncand=0,p,nv1=0;
-    double *v1,H1,var1,*vp,*vl;
-    int posvp=0,posvl=0;
-    double minvl=0.0,minvp=0.0;
-    FILE *fp;
-    fp=fopen("/home/emerson/Desktop/SatInsMap/out/Rescomp_nrcan.txt","a");
-    time2epoch(obs->time, epoch);
+//     double r1=0.0, mmcand[BUFFSIZE*2*3],*candsat;
+//     double epoch[6],xaux,yaux,zaux;
+//     int count=0,ncand=0,p,nv1=0;
+//     double *v1,H1,var1,*vp,*vl;
+//     int posvp=0,posvl=0;
+//     double minvl=0.0,minvp=0.0;
+//     FILE *fp;
+//     fp=fopen("/home/emerson/Desktop/SatInsMap/out/Rescomp_nrcan.txt","a");
+//     time2epoch(obs->time, epoch);
 
-    trace(3,"res_ppp : n=%d nx=%d\n",n,nx);
+//     trace(3,"res_ppp : n=%d nx=%d\n",n,nx);
 
-    for (i=0;i<MAXSAT;i++) rtk->ssat[i].vsat[0]=0;
+//     for (i=0;i<MAXSAT;i++) rtk->ssat[i].vsat[0]=0;
 
-    for (i=0;i<3;i++) rr[i]=x[i];
+//     for (i=0;i<3;i++) rr[i]=x[i];
 
-    /* earth tides correction */
-    if (opt->tidecorr) {
-        tideopt=opt->tidecorr==1?1:7; /* 1:solid, 2:solid+otl+pole */
+//     /* earth tides correction */
+//     if (opt->tidecorr) {
+//         tideopt=opt->tidecorr==1?1:7; /* 1:solid, 2:solid+otl+pole */
 
-        tidedisp(gpst2utc(obs[0].time),rr,tideopt,&nav->erp,opt->odisp[0],
-                 disp);
-        for (i=0;i<3;i++) rr[i]+=disp[i];
-    }
-    ecef2pos(rr,pos);
+//         tidedisp(gpst2utc(obs[0].time),rr,tideopt,&nav->erp,opt->odisp[0],
+//                  disp);
+//         for (i=0;i<3;i++) rr[i]+=disp[i];
+//     }
+//     ecef2pos(rr,pos);
 
-    /* Map-matching SPP with the Map  */
-    ncand=match(rtk,obs+i,n,nav,mmcand);
-    //printf("\n Candidates size: %d \n",ncand);
+//     /* Map-matching SPP with the Map  */
+//     ncand=match(rtk,obs+i,n,nav,mmcand);
+//     //printf("\n Candidates size: %d \n",ncand);
 
-   v1=mat(ncand,2);
-   vp=mat(ncand,1);
-   vl=mat(ncand,1);
-   candsat=zeros(n,4);
+//    v1=mat(ncand,2);
+//    vp=mat(ncand,1);
+//    vl=mat(ncand,1);
+//    candsat=zeros(n,4);
 
-    for (i=0;i<n&&i<MAXOBS;i++) {
-      nv1=0;
-      sat=obs[i].sat;
+//     for (i=0;i<n&&i<MAXOBS;i++) {
+//       nv1=0;
+//       sat=obs[i].sat;
 
-      for (p = 0; p < ncand; p++) {
+//       for (p = 0; p < ncand; p++) {
 
-        for (k = 0; k <3; k++) rr[k]=mmcand[p*3+k];
+//         for (k = 0; k <3; k++) rr[k]=mmcand[p*3+k];
 
-        /* earth tides correction */
-        if (opt->tidecorr) {
-            tideopt=opt->tidecorr==1?1:7; /* 1:solid, 2:solid+otl+pole */
+//         /* earth tides correction */
+//         if (opt->tidecorr) {
+//             tideopt=opt->tidecorr==1?1:7; /* 1:solid, 2:solid+otl+pole */
 
-            tidedisp(gpst2utc(obs[0].time),rr,tideopt,&nav->erp,opt->odisp[0],
-                     disp);
-            for (k=0;k<3;k++) rr[k]+=disp[k];
-        }
+//             tidedisp(gpst2utc(obs[0].time),rr,tideopt,&nav->erp,opt->odisp[0],
+//                      disp);
+//             for (k=0;k<3;k++) rr[k]+=disp[k];
+//         }
 
-        ecef2pos(rr,pos);
+//         ecef2pos(rr,pos);
 
-        if (!(sys=satsys(sat,NULL))||!rtk->ssat[sat-1].vs) continue;
+//         if (!(sys=satsys(sat,NULL))||!rtk->ssat[sat-1].vs) continue;
 
-        /* geometric distance/azimuth/elevation angle */
-        if ((r=geodist(rs+i*6,rr,e))<=0.0||
-            satazel(pos,e,azel+i*2)<opt->elmin) continue;
+//         /* geometric distance/azimuth/elevation angle */
+//         if ((r=geodist(rs+i*6,rr,e))<=0.0||
+//             satazel(pos,e,azel+i*2)<opt->elmin) continue;
 
-        /* excluded satellite? */
-        if (satexclude(obs[i].sat,svh[i],opt)) continue;
+//         /* excluded satellite? */
+//         if (satexclude(obs[i].sat,svh[i],opt)) continue;
 
-        /* tropospheric delay correction */
-        if (opt->tropopt==TROPOPT_SAAS) {
-            dtrp=tropmodel(obs[i].time,pos,azel+i*2,REL_HUMI);
-            vart=SQR(ERR_SAAS);
-        }
-        else if (opt->tropopt==TROPOPT_SBAS) {
-            dtrp=sbstropcorr(obs[i].time,pos,azel+i*2,&vart);
-        }
-        else if (opt->tropopt==TROPOPT_EST||opt->tropopt==TROPOPT_ESTG) {
-            dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x+IT(opt),dtdx,&vart);
-        }
-        else if (opt->tropopt==TROPOPT_COR||opt->tropopt==TROPOPT_CORG) {
-            dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x,dtdx,&vart);
-        }
-        /* satellite antenna model */
-        if (opt->posopt[0]) {
-            satantpcv(rs+i*6,rr,nav->pcvs+sat-1,dants);
-        }
-        /* receiver antenna model */
-        antmodel(opt->pcvr,opt->antdel[0],azel+i*2,opt->posopt[1],dantr);
+//         /* tropospheric delay correction */
+//         if (opt->tropopt==TROPOPT_SAAS) {
+//             dtrp=tropmodel(obs[i].time,pos,azel+i*2,REL_HUMI);
+//             vart=SQR(ERR_SAAS);
+//         }
+//         else if (opt->tropopt==TROPOPT_SBAS) {
+//             dtrp=sbstropcorr(obs[i].time,pos,azel+i*2,&vart);
+//         }
+//         else if (opt->tropopt==TROPOPT_EST||opt->tropopt==TROPOPT_ESTG) {
+//             dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x+IT(opt),dtdx,&vart);
+//         }
+//         else if (opt->tropopt==TROPOPT_COR||opt->tropopt==TROPOPT_CORG) {
+//             dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x,dtdx,&vart);
+//         }
+//         /* satellite antenna model */
+//         if (opt->posopt[0]) {
+//             satantpcv(rs+i*6,rr,nav->pcvs+sat-1,dants);
+//         }
+//         /* receiver antenna model */
+//         antmodel(opt->pcvr,opt->antdel[0],azel+i*2,opt->posopt[1],dantr);
 
-        /* phase windup correction */
-        if (opt->posopt[2]) {
-            windupcorr(rtk->sol.time,rs+i*6,rr,&rtk->ssat[sat-1].phw);
-        }
-        /* ionosphere and antenna phase corrected measurements */
-        if (!corrmeas(obs+i,nav,pos,azel+i*2,&rtk->opt,dantr,dants,
-                      rtk->ssat[sat-1].phw,meas,varm,&brk)) {
-            continue;
-        }
+//         /* phase windup correction */
+//         if (opt->posopt[2]) {
+//             windupcorr(rtk->sol.time,rs+i*6,rr,&rtk->ssat[sat-1].phw);
+//         }
+//         /* ionosphere and antenna phase corrected measurements */
+//         if (!corrmeas(obs+i,nav,pos,azel+i*2,&rtk->opt,dantr,dants,
+//                       rtk->ssat[sat-1].phw,meas,varm,&brk)) {
+//             continue;
+//         }
 
-        /* satellite clock and tropospheric delay */
-        r+=-CLIGHT*dts[i*2]+dtrp;
+//         /* satellite clock and tropospheric delay */
+//         r+=-CLIGHT*dts[i*2]+dtrp;
 
-        trace(5,"sat=%2d azel=%6.1f %5.1f dtrp=%.3f dantr=%6.3f %6.3f dants=%6.3f %6.3f phw=%6.3f\n",
-              sat,azel[i*2]*R2D,azel[1+i*2]*R2D,dtrp,dantr[0],dantr[1],dants[0],
-              dants[1],rtk->ssat[sat-1].phw);
+//         trace(5,"sat=%2d azel=%6.1f %5.1f dtrp=%.3f dantr=%6.3f %6.3f dants=%6.3f %6.3f phw=%6.3f\n",
+//               sat,azel[i*2]*R2D,azel[1+i*2]*R2D,dtrp,dantr[0],dantr[1],dants[0],
+//               dants[1],rtk->ssat[sat-1].phw);
 
-        for (j=0;j<2;j++) { /* for phase and code */
+//         for (j=0;j<2;j++) { /* for phase and code */
 
-            if (meas[j]==0.0) continue;
+//             if (meas[j]==0.0) continue;
 
-            for (k=0;k<nx;k++) H1=0.0;
+//             for (k=0;k<nx;k++) H1=0.0;
 
-            v1[nv1]=meas[j]-r;
+//             v1[nv1]=meas[j]-r;
 
-            for (k=0;k<3;k++) H1=-e[k];
+//             for (k=0;k<3;k++) H1=-e[k];
 
-            if (sys!=SYS_GLO) {
-                v1[nv1]-=x[IC(0,opt)];
-                H1=1.0;
-            }
-            else {
-                v1[nv1]-=x[IC(1,opt)];
-                H1=1.0;
-            }
-            if (opt->tropopt>=TROPOPT_EST) {
-                for (k=0;k<(opt->tropopt>=TROPOPT_ESTG?3:1);k++) {
-                    H1=dtdx[k];
-                }
-            }
-            if (j==0) {
-                v1[nv1]-=x[IB(obs[i].sat,opt)];
-                H1=1.0;
-            }
-        //    var1=varerr(obs[i].sat,sys,azel[1+i*2],j,opt)+varm[j]+vare[i]+vart;
+//             if (sys!=SYS_GLO) {
+//                 v1[nv1]-=x[IC(0,opt)];
+//                 H1=1.0;
+//             }
+//             else {
+//                 v1[nv1]-=x[IC(1,opt)];
+//                 H1=1.0;
+//             }
+//             if (opt->tropopt>=TROPOPT_EST) {
+//                 for (k=0;k<(opt->tropopt>=TROPOPT_ESTG?3:1);k++) {
+//                     H1=dtdx[k];
+//                 }
+//             }
+//             if (j==0) {
+//                 v1[nv1]-=x[IB(obs[i].sat,opt)];
+//                 H1=1.0;
+//             }
+//         //    var1=varerr(obs[i].sat,sys,azel[1+i*2],j,opt)+varm[j]+vare[i]+vart;
 
-        //    if (j==0) rtk->ssat[sat-1].resc[0]=v1[nv1];
-        //    else      rtk->ssat[sat-1].resp[0]=v1[nv1];
+//         //    if (j==0) rtk->ssat[sat-1].resc[0]=v1[nv1];
+//         //    else      rtk->ssat[sat-1].resp[0]=v1[nv1];
 
-            /* test innovation */
-#if 0
-            if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno) {
-#else
-            if (opt->maxinno>0.0&&fabs(v1[nv1])>opt->maxinno&&sys!=SYS_GLO) {
-#endif
-                trace(2,"ppp outlier rejected %s sat=%2d type=%d v=%.3f\n",
-                      time_str(obs[i].time,0),sat,j,v1[nv1]);
-              //  rtk->ssat[sat-1].rejc[0]++;
-                continue;
-            }
-          //  if (j==0) rtk->ssat[sat-1].vsat[0]=1;
-            nv1++;
-        } // Phase and code loop (j)
+//             /* test innovation */
+// #if 0
+//             if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno) {
+// #else
+//             if (opt->maxinno>0.0&&fabs(v1[nv1])>opt->maxinno&&sys!=SYS_GLO) {
+// #endif
+//                 trace(2,"ppp outlier rejected %s sat=%2d type=%d v=%.3f\n",
+//                       time_str(obs[i].time,0),sat,j,v1[nv1]);
+//               //  rtk->ssat[sat-1].rejc[0]++;
+//                 continue;
+//             }
+//           //  if (j==0) rtk->ssat[sat-1].vsat[0]=1;
+//             nv1++;
+//         } // Phase and code loop (j)
 
-      // printf("vL: %lf, vP: %lf\n", v1[nv1-2],v1[nv1-1]);
+//       // printf("vL: %lf, vP: %lf\n", v1[nv1-2],v1[nv1-1]);
 
-    } //Candidates loop (p)
+//     } //Candidates loop (p)
 
-     /* Find the smaller residuals (use it for building the final v,H,var..)  */
-     for (k = 0; k < ncand; k++) {
-       vl[k]=v1[k*2];
-       vp[k]=v1[k*2+1];
-      // printf("vL: %lf vP: %lf \n", vl[k],vp[k]);
-     }
- if (ncand!=0) {
-   posvp=resmin(vp,ncand,&minvp);
-   posvl=resmin(vl,ncand,&minvl);
-  // printf("Min residuals and candidate vector position:\nP:%lf,%d\nL:%lf,%d\n",minvp,posvp,minvl,posvl);
- }
+//      /* Find the smaller residuals (use it for building the final v,H,var..)  */
+//      for (k = 0; k < ncand; k++) {
+//        vl[k]=v1[k*2];
+//        vp[k]=v1[k*2+1];
+//       // printf("vL: %lf vP: %lf \n", vl[k],vp[k]);
+//      }
+//  if (ncand!=0) {
+//    posvp=resmin(vp,ncand,&minvp);
+//    posvl=resmin(vl,ncand,&minvl);
+//   // printf("Min residuals and candidate vector position:\nP:%lf,%d\nL:%lf,%d\n",minvp,posvp,minvl,posvl);
+//  }
 
-    // for (k = 0; k <3; k++) rr[k]=mmcand[p*3+k];
-//for (i=0;i<n&&i<MAXOBS;i++) {
-     for (j=0;j<3;j++) rr[j]=x[j];
+//     // for (k = 0; k <3; k++) rr[k]=mmcand[p*3+k];
+// //for (i=0;i<n&&i<MAXOBS;i++) {
+//      for (j=0;j<3;j++) rr[j]=x[j];
 
-     /* earth tides correction */
-     if (opt->tidecorr) {
-         tideopt=opt->tidecorr==1?1:7; /* 1:solid, 2:solid+otl+pole */
+//      /* earth tides correction */
+//      if (opt->tidecorr) {
+//          tideopt=opt->tidecorr==1?1:7; /* 1:solid, 2:solid+otl+pole */
 
-         tidedisp(gpst2utc(obs[0].time),rr,tideopt,&nav->erp,opt->odisp[0],
-                  disp);
-         for (i=0;i<3;i++) rr[i]+=disp[i];
-     }
+//          tidedisp(gpst2utc(obs[0].time),rr,tideopt,&nav->erp,opt->odisp[0],
+//                   disp);
+//          for (i=0;i<3;i++) rr[i]+=disp[i];
+//      }
 
-     ecef2pos(rr,pos);
+//      ecef2pos(rr,pos);
 
-  //   sat=obs[i].sat;
+//   //   sat=obs[i].sat;
 
-     if (!(sys=satsys(sat,NULL))||!rtk->ssat[sat-1].vs) continue;
+//      if (!(sys=satsys(sat,NULL))||!rtk->ssat[sat-1].vs) continue;
 
-     /* geometric distance/azimuth/elevation angle */
-     if ((r=geodist(rs+i*6,rr,e))<=0.0||
-         satazel(pos,e,azel+i*2)<opt->elmin) continue;
+//      /* geometric distance/azimuth/elevation angle */
+//      if ((r=geodist(rs+i*6,rr,e))<=0.0||
+//          satazel(pos,e,azel+i*2)<opt->elmin) continue;
 
-     /* excluded satellite? */
-     if (satexclude(obs[i].sat,svh[i],opt)) continue;
+//      /* excluded satellite? */
+//      if (satexclude(obs[i].sat,svh[i],opt)) continue;
 
-     /* tropospheric delay correction */
-     if (opt->tropopt==TROPOPT_SAAS) {
-         dtrp=tropmodel(obs[i].time,pos,azel+i*2,REL_HUMI);
-         vart=SQR(ERR_SAAS);
-     }
-     else if (opt->tropopt==TROPOPT_SBAS) {
-         dtrp=sbstropcorr(obs[i].time,pos,azel+i*2,&vart);
-     }
-     else if (opt->tropopt==TROPOPT_EST||opt->tropopt==TROPOPT_ESTG) {
-         dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x+IT(opt),dtdx,&vart);
-     }
-     else if (opt->tropopt==TROPOPT_COR||opt->tropopt==TROPOPT_CORG) {
-         dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x,dtdx,&vart);
-     }
-     /* satellite antenna model */
-     if (opt->posopt[0]) {
-         satantpcv(rs+i*6,rr,nav->pcvs+sat-1,dants);
-     }
-     /* receiver antenna model */
-     antmodel(opt->pcvr,opt->antdel[0],azel+i*2,opt->posopt[1],dantr);
+//      /* tropospheric delay correction */
+//      if (opt->tropopt==TROPOPT_SAAS) {
+//          dtrp=tropmodel(obs[i].time,pos,azel+i*2,REL_HUMI);
+//          vart=SQR(ERR_SAAS);
+//      }
+//      else if (opt->tropopt==TROPOPT_SBAS) {
+//          dtrp=sbstropcorr(obs[i].time,pos,azel+i*2,&vart);
+//      }
+//      else if (opt->tropopt==TROPOPT_EST||opt->tropopt==TROPOPT_ESTG) {
+//          dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x+IT(opt),dtdx,&vart);
+//      }
+//      else if (opt->tropopt==TROPOPT_COR||opt->tropopt==TROPOPT_CORG) {
+//          dtrp=prectrop(obs[i].time,pos,azel+i*2,opt,x,dtdx,&vart);
+//      }
+//      /* satellite antenna model */
+//      if (opt->posopt[0]) {
+//          satantpcv(rs+i*6,rr,nav->pcvs+sat-1,dants);
+//      }
+//      /* receiver antenna model */
+//      antmodel(opt->pcvr,opt->antdel[0],azel+i*2,opt->posopt[1],dantr);
 
-     /* phase windup correction */
-     if (opt->posopt[2]) {
-         windupcorr(rtk->sol.time,rs+i*6,rr,&rtk->ssat[sat-1].phw);
-     }
-     /* ionosphere and antenna phase corrected measurements */
-     if (!corrmeas(obs+i,nav,pos,azel+i*2,&rtk->opt,dantr,dants,
-                   rtk->ssat[sat-1].phw,meas,varm,&brk)) {
-         continue;
-     }
+//      /* phase windup correction */
+//      if (opt->posopt[2]) {
+//          windupcorr(rtk->sol.time,rs+i*6,rr,&rtk->ssat[sat-1].phw);
+//      }
+//      /* ionosphere and antenna phase corrected measurements */
+//      if (!corrmeas(obs+i,nav,pos,azel+i*2,&rtk->opt,dantr,dants,
+//                    rtk->ssat[sat-1].phw,meas,varm,&brk)) {
+//          continue;
+//      }
 
-     /* satellite clock and tropospheric delay */
-     r+=-CLIGHT*dts[i*2]+dtrp;
+//      /* satellite clock and tropospheric delay */
+//      r+=-CLIGHT*dts[i*2]+dtrp;
 
-     trace(5,"sat=%2d azel=%6.1f %5.1f dtrp=%.3f dantr=%6.3f %6.3f dants=%6.3f %6.3f phw=%6.3f\n",
-           sat,azel[i*2]*R2D,azel[1+i*2]*R2D,dtrp,dantr[0],dantr[1],dants[0],
-           dants[1],rtk->ssat[sat-1].phw);
+//      trace(5,"sat=%2d azel=%6.1f %5.1f dtrp=%.3f dantr=%6.3f %6.3f dants=%6.3f %6.3f phw=%6.3f\n",
+//            sat,azel[i*2]*R2D,azel[1+i*2]*R2D,dtrp,dantr[0],dantr[1],dants[0],
+//            dants[1],rtk->ssat[sat-1].phw);
 
-     for (j=0;j<2;j++) { /* for phase and code */
+//      for (j=0;j<2;j++) { /* for phase and code */
 
-         if (meas[j]==0.0) continue;
+//          if (meas[j]==0.0) continue;
 
-         for (k=0;k<nx;k++) H[k+nx*nv]=0.0;
+//          for (k=0;k<nx;k++) H[k+nx*nv]=0.0;
 
-         v[nv]=meas[j]-r;
+//          v[nv]=meas[j]-r;
 
-         for (k=0;k<3;k++) H[k+nx*nv]=-e[k];
+//          for (k=0;k<3;k++) H[k+nx*nv]=-e[k];
 
-         if (sys!=SYS_GLO) {
-             v[nv]-=x[IC(0,opt)];
-             H[IC(0,opt)+nx*nv]=1.0;
-         }
-         else {
-             v[nv]-=x[IC(1,opt)];
-             H[IC(1,opt)+nx*nv]=1.0;
-         }
-         if (opt->tropopt>=TROPOPT_EST) {
-             for (k=0;k<(opt->tropopt>=TROPOPT_ESTG?3:1);k++) {
-                 H[IT(opt)+k+nx*nv]=dtdx[k];
-             }
-         }
-         if (j==0) {
-             v[nv]-=x[IB(obs[i].sat,opt)];
-             H[IB(obs[i].sat,opt)+nx*nv]=1.0;
-         }
+//          if (sys!=SYS_GLO) {
+//              v[nv]-=x[IC(0,opt)];
+//              H[IC(0,opt)+nx*nv]=1.0;
+//          }
+//          else {
+//              v[nv]-=x[IC(1,opt)];
+//              H[IC(1,opt)+nx*nv]=1.0;
+//          }
+//          if (opt->tropopt>=TROPOPT_EST) {
+//              for (k=0;k<(opt->tropopt>=TROPOPT_ESTG?3:1);k++) {
+//                  H[IT(opt)+k+nx*nv]=dtdx[k];
+//              }
+//          }
+//          if (j==0) {
+//              v[nv]-=x[IB(obs[i].sat,opt)];
+//              H[IB(obs[i].sat,opt)+nx*nv]=1.0;
+//          }
 
-         var[nv]=varerr(obs[i].sat,sys,azel[1+i*2],j,opt)+varm[j]+vare[i]+vart;
+//          var[nv]=varerr(obs[i].sat,sys,azel[1+i*2],j,opt)+varm[j]+vare[i]+vart;
 
-         if (j==0) rtk->ssat[sat-1].resc[0]=v[nv];
-         else      rtk->ssat[sat-1].resp[0]=v[nv];
+//          if (j==0) rtk->ssat[sat-1].resc[0]=v[nv];
+//          else      rtk->ssat[sat-1].resp[0]=v[nv];
 
-         /* test innovation */
-#if 0
-         if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno) {
-#else
-         if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno&&sys!=SYS_GLO) {
-#endif
-             trace(2,"ppp outlier rejected %s sat=%2d type=%d v=%.3f\n",
-                   time_str(obs[i].time,0),sat,j,v[nv]);
-             rtk->ssat[sat-1].rejc[0]++;
-             continue;
-         }
-         if (j==0) rtk->ssat[sat-1].vsat[0]=1;
-         nv++;
+//          /* test innovation */
+// #if 0
+//          if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno) {
+// #else
+//          if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno&&sys!=SYS_GLO) {
+// #endif
+//              trace(2,"ppp outlier rejected %s sat=%2d type=%d v=%.3f\n",
+//                    time_str(obs[i].time,0),sat,j,v[nv]);
+//              rtk->ssat[sat-1].rejc[0]++;
+//              continue;
+//          }
+//          if (j==0) rtk->ssat[sat-1].vsat[0]=1;
+//          nv++;
 
-     } // Phase and code loop (j)
-  //   printf("PROCESSING RES.:\n" );
-//  printf("RES_PPP 2: j:%d, %d, %d\n",nv,posvl,ncand);
-  if(ncand != 0 && iter==2){
-fprintf(fp,"%lf %d %lf %lf %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), sat,v[nv-2],v[nv-1],vl[posvl],vp[posvl] );
-}
-     if (minvl<v[nv-2]) {
-    //   printf("Candidate residuals is minor than Processing!!!!!!!! \n");/* code */
-       candsat[i*4]=(double)sat;
-       candsat[i*4+1]=mmcand[posvl*3];
-       candsat[i*4+2]=mmcand[posvl*3+1];
-       candsat[i*4+3]=mmcand[posvl*3+2];
-     }else{ candsat[i*4]=0.0;
-            candsat[i*4+1]=0.0;
-            candsat[i*4+2]=0.0;
-            candsat[i*4+3]=0.0;}
-//NOT FREEING V1
- //free(v1);
-   } //sat loop (i)
+//      } // Phase and code loop (j)
+//   //   printf("PROCESSING RES.:\n" );
+// //  printf("RES_PPP 2: j:%d, %d, %d\n",nv,posvl,ncand);
+//   if(ncand != 0 && iter==2){
+// fprintf(fp,"%lf %d %lf %lf %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), sat,v[nv-2],v[nv-1],vl[posvl],vp[posvl] );
+// }
+//      if (minvl<v[nv-2]) {
+//     //   printf("Candidate residuals is minor than Processing!!!!!!!! \n");/* code */
+//        candsat[i*4]=(double)sat;
+//        candsat[i*4+1]=mmcand[posvl*3];
+//        candsat[i*4+2]=mmcand[posvl*3+1];
+//        candsat[i*4+3]=mmcand[posvl*3+2];
+//      }else{ candsat[i*4]=0.0;
+//             candsat[i*4+1]=0.0;
+//             candsat[i*4+2]=0.0;
+//             candsat[i*4+3]=0.0;}
+// //NOT FREEING V1
+//  //free(v1);
+//    } //sat loop (i)
 
-    xaux=0.0;yaux=0.0;zaux=0.0;count=0;
-    j=0;
-    for ( i = 0; i < n; i++) {
-      if(candsat[i*4+1]<=1) j++;
-      else{ xaux+=candsat[i*4+1];
-        yaux+=candsat[i*4+2];
-        zaux+=candsat[i*4+3];
-        count++;
-        }
-  //      printf("MMCANDVECTOR: %lf, %lf, %lf\n",candsat[i*4+1],candsat[i*4+2],candsat[i*4+3]);
-      }
-if (count!=0) {
-  mmpos[4]=epoch[3]+(epoch[4]/60)+(epoch[5]/3600);
-  mmpos[0]=xaux/count;
-  mmpos[1]=yaux/count;
-  mmpos[2]=zaux/count;
-}else{
-  mmpos[4]=epoch[3]+(epoch[4]/60)+(epoch[5]/3600);
-  mmpos[0]=0.0;
-  mmpos[1]=0.0;
-  mmpos[2]=0.0;
-}
+//     xaux=0.0;yaux=0.0;zaux=0.0;count=0;
+//     j=0;
+//     for ( i = 0; i < n; i++) {
+//       if(candsat[i*4+1]<=1) j++;
+//       else{ xaux+=candsat[i*4+1];
+//         yaux+=candsat[i*4+2];
+//         zaux+=candsat[i*4+3];
+//         count++;
+//         }
+//   //      printf("MMCANDVECTOR: %lf, %lf, %lf\n",candsat[i*4+1],candsat[i*4+2],candsat[i*4+3]);
+//       }
+// if (count!=0) {
+//   mmpos[4]=epoch[3]+(epoch[4]/60)+(epoch[5]/3600);
+//   mmpos[0]=xaux/count;
+//   mmpos[1]=yaux/count;
+//   mmpos[2]=zaux/count;
+// }else{
+//   mmpos[4]=epoch[3]+(epoch[4]/60)+(epoch[5]/3600);
+//   mmpos[0]=0.0;
+//   mmpos[1]=0.0;
+//   mmpos[2]=0.0;
+// }
 
-  //  printf("Candid. Sum: %lf, %lf, %lf, count:%d\n",xaux,yaux,zaux,count);
+//   //  printf("Candid. Sum: %lf, %lf, %lf, count:%d\n",xaux,yaux,zaux,count);
 
-    for (i=0;i<nv;i++) for (j=0;j<nv;j++) {
-        R[i+j*nv]=i==j?var[i]:0.0;
-    }
-    trace(5,"x=\n"); tracemat(5,x, 1,nx,8,3);
-    trace(5,"v=\n"); tracemat(5,v, 1,nv,8,3);
-    trace(5,"H=\n"); tracemat(5,H,nx,nv,8,3);
-    trace(5,"R=\n"); tracemat(5,R,nv,nv,8,5);
-    free(v1);free(vp);free(vl);free(candsat);
-    fclose(fp);
-    return nv;
-}
+//     for (i=0;i<nv;i++) for (j=0;j<nv;j++) {
+//         R[i+j*nv]=i==j?var[i]:0.0;
+//     }
+//     trace(5,"x=\n"); tracemat(5,x, 1,nx,8,3);
+//     trace(5,"v=\n"); tracemat(5,v, 1,nv,8,3);
+//     trace(5,"H=\n"); tracemat(5,H,nx,nv,8,3);
+//     trace(5,"R=\n"); tracemat(5,R,nv,nv,8,5);
+//     free(v1);free(vp);free(vl);free(candsat);
+//     fclose(fp);
+//     return nv;
+// }
 /* phase and code residuals --------------------------------------------------*/
 static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
                    const double *dts, const double *vare, const int *svh,
@@ -1363,279 +1400,279 @@ extern int pppnx(const prcopt_t *opt)
     return NX(opt);
 }
 /* precise point positioning modified ----------------------------------------*/
-extern void pppos1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
-{
-    const prcopt_t *opt=&rtk->opt;
-    double *rs,*dts,*var,*v,*H,*R,*azel,*xp,*Pp;
-    int i,nv,info,svh[MAXOBS],stat=SOLQ_SINGLE;
-    double e[3];
-    int k,p;
+// extern void pppos1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
+// {
+//     const prcopt_t *opt=&rtk->opt;
+//     double *rs,*dts,*var,*v,*H,*R,*azel,*xp,*Pp;
+//     int i,nv,info,svh[MAXOBS],stat=SOLQ_SINGLE;
+//     double e[3];
+//     int k,p;
 
-    double epoch[6],mmpos[4],rclst[3];
-    FILE *fp;
-  //  fp=fopen("/home/emerson/Desktop/SatInsMap/out/3dcand.txt","a");
-    FILE *fp1,*fp2;
-    FILE *f2,*f3;
-  //  fp1=fopen("/home/emerson/Desktop/SatInsMap/out/spp.txt","a");
-  //  fp2=fopen("/home/emerson/Desktop/SatInsMap/out/finalpos.txt","a");
-  double r1=0.0, mmcand[(BUFFSIZE*2)*3];
-  int count=0,ncand=0,nv1=0;
-  //double *vp,*vl;
-  double vp,vl,*vlcand,*vpcand,sppP[3],vv,*S,*F;
-  int sat;
-  int posvl=0,posvp=0;
-  double minvl=0.0,minvp=0.0;
-  //fp1=fopen("/home/emerson/Desktop/SatInsMap/out/sppstd_nsat.txt","a");
-//  fp1=fopen("/home/emerson/Desktop/SatInsMap/out/amb_sol.txt","a");
-//  fp1=fopen("/home/emerson/Desktop/SatInsMap/out/Resppos3_vtpv_ppp.txt","a");
-//  fp1=fopen("/home/emerson/Desktop/SatInsMap/out/Resppos_vtpv_chisq.txt","a");
-//  fp2=fopen("/home/emerson/Desktop/SatInsMap/out/Resppos_vtpv_chisq_tger.txt","a");
-  //f2=fopen("/home/emerson/Desktop/SatInsMap/out/Res_phase_inov_ppp.txt","a");
-  //f3=fopen("/home/emerson/Desktop/SatInsMap/out/Res_pseud_inov_ppp.txt","a");
-  //fp2=fopen("/home/emerson/Desktop/SatInsMap/out/3dclst_lane_dist.txt","a");
-  //fp2=fopen("/home/emerson/Desktop/SatInsMap/data/Rtklib_PPP_estTrop_kin_height.txt","a");
+//     double epoch[6],mmpos[4],rclst[3];
+//     FILE *fp;
+//   //  fp=fopen("/home/emerson/Desktop/SatInsMap/out/3dcand.txt","a");
+//     FILE *fp1,*fp2;
+//     FILE *f2,*f3;
+//   //  fp1=fopen("/home/emerson/Desktop/SatInsMap/out/spp.txt","a");
+//   //  fp2=fopen("/home/emerson/Desktop/SatInsMap/out/finalpos.txt","a");
+//   double r1=0.0, mmcand[(BUFFSIZE*2)*3];
+//   int count=0,ncand=0,nv1=0;
+//   //double *vp,*vl;
+//   double vp,vl,*vlcand,*vpcand,sppP[3],vv,*S,*F;
+//   int sat;
+//   int posvl=0,posvp=0;
+//   double minvl=0.0,minvp=0.0;
+//   //fp1=fopen("/home/emerson/Desktop/SatInsMap/out/sppstd_nsat.txt","a");
+// //  fp1=fopen("/home/emerson/Desktop/SatInsMap/out/amb_sol.txt","a");
+// //  fp1=fopen("/home/emerson/Desktop/SatInsMap/out/Resppos3_vtpv_ppp.txt","a");
+// //  fp1=fopen("/home/emerson/Desktop/SatInsMap/out/Resppos_vtpv_chisq.txt","a");
+// //  fp2=fopen("/home/emerson/Desktop/SatInsMap/out/Resppos_vtpv_chisq_tger.txt","a");
+//   //f2=fopen("/home/emerson/Desktop/SatInsMap/out/Res_phase_inov_ppp.txt","a");
+//   //f3=fopen("/home/emerson/Desktop/SatInsMap/out/Res_pseud_inov_ppp.txt","a");
+//   //fp2=fopen("/home/emerson/Desktop/SatInsMap/out/3dclst_lane_dist.txt","a");
+//   //fp2=fopen("/home/emerson/Desktop/SatInsMap/data/Rtklib_PPP_estTrop_kin_height.txt","a");
 
-    ssat_t *ssat;
-    double tow;
-    int j,week,nfreq=1,m;
-    char id[32];
+//     ssat_t *ssat;
+//     double tow;
+//     int j,week,nfreq=1,m;
+//     char id[32];
 
-    time2epoch(obs->time, epoch);
+//     time2epoch(obs->time, epoch);
 
-    trace(3,"pppos   : nx=%d n=%d\n",rtk->nx,n);
+//     trace(3,"pppos   : nx=%d n=%d\n",rtk->nx,n);
 
-    rs=mat(6,n); dts=mat(2,n); var=mat(1,n); azel=zeros(2,n);
+//     rs=mat(6,n); dts=mat(2,n); var=mat(1,n); azel=zeros(2,n);
 
-    for (i=0;i<MAXSAT;i++) rtk->ssat[i].fix[0]=0;
+//     for (i=0;i<MAXSAT;i++) rtk->ssat[i].fix[0]=0;
 
-    /* temporal update of states */
-    udstate_ppp(rtk,obs,n,nav);
+//     /* temporal update of states */
+//     udstate_ppp(rtk,obs,n,nav);
 
-    trace(4,"x(0)="); tracemat(4,rtk->x,1,NR(opt),13,4);
+//     trace(4,"x(0)="); tracemat(4,rtk->x,1,NR(opt),13,4);
 
-    /* satellite positions and clocks */
-    satposs(obs[0].time,obs,n,nav,rtk->opt.sateph,rs,dts,var,svh);
+//     /* satellite positions and clocks */
+//     satposs(obs[0].time,obs,n,nav,rtk->opt.sateph,rs,dts,var,svh);
 
-    /* exclude measurements of eclipsing satellite */
-    if (rtk->opt.posopt[3]) {
-        testeclipse(obs,n,nav,rs);
-    }
+//     /* exclude measurements of eclipsing satellite */
+//     if (rtk->opt.posopt[3]) {
+//         testeclipse(obs,n,nav,rs);
+//     }
 
-    xp=mat(rtk->nx,1); Pp=zeros(rtk->nx,rtk->nx);
-    matcpy(xp,rtk->x,rtk->nx,1);
-    nv=n*rtk->opt.nf*2; v=mat(nv,1); H=mat(rtk->nx,nv); R=mat(nv,nv);
-    S=mat(nv,nv);
-    F=mat(rtk->nx,nv);
+//     xp=mat(rtk->nx,1); Pp=zeros(rtk->nx,rtk->nx);
+//     matcpy(xp,rtk->x,rtk->nx,1);
+//     nv=n*rtk->opt.nf*2; v=mat(nv,1); H=mat(rtk->nx,nv); R=mat(nv,nv);
+//     S=mat(nv,nv);
+//     F=mat(rtk->nx,nv);
 
-   /* Gettin SPP stds  and # of sat*/
-  //fprintf(fp1,"%lf %lf %lf %lf %d\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), sqrt(rtk->sol.qr[0]),sqrt(rtk->sol.qr[1]),sqrt(rtk->sol.qr[2]),n);
+//    /* Gettin SPP stds  and # of sat*/
+//   //fprintf(fp1,"%lf %lf %lf %lf %d\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), sqrt(rtk->sol.qr[0]),sqrt(rtk->sol.qr[1]),sqrt(rtk->sol.qr[2]),n);
 
-  /* Map-matching SPP with the Map   */
-  ncand=match(rtk,obs+i,n,nav,mmcand);
+//   /* Map-matching SPP with the Map   */
+//   ncand=match(rtk,obs+i,n,nav,mmcand);
 
-  vlcand=mat(ncand,1);
-  vpcand=mat(ncand,1);
+//   vlcand=mat(ncand,1);
+//   vpcand=mat(ncand,1);
 
-  for (p = 0; p < ncand; p++) {               /* Candidates loop  */
-    /* Update xp and constrain Pp (Covariances!) with the lane accuracy level */
-    for (k=0;k<3;k++) {
-     xp[k]=mmcand[p*3+k];
-     rtk->P[k+k*rtk->nx]=0.000001; // std of 1 cm for x,y and z comp.
-   }
-    vp=0.0;
-    vl=0.0;
+//   for (p = 0; p < ncand; p++) {               /* Candidates loop  */
+//     /* Update xp and constrain Pp (Covariances!) with the lane accuracy level */
+//     for (k=0;k<3;k++) {
+//      xp[k]=mmcand[p*3+k];
+//      rtk->P[k+k*rtk->nx]=0.000001; // std of 1 cm for x,y and z comp.
+//    }
+//     vp=0.0;
+//     vl=0.0;
 
-    for (i=0;i<rtk->opt.niter;i++) {
+//     for (i=0;i<rtk->opt.niter;i++) {
 
-        /* phase and code residuals */
-        if ((nv=res_ppp(i,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel))<=0) break;
+//         /* phase and code residuals */
+//         if ((nv=res_ppp(i,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel))<=0) break;
 
-        /* measurement update */
-        matcpy(Pp,rtk->P,rtk->nx,rtk->nx);
+//         /* measurement update */
+//         matcpy(Pp,rtk->P,rtk->nx,rtk->nx);
 
-        if ((info=filter(xp,Pp,H,v,R,rtk->nx,nv))) {
-            trace(2,"ppp filter error %s info=%d\n",time_str(rtk->sol.time,0),
-                  info);
-            break;
-        }
-        trace(4,"x(%d)=",i+1); tracemat(4,xp,1,NR(opt),13,4);
+//         if ((info=filter(xp,Pp,H,v,R,rtk->nx,nv))) {
+//             trace(2,"ppp filter error %s info=%d\n",time_str(rtk->sol.time,0),
+//                   info);
+//             break;
+//         }
+//         trace(4,"x(%d)=",i+1); tracemat(4,xp,1,NR(opt),13,4);
 
-        stat=SOLQ_PPP;
-    }
+//         stat=SOLQ_PPP;
+//     }
 
-    /* Compute residuals std: Sk = R + HPHt
-    matcpy(S,R,nv,nv);
-    matmul("NT",n,m,n,1.0,Pp,H,0.0,F);       // S=H*P*H'+R
-    matmul("TN",m,m,n,1.0,H,F,1.0,S);  */
+//     /* Compute residuals std: Sk = R + HPHt
+//     matcpy(S,R,nv,nv);
+//     matmul("NT",n,m,n,1.0,Pp,H,0.0,F);       // S=H*P*H'+R
+//     matmul("TN",m,m,n,1.0,H,F,1.0,S);  */
 
-    /* Computing merit function x^2=v*R^-1*r^T  */
-    for (i=0;i<nv/2;i++){ for (j=0;j<nv/2;j++) {
-      if(i==j){
-        if(j%2==0){
-          //if(v[j]!=0.00000)
-          vl+=v[j]*(1/R[i*nv+j])*v[j];//*(1/R[i*nv+j])
-        }else{
-        //  if(v[j-1]!=0.00000)
-        vp+=v[j]*(1/R[i*nv+j])*v[j]; //*(1/R[i*nv+j])
-        }
-      }
-     }
-    }
+//     /* Computing merit function x^2=v*R^-1*r^T  */
+//     for (i=0;i<nv/2;i++){ for (j=0;j<nv/2;j++) {
+//       if(i==j){
+//         if(j%2==0){
+//           //if(v[j]!=0.00000)
+//           vl+=v[j]*(1/R[i*nv+j])*v[j];//*(1/R[i*nv+j])
+//         }else{
+//         //  if(v[j-1]!=0.00000)
+//         vp+=v[j]*(1/R[i*nv+j])*v[j]; //*(1/R[i*nv+j])
+//         }
+//       }
+//      }
+//     }
 
-  vlcand[p]=vl;
-  vpcand[p]=vp;
-} /* Candidates loop  */
+//   vlcand[p]=vl;
+//   vpcand[p]=vp;
+// } /* Candidates loop  */
 
- /* PPP credit-function res storage */
- //fprintf(fp1,"%lf %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), vl, vp);
+//  /* PPP credit-function res storage */
+//  //fprintf(fp1,"%lf %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), vl, vp);
 
-  if (ncand!=0) {
-  posvp=resmin(vpcand,ncand,&minvp);
-  posvl=resmin(vlcand,ncand,&minvl);
-  //fprintf(fp1,"%lf %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), minvl,minvp);
-  }
+//   if (ncand!=0) {
+//   posvp=resmin(vpcand,ncand,&minvp);
+//   posvl=resmin(vlcand,ncand,&minvl);
+//   //fprintf(fp1,"%lf %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), minvl,minvp);
+//   }
 
-  /* Update solution Here */
-  for (k=0;k<3;k++) {
-      xp[k]=mmcand[posvl*3+k];
-      Pp[k+k*rtk->nx]=0.000001; // std of 2 cm for x,y and z comp.
-  }
+//   /* Update solution Here */
+//   for (k=0;k<3;k++) {
+//       xp[k]=mmcand[posvl*3+k];
+//       Pp[k+k*rtk->nx]=0.000001; // std of 2 cm for x,y and z comp.
+//   }
 
-  /* Last estimate and storage of the best candidate residuals  */
+//   /* Last estimate and storage of the best candidate residuals  */
 
-  for (i=0;i<2;i++) {
+//   for (i=0;i<2;i++) {
 
-      // phase and code residuals
-      if ((nv=res_ppp(i,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel))<=0) break;
+//       // phase and code residuals
+//       if ((nv=res_ppp(i,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel))<=0) break;
 
-      // measurement update
-      matcpy(Pp,rtk->P,rtk->nx,rtk->nx);
+//       // measurement update
+//       matcpy(Pp,rtk->P,rtk->nx,rtk->nx);
 
-      if ((info=filter(xp,Pp,H,v,R,rtk->nx,nv))) {
-          trace(2,"ppp filter error %s info=%d\n",time_str(rtk->sol.time,0),
-                info);
-          break;
-      }
-      trace(4,"x(%d)=",i+1); tracemat(4,xp,1,NR(opt),13,4);
+//       if ((info=filter(xp,Pp,H,v,R,rtk->nx,nv))) {
+//           trace(2,"ppp filter error %s info=%d\n",time_str(rtk->sol.time,0),
+//                 info);
+//           break;
+//       }
+//       trace(4,"x(%d)=",i+1); tracemat(4,xp,1,NR(opt),13,4);
 
-      stat=SOLQ_PPP;
-  }
+//       stat=SOLQ_PPP;
+//   }
 
-  /* Compute residuals covariances: Sk = R + HPHt */
-  matcpy(S,R,nv,nv);
-  matmul("NT",n,m,n,1.0,Pp,H,0.0,F);       // S=H*P*H'+R
-  matmul("TN",m,m,n,1.0,H,F,1.0,S);
+//   /* Compute residuals covariances: Sk = R + HPHt */
+//   matcpy(S,R,nv,nv);
+//   matmul("NT",n,m,n,1.0,Pp,H,0.0,F);       // S=H*P*H'+R
+//   matmul("TN",m,m,n,1.0,H,F,1.0,S);
 
- /* Innovation covariance bound (test) file for phase and pseudorange */
-  for (i=0;i<nv/2;i++){ for (j=0;j<nv/2;j++) {
-    if(i==j){
-      if(j%2==0){
-      //  fprintf(f2, "%lf %lf %lf %lf\n",epoch[3]+(epoch[4]/60)+(epoch[5]/3600),v[j],-2*sqrt(S[i*nv+j]),2*sqrt(S[i*nv+j]));
-      }else{
-      //fprintf(f3, "%lf %lf %lf %lf\n",epoch[3]+(epoch[4]/60)+(epoch[5]/3600),v[j],-2*sqrt(S[i*nv+j]),2*sqrt(S[i*nv+j]));
-      }
-    }
-   }
-  }
+//  /* Innovation covariance bound (test) file for phase and pseudorange */
+//   for (i=0;i<nv/2;i++){ for (j=0;j<nv/2;j++) {
+//     if(i==j){
+//       if(j%2==0){
+//       //  fprintf(f2, "%lf %lf %lf %lf\n",epoch[3]+(epoch[4]/60)+(epoch[5]/3600),v[j],-2*sqrt(S[i*nv+j]),2*sqrt(S[i*nv+j]));
+//       }else{
+//       //fprintf(f3, "%lf %lf %lf %lf\n",epoch[3]+(epoch[4]/60)+(epoch[5]/3600),v[j],-2*sqrt(S[i*nv+j]),2*sqrt(S[i*nv+j]));
+//       }
+//     }
+//    }
+//   }
 
-  /* Separating residuals */
-  vl=0.0;vp=0.0;
-  /* Computing merit function x^2=v*R^-1*r^T  */
-  for (i=0;i<nv/2;i++){ for (j=0;j<nv/2;j++) {
-    if(i==j){
-      if(j%2==0){
-        //if(v[j]!=0.00000)
-        vl+=v[j]*v[j];//*(1/R[i*nv+j]) or (1/S[i*nv+j])
-      }else{
-      //  if(v[j-1]!=0.00000)
-      vp+=v[j]*v[j]; //*(1/R[i*nv+j])
-      }
-    }
-   }
-  }
+//   /* Separating residuals */
+//   vl=0.0;vp=0.0;
+//   /* Computing merit function x^2=v*R^-1*r^T  */
+//   for (i=0;i<nv/2;i++){ for (j=0;j<nv/2;j++) {
+//     if(i==j){
+//       if(j%2==0){
+//         //if(v[j]!=0.00000)
+//         vl+=v[j]*v[j];//*(1/R[i*nv+j]) or (1/S[i*nv+j])
+//       }else{
+//       //  if(v[j-1]!=0.00000)
+//       vp+=v[j]*v[j]; //*(1/R[i*nv+j])
+//       }
+//     }
+//    }
+//   }
 
-  /* chi-square validation of residuals together */
-  vv=dot(v,v,nv);
-  //fprintf(fp2,"%lf %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), vv,chisqr95[nv-(5+n)-1]);
-  if (nv>rtk->nx&&vv>chisqr[nv-rtk->nx-1]) {
-    //  printf("chi-square error time:%lf nv=%d vv=%.1f cs=%.1f",epoch[3]+(epoch[4]/60)+(epoch[5]/3600),nv,vv,chisqr[nv-rtk->nx-1]);
-      //return 0;
-  }
+//   /* chi-square validation of residuals together */
+//   vv=dot(v,v,nv);
+//   //fprintf(fp2,"%lf %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), vv,chisqr95[nv-(5+n)-1]);
+//   if (nv>rtk->nx&&vv>chisqr[nv-rtk->nx-1]) {
+//     //  printf("chi-square error time:%lf nv=%d vv=%.1f cs=%.1f",epoch[3]+(epoch[4]/60)+(epoch[5]/3600),nv,vv,chisqr[nv-rtk->nx-1]);
+//       //return 0;
+//   }
 
-/* Final solution update  */
-for (k=0;k<3;k++) {
-  xp[k]=mmcand[posvl*3+k];
-}
-    if (stat==SOLQ_PPP) {
-        /* postfit residuals */
-        //res_ppp(1,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel);
+// /* Final solution update  */
+// for (k=0;k<3;k++) {
+//   xp[k]=mmcand[posvl*3+k];
+// }
+//     if (stat==SOLQ_PPP) {
+//         /* postfit residuals */
+//         //res_ppp(1,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel);
 
-        /* DO tests Here  */
+//         /* DO tests Here  */
 
-        /* update state and covariance matrix */
-        matcpy(rtk->x,xp,rtk->nx,1);
-        matcpy(rtk->P,Pp,rtk->nx,rtk->nx);
-    //printf("SOLXYZ: %lf, %lf, %lf\n",xp[0],xp[1],xp[2] );
-    //fprintf(fp2, "%lf %lf %lf %lf\n",(epoch[3]+epoch[4]/60+epoch[5]/3600),xp[0],xp[1],xp[2]);
-    //printf("Xp:%lf, %lf, %lf\n",xp[0],xp[1],xp[2]);
-  //  inibuff();
-  //  clstpt(rtk->x);
-  //  for(i=0;i<3;i++) rclst[i]=lane.buffer[lane.currsearch*3+i]; //Closest Point
-  //  printf("Clst:%lf, %lf, %lf\nDist:%lf\n",rclst[0],rclst[1],rclst[2],dist(xp, rclst));
-   //double pos[3];
-  //  ecef2pos(rtk->x,pos);
-  //  fprintf(fp2, "%lf %lf\n", (epoch[3]+epoch[4]/60+epoch[5]/3600), pos[2] );
-  //  fprintf(fp2, "%lf %lf\n", (epoch[3]+epoch[4]/60+epoch[5]/3600), dist(xp, rclst) );
+//         /* update state and covariance matrix */
+//         matcpy(rtk->x,xp,rtk->nx,1);
+//         matcpy(rtk->P,Pp,rtk->nx,rtk->nx);
+//     //printf("SOLXYZ: %lf, %lf, %lf\n",xp[0],xp[1],xp[2] );
+//     //fprintf(fp2, "%lf %lf %lf %lf\n",(epoch[3]+epoch[4]/60+epoch[5]/3600),xp[0],xp[1],xp[2]);
+//     //printf("Xp:%lf, %lf, %lf\n",xp[0],xp[1],xp[2]);
+//   //  inibuff();
+//   //  clstpt(rtk->x);
+//   //  for(i=0;i<3;i++) rclst[i]=lane.buffer[lane.currsearch*3+i]; //Closest Point
+//   //  printf("Clst:%lf, %lf, %lf\nDist:%lf\n",rclst[0],rclst[1],rclst[2],dist(xp, rclst));
+//    //double pos[3];
+//   //  ecef2pos(rtk->x,pos);
+//   //  fprintf(fp2, "%lf %lf\n", (epoch[3]+epoch[4]/60+epoch[5]/3600), pos[2] );
+//   //  fprintf(fp2, "%lf %lf\n", (epoch[3]+epoch[4]/60+epoch[5]/3600), dist(xp, rclst) );
 
-        /* ambiguity resolution in ppp */
-        if (opt->modear==ARMODE_PPPAR||opt->modear==ARMODE_PPPAR_ILS) {
-            if (pppamb(rtk,obs,n,nav,azel)) stat=SOLQ_FIX;
-        }
-        //if (pppamb(rtk,obs,n,nav,azel)) stat=SOLQ_FIX;
+//         /* ambiguity resolution in ppp */
+//         if (opt->modear==ARMODE_PPPAR||opt->modear==ARMODE_PPPAR_ILS) {
+//             if (pppamb(rtk,obs,n,nav,azel)) stat=SOLQ_FIX;
+//         }
+//         //if (pppamb(rtk,obs,n,nav,azel)) stat=SOLQ_FIX;
 
-        /* update solution status */
-        rtk->sol.ns=0;
-        for (i=0;i<n&&i<MAXOBS;i++) {
-            if (!rtk->ssat[obs[i].sat-1].vsat[0]) continue;
-            rtk->ssat[obs[i].sat-1].lock[0]++;
-            rtk->ssat[obs[i].sat-1].outc[0]=0;
-            rtk->ssat[obs[i].sat-1].fix [0]=4;
-            rtk->sol.ns++;
-        }
-        rtk->sol.stat=stat;
+//         /* update solution status */
+//         rtk->sol.ns=0;
+//         for (i=0;i<n&&i<MAXOBS;i++) {
+//             if (!rtk->ssat[obs[i].sat-1].vsat[0]) continue;
+//             rtk->ssat[obs[i].sat-1].lock[0]++;
+//             rtk->ssat[obs[i].sat-1].outc[0]=0;
+//             rtk->ssat[obs[i].sat-1].fix [0]=4;
+//             rtk->sol.ns++;
+//         }
+//         rtk->sol.stat=stat;
 
-        for (i=0;i<3;i++) {
-            rtk->sol.rr[i]=rtk->x[i];
-            rtk->sol.qr[i]=(float)rtk->P[i+i*rtk->nx];
-        }
-        rtk->sol.qr[3]=(float)rtk->P[1];
-        rtk->sol.qr[4]=(float)rtk->P[2+rtk->nx];
-        rtk->sol.qr[5]=(float)rtk->P[2];
-        rtk->sol.dtr[0]=rtk->x[IC(0,opt)];
-        rtk->sol.dtr[1]=rtk->x[IC(1,opt)]-rtk->x[IC(0,opt)];
-        for (i=0;i<n&&i<MAXOBS;i++) {
-            rtk->ssat[obs[i].sat-1].snr[0]=MIN(obs[i].SNR[0],obs[i].SNR[1]);
-        }
-        for (i=0;i<MAXSAT;i++) {
-            if (rtk->ssat[i].slip[0]&3) rtk->ssat[i].slipc[0]++;
-        }
-    }
-    free(rs); free(dts); free(var); free(azel);
-    free(xp); free(Pp); free(v); free(H); free(R);
-    free(vlcand);free(vpcand);free(S);free(F);
-  //  fclose(fp1);
-  //  fclose(fp2);
-    //fclose(f2);fclose(f3);
-    //fclose(fp);
+//         for (i=0;i<3;i++) {
+//             rtk->sol.rr[i]=rtk->x[i];
+//             rtk->sol.qr[i]=(float)rtk->P[i+i*rtk->nx];
+//         }
+//         rtk->sol.qr[3]=(float)rtk->P[1];
+//         rtk->sol.qr[4]=(float)rtk->P[2+rtk->nx];
+//         rtk->sol.qr[5]=(float)rtk->P[2];
+//         rtk->sol.dtr[0]=rtk->x[IC(0,opt)];
+//         rtk->sol.dtr[1]=rtk->x[IC(1,opt)]-rtk->x[IC(0,opt)];
+//         for (i=0;i<n&&i<MAXOBS;i++) {
+//             rtk->ssat[obs[i].sat-1].snr[0]=MIN(obs[i].SNR[0],obs[i].SNR[1]);
+//         }
+//         for (i=0;i<MAXSAT;i++) {
+//             if (rtk->ssat[i].slip[0]&3) rtk->ssat[i].slipc[0]++;
+//         }
+//     }
+//     free(rs); free(dts); free(var); free(azel);
+//     free(xp); free(Pp); free(v); free(H); free(R);
+//     free(vlcand);free(vpcand);free(S);free(F);
+//   //  fclose(fp1);
+//   //  fclose(fp2);
+//     //fclose(f2);fclose(f3);
+//     //fclose(fp);
 
 
-    for (i=0;i<n;i++) {
-        j=IB(obs[i].sat,&rtk->opt);
-      //  printf("AMBSAT[%d]: %lf, STD: %lf\n",j,rtk->x[j],sqrt(rtk->P[j+j*rtk->nx]));
-    //    fprintf(fp1,"%lf %d %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), j+1,rtk->x[j],sqrt(rtk->P[j+j*rtk->nx]));
-    }
-  //  fclose(fp1);
-}
+//     for (i=0;i<n;i++) {
+//         j=IB(obs[i].sat,&rtk->opt);
+//       //  printf("AMBSAT[%d]: %lf, STD: %lf\n",j,rtk->x[j],sqrt(rtk->P[j+j*rtk->nx]));
+//     //    fprintf(fp1,"%lf %d %lf %lf\n", epoch[3]+(epoch[4]/60)+(epoch[5]/3600), j+1,rtk->x[j],sqrt(rtk->P[j+j*rtk->nx]));
+//     }
+//   //  fclose(fp1);
+// }
 
 /* precise point positioning -------------------------------------------------*/
 extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)

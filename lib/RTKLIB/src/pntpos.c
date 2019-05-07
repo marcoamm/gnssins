@@ -343,7 +343,7 @@ static int estpos(const obsd_t *obs, int n, const double *rs, const double *dts,
             sprintf(msg,"lsq error info=%d",info);
             break;
         }
-        printf("Dx_clock_offset: %lf+=%lf - nsat: %d, Valid: %d\n", x[3], dx[3], n, nv);
+        
         for (j=0;j<NX;j++) x[j]+=dx[j];
 
         if (norm(dx,NX)<1E-4) {

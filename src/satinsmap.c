@@ -8,7 +8,7 @@
 #include <assert.h>
 #include <dirent.h>
 
-#include "rtklib.h"
+#include "../lib/RTKLIB/src/rtklib.h"
 #include "satinsmap.h"
 //#include "INS_GNSS.h"
 
@@ -19,7 +19,7 @@ FILE *fimu;          /* Imu datafile pointer  */
 FILE *imu_tactical; /* Imu datafile pointer */
 lane_t lane;
 imuraw_t imu_obs_global={{0}}; 
-pva_t pva_global={{0}};
+pva_t pva_global={{0}};  
 pva_t pvagnss={{0}};
 insgnss_opt_t insgnssopt={0};
 sol_t *solw;         /* gnss solution structure buffer */
@@ -1297,8 +1297,135 @@ extern void asi_blk_mat(double *A,int m,int n,const double *B,int p ,int q,
         for (j=isc;j<isc+q;j++) A[i+j*m]=B[(i-isr)+(j-isc)*p];
     }
 }
+/* correction direction cosine matrix by attitude errors---------------------
+ * args   :  double *dx  I   attitude errors
+ *           double *C   IO  direction cosine matrix
+ * return : none
+ * --------------------------------------------------------------------------*/
+extern void corratt(const double *dx,double *C)
+{
+    int i;
+    double T[9],*I=eye(3);
+
+    skewsym3(dx,T);
+    for (i=0;i<9;i++) I[i]-=T[i];
+
+    matcpy(T,C,3,3);
+    matmul("NN",3,3,3,1.0,I,T,0.0,C);
+    free(I);
+}
+
+/* correction imu accl. and gyro. measurements-----------------------------
+ * args     :    I  double *accl  imu accl. measurements
+ *               I  double *gyro  imu gyro. measurements
+ *               I  double *Ma    non-orthogonal between sensor axes and
+ *                                body frame for accelerometers
+ *               I  double *Mg    non-orthogonal between sensor axes and
+ *                                body frame for gyroscopes
+ *               I  double *ba    accelemeter-bias
+ *               I  double *bg    gyro-bias
+ *               I  double *Gg    g-dependent bias for a gyro triad
+ *               O  double *cor_accl
+ *                         *cor_gyro  corrected imu accl. and gyro. measurements
+ * return : none
+ * -----------------------------------------------------------------------*/
+extern void ins_errmodel2(const double *accl,const double *gyro,const double *Ma,
+                          const double *Mg,const double *ba,const double *bg,
+                          const double *Gg,double *cor_accl,double *cor_gyro)
+{
+    int i,j;
+    double Mai[9],Mgi[9],*I=eye(3),T[9]={0},Gf[3]={0};
+
+    for (i=0;i<3;i++) for (j=0;j<3;j++) Mai[i+j*3]=I[i+j*3]+Ma[i+j*3];
+    for (i=0;i<3;i++) for (j=0;j<3;j++) Mgi[i+j*3]=I[i+j*3]+Mg[i+j*3];
+
+    if (!matinv(Mai,3)&&!matinv(Mgi,3)) {
+        matmul("NN",3,1,3,1.0,Mai,accl,0.0,T);
+        matmul("NN",3,1,3,1.0,Mgi,gyro,0.0,T+3);
+    }
+    if (cor_accl) {
+        for (i=0;i<3;i++) cor_accl[i]=T[i]-ba[i];
+        matmul("NN",3,1,3,1.0,Gg,accl,0.0,Gf);
+    }
+    if (cor_gyro) {
+        for (i=0;i<3;i++) cor_gyro[i]=T[3+i]-bg[i]-Gf[i];
+    }
+    free(I);
+}
+
+/* get the acceleration of body in ecef-frame by input acceleration measurements
+ * args     :  double *fib    I  input acceleration measurements
+ *             double *Cbe    I  body-frame to ecef-frame convert matrix
+ *             double *re     I  position of imu-body in ecef-frame
+ *             double *ve     I  velocity of imu-body in ecef-frame
+ *             double *ae     O  acceleration of imu-body in ecef-frame
+ * return :none
+ * --------------------------------------------------------------------------*/
+extern void getaccl(const double *fib,const double *Cbe,const double *re,
+                    const double *ve,double *ae)
+{
+    int i; double fe[3],ge[3],cori[3];
+
+    matmul3v("N",Cbe,fib,fe);
+    Gravity_ECEF(re,ge);
+    matmul3v("N",Omge,ve,cori);
+
+    for (i=0;i<3;i++) {
+        ae[i]=fe[i]+ge[i]-2.0*cori[i];
+    }
+}
+
 /* close loop for non-holonomic constraint-----------------------------------*/
-void clp(pva_t *PVA_sol, const double *x)
+extern void clp(ins_states_t *ins,const insgnss_opt_t *opt,const double *x)
+{
+    int i,iba,nba,ibg,nbg,isg,nsg,isa,nsa;
+    double *I=eye(3),fibc[3],omgbc[3],ang[3];
+
+    iba=xiBa(opt); nba=xnBa(opt);
+    ibg=xiBg(opt); nbg=xnBg(opt);
+    //isg=xiSg(opt); nsg=xnSg(opt);
+    //isa=xiSa(opt); nsa=xnSa(opt);
+
+    /* close-loop attitude correction */
+    corratt(x,ins->Cbe);
+
+    /* close-loop velocity and position correction */
+    ins->ve[0]-=x[xiV(opt)+0];
+    ins->ve[1]-=x[xiV(opt)+1];
+    ins->ve[2]-=x[xiV(opt)+2];
+
+    ins->re[0]-=x[xiP(opt)+0];
+    ins->re[1]-=x[xiP(opt)+1];
+    ins->re[2]-=x[xiP(opt)+2];
+
+    /* close-loop accl and gyro bias */
+    ins->data.ba[0]+=x[iba+0];
+    ins->data.ba[1]+=x[iba+1];
+    ins->data.ba[2]+=x[iba+2];
+
+    ins->data.bg[0]+=x[ibg+0];
+    ins->data.bg[1]+=x[ibg+1];
+    ins->data.bg[2]+=x[ibg+2];
+
+    /* close-loop residual scale factors of gyro and accl */
+    //for (i=isg;i<isg+nsg;i++) ins->Mg[i-isg+(i-isg)*3]+=x[i];
+
+    //for (i=isa;i<isa+nsa;i++) ins->Ma[i-isa+(i-isa)*3]+=x[i];
+
+    /* correction imu accl and gyro measurements data */
+    ins_errmodel2(ins->data.fb0,ins->data.wibb0,
+                  ins->data.Ma,ins->data.Mg,
+                  ins->data.ba,ins->data.bg,ins->data.Gg,
+                  fibc,omgbc);
+
+    /* correction imu-body accelerometer */
+    getaccl(fibc,ins->Cbe,ins->re,ins->ve,ins->ae);
+
+    free(I);
+}
+
+/* close loop for non-holonomic constraint-----------------------------------*/
+void clp1(pva_t *PVA_sol, const double *x)
 {
     int i;
     double Skew_x_est_new[9]={0.0}, I[9]={1,0,0,0,1,0,0,0,1};
@@ -1429,7 +1556,7 @@ extern int zvu(pva_t *PVA_sol, const um7pack_t *imu, int nx)
             /* solution ok */
             //ins->stat=INSS_ZVU;
             info=1;
-            clp(PVA_sol,x);
+            clp1(PVA_sol,x);
             /* Full weight matrix  */
             for (i=0; i<nx; i++) {
               for (j=0;j<nx;j++) {
@@ -1623,7 +1750,7 @@ printf("\n");
             /* solution ok */
             //ins->stat=INSS_NHC;
             info=1;
-            clp(PVA_sol,x);
+            clp1(PVA_sol,x);
             /* Full weight matrix  */
             for (i=0; i<nx; i++) {
               for (j=0;j<nx;j++) {
@@ -2626,9 +2753,8 @@ extern void insinit(ins_states_t *ins, insgnss_opt_t *insopt, prcopt_t *opt)
 
     getP0(insopt, ins->P, ins->nx);
     //getP0(insopt, ins->Pa, ins->nx);    
-
-    
-}
+ 
+}   
 
 /* free ins control ------------------------------------------------------------
 * free memory for ins control struct
@@ -2637,7 +2763,7 @@ extern void insinit(ins_states_t *ins, insgnss_opt_t *insopt, prcopt_t *opt)
 *-----------------------------------------------------------------------------*/
 extern void insfree(ins_states_t *ins)
 {
-    trace(3,"insfree :\n");
+    trace(3,"insfree :\n"); 
 
     ins->nx=ins->nb=0;
     free(ins->x ); ins->x =NULL;
@@ -2668,61 +2794,85 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   printf("\n *****************  CORE BEGINS ***********************\n");
 
   /* initialize ins state */
-    printf("XnX: %d\n", xnX(opt));
-    insinit(&insc, &insgnssopt, opt);
+  insinit(&insc, &insgnssopt, opt);
 
   /* initialize ins/gnss parameter default uncertainty */
   ig_paruncinit(&insgnssopt);
-  printf("Insc.nx inside 1: %d\n", insc.nx);
+  
   /* Initialize time from GNSS */
   gnss_time=time2gpst(rtk->sol.time,&week);
 
   /* Feed gnss solution and measurement buffers */
   gnssbuffer(&rtk->sol, obs, n);
-  printf("Insc.nx inside 4: %d\n", insc.nx);
+
   /* Ins and integration loop
   Processing window - integrates when GNSS and INS mea. are closer by 0.1s
   The do while takes care when INS or GNSS is too ahead from each other         */  
   do {
+    if (insgnssopt.ins_ini)
+    {
+      printf("\n **** Ins Loop starts **** \n");
+    }
+    
     if(core_count>0){
-      memset(&insc, 0, sizeof(insc));
-    }    
-
-     printf("insw.re: %lf %lf %lf\n", insw[ins_w_counter-1].re[0],insw[ins_w_counter-1].re[1],insw[ins_w_counter-1].re[2] );
-     printf("insw.ve: %lf %lf %lf\n", insw[ins_w_counter-1].ve[0],insw[ins_w_counter-1].ve[1],insw[ins_w_counter-1].ve[2] );
+      memset(&insc, 0, sizeof(insc)); 
+    }
 
     /* Initialize ins states with previous state from ins buffer */
       if(ins_w_counter>insgnssopt.insw-1){
+    printf("insw.re: %lf %lf %lf\n", insw[insgnssopt.insw-1].pre[0],insw[insgnssopt.insw-1].pre[1],insw[insgnssopt.insw-1].pre[2] );
+    printf("insw.ve: %lf %lf %lf\n", insw[insgnssopt.insw-1].pve[0],insw[insgnssopt.insw-1].pve[1],insw[insgnssopt.insw-1].pve[2] );
+    printf("pCbew:\n");
+    for (i = 0; i < 3; i++){
+      for (j = 0; j < 3; j++){
+        printf("%lf, ", insw[insgnssopt.insw-1].pCbe[i * 3 + j]); /* code */
+       }
+     printf("];\n"); 
+    }
        insc=insw[insgnssopt.insw-1];
-      }else {if(ins_w_counter>1) insc=insw[ins_w_counter-1];printf("Passing values here\n");}
-
-     printf("ins.re1: %lf %lf %lf\n", insc.pre[0],insc.pre[1],insc.pre[2] );
-     printf("ins.ve1: %lf %lf %lf\n", insc.pve[0],insc.pve[1],insc.pve[2] );
-     
-    for (i = 0; i < 3; i++)
-     {
-       for (j = 0; j < 3; j++)
-          {
-      printf("%lf, ", insc.pCbe[i * 3 + j]); /* code */
-          }
-               printf("];\n");
+      }else {
+    printf("insw.re: %lf %lf %lf\n", insw[ins_w_counter-1].pre[0],insw[ins_w_counter-1].pre[1],insw[ins_w_counter-1].pre[2] );
+    printf("insw.ve: %lf %lf %lf\n", insw[ins_w_counter-1].pve[0],insw[ins_w_counter-1].pve[1],insw[ins_w_counter-1].pve[2] );
+    printf("pCbew:\n");
+    for (i = 0; i < 3; i++){
+      for (j = 0; j < 3; j++){
+        printf("%lf, ", insw[ins_w_counter-1].pCbe[i * 3 + j]); /* code */
+       }
+     printf("];\n"); 
     }
 
-    /* input ins */
-    if(!inputimu(&insc, week)) {printf("End of imu file\n"); break;}
-    printf("Insc.nx inside 5: %d\n", insc.nx);
-    if (ins_w_counter >= 2){
+        if(ins_w_counter>1) {
+          printf(" ** Passing values here **\n");
+          insc=insw[ins_w_counter-1];
+          for (i = 0; i < 3; i++) insc.pre[i]=insw[ins_w_counter-1].pre[i];
+          //insc.pre=insw[ins_w_counter-1].re;
+        }
+      }
+
+      printf("ins.nx: %d\n", insc.nx);
+      printf("ins.data.fb0: %lf %lf %lf\n", insc.pdata.fb0[0],insc.pdata.fb0[1],insc.pdata.fb0[2] );
+      printf("ins.data.wibb0: %lf %lf %lf\n", insc.pdata.wibb0[0],insc.pdata.wibb0[1],insc.pdata.wibb0[2] );
+
+
+    /* input ins */ 
+    if(!inputimu(&insc, week)) {printf(" ** End of imu file **\n"); break;}
+
+     printf("ins.data.fb: %lf %lf %lf\n", insc.data.fb[0],insc.data.fb[1],insc.data.fb[2] );
+     printf("ins.data.wibb: %lf %lf %lf\n", insc.data.wibb[0],insc.data.wibb[1],insc.data.wibb[2] );
+    
+    if (ins_w_counter >= 1){
       insc.dt = insc.time - insc.ptime;
     }
 
+    printf("Ins time: %lf %lf %lf\n", insc.dt,insc.time,insc.ptime);
+
     /* If INS time is ahead of GNSS exit INS loop */ 
-    if (gnss_time-insc.time < -0.01) {// for tactical, -1.65 for consumer
-        printf("Ins time ahead gps time: inst:%lf, gpst:%lf\n", insc.time,gnss_time); 
+    if (gnss_time-insc.time < -0.01) {
+      // for tactical, -1.65 for consumer
+      printf("\n ** Ins time ahead gps time **\n", insc.time,gnss_time); 
    
       /* Back INS file reader up */
       rewind(imu_tactical);
-
-      printf("Insc.nx inside if: %d\n", insc.nx);
 
       insc.stat=-1;
       break; 
@@ -2732,30 +2882,46 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       
       /* initial ins states */
       // Here it's where the PVA initialization with the alignment is done
-      if (gnss_w_counter>2 && ins_w_counter<500){ 
+      printf("Ins initialization condition: %d %d\n", gnss_w_counter, insgnssopt.ins_ini); 
+      if (gnss_w_counter>2 && insgnssopt.ins_ini!=1){ 
         //150 means 1s of ins data, thus perform initialization only in the beginning 
         if(init_inspva(solw, &insc)){
-          printf("Ins initialization ok: %lf\n", insc.time); 
+        printf(" ** Ins initialization ok: %lf **\n", insc.time);
+        printf("ins.re1: %lf %lf %lf\n", insc.pre[0],insc.pre[1],insc.pre[2] );
+        printf("ins.ve1: %lf %lf %lf\n", insc.pve[0],insc.pve[1],insc.pve[2] );
+     for (i = 0; i < 3; i++)
+     {
+       for (j = 0; j < 3; j++)
+       {
+         printf("%lf, ", insc.pCbe[i * 3 + j]); /* code */ 
+        }
+        printf("];\n"); 
+    } 
+          insgnssopt.ins_ini=1;
         }else{
-          printf("Ins initialization error: %lf\n", insc.time);
+          printf(" ** Ins initialization error: %lf **\n", insc.time);
+          insupdt(&insc);
+          /* Add current ins measurement to buffer */
+          insbuffer(&insc);
+          ins_w_counter++;
+          insgnssopt.ins_ini=0;
           continue;
         }
       }
 
       /* Check if ins and gps observations match for integration */
-      flag=interp_ins2gpst(gnss_time, &insc);
+      flag=interp_ins2gpst(gnss_time, &insc); 
 
       /* Integration */
       if (insgnssopt.mode){ // Add condition: if less than four satellites mode=0;
          /* Tightly-coupled ins/gnss */
-          printf("Insc.nx: %d\n", insc.nx);
          TC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
-      }else{
+      }else{  
          /* Loosley-coupled ins/gnss */
-         LC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
+         LC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag); 
       }
-
-     /* printf("P: \n");
+ 
+     /* printf("P: \n");   
       for (i = 0; i < insc.nx; i++)
       {
         for (j = 0; j < insc.nx; j++)
@@ -2763,15 +2929,15 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
           printf("%lf ", insc.P[i*insc.nx+j]); 
         }
         printf("\n");
-      }
-*/
-      if (ins_w_counter > 500) 
+      }*/
+
+      if (ins_w_counter > 500)  
       {
-          exit(0);
-      }
+          //exit(0);
+      }  
       
       
-      /* Non-holonomic constraints */
+      /* Non-holonomic constraints */  
       if(insc.pdata.sec > 0.0 ){
         //nhc(&PVA_prev_sol, &insc, 17); 
       }
@@ -2785,24 +2951,26 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
         zvu_counter=0;
       }
       
-      /* Output PVA solution  */ 
+      /* Output PVA solution    
       if (insc.ptime>0.0) {
          fprintf(out_PVA,"%lf %.12lf %.12lf %lf %lf %lf %lf %lf %lf %lf %d\n",\
          insc.time, insc.rn[0]*R2D, insc.rn[1]*R2D, insc.rn[2],\
          insc.vn[0], insc.vn[1], insc.vn[2],
-         insc.an[0]*R2D,insc.an[1]*R2D,insc.an[2]*R2D, insgnssopt.Nav_or_KF);
+         insc.an[0]*R2D,insc.an[1]*R2D,insc.an[2]*R2D, insgnssopt.Nav_or_KF);  
       }
-
+      */
       
 
     } // end If INS time ahead of GNSS condition
 
-     /* Update ins states and measurements */
+     /* Update ins states and measurements */ 
      insupdt(&insc);
+
+     printf("\nIns after structure update\n");    
      printf("ins.re: %lf %lf %lf\n", insc.re[0],insc.re[1],insc.re[2] );
      printf("ins.ve: %lf %lf %lf\n", insc.ve[0],insc.ve[1],insc.ve[2] );
      printf("ins->Cbe=[");
-    for (i = 0; i < 3; i++)
+    for (i = 0; i < 3; i++) 
      {
        for (j = 0; j < 3; j++)
           {
@@ -2825,69 +2993,61 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
      /* Add current ins measurement to buffer */
      insbuffer(&insc);
 
-     printf("insbuffer nx: %d\n", insw[0].nx);
-
      /* Global ins counter */
      ins_w_counter++;
      core_count++;
-
-     printf("\nEND IMU LOOP ITERATION\n");
+     
+     printf("Ins counter updated: %d\n", ins_w_counter);
+     printf("\n **** Ins Loop ends **** \n");
 
      /* Loop conditions */
      if (gnss_time-insc.time<0.0001) {
-      printf("UPDATE INS AND GNSS \n");
+      printf("UPDATE INS AND GNSS: gpst: %lf, imut: %lf, dt diff: %lf\n", gnss_time, insc.time, gnss_time-insc.time);
       break;
      }else{
        if (gnss_time-insc.time<-0.0001) {
-       printf("UPDATE INS AND GNSS \n");
+       printf("UPDATE INS AND GNSS: gpst: %lf, imut: %lf, dt diff: %lf\n", gnss_time, insc.time, gnss_time-insc.time);
        break;
        }else{
-         printf("KEEP UPDATING INS \n");
+         printf("KEEP UPDATING INS: gpst: %lf, imut: %lf, dt diff: %lf\n", gnss_time, insc.time, gnss_time-insc.time);
         }
       }
 
   } while(gnss_time-insc.time > 0.0001 || \ 
    gnss_time-insc.time > -0.0001 );
 
-   printf("GPSt: %lf, IMUt: %lf, dt: %lf\n", gnss_time, insc.time, gnss_time-insc.time); 
+  printf("\n ** Out of loop **\ngpst: %lf, imut: %lf, dt diff: %lf\n", gnss_time, insc.time, gnss_time-insc.time); 
 
 
    /* Initialize position from GNSS SPP */
 
    /* Update */
    
-    /**/
+    /*
     printf("Length: %d\n", sizeof(obsw) );
     printf("GNSSOBS N: %d %d %d\n", obsw.n0, \
     obsw.n1,obsw.n2 );
-
-       //printf("GNSSOBS Sat: %d %d\n",obsw[0].data[0].sat, sizeof(obsw[0].data));
-       /*printf("GNSSOBS SNR: %lf \n",obsw[2]->data[0].P[0]);*/
-
-      if (gnss_w_counter >2)
-     {
+      if (gnss_w_counter >2){
        printf("GNSSOBS TIMES: %lf %lf %lf\n",time2gpst(obsw.data0[0].time, NULL),\
      time2gpst(obsw.data1[0].time, NULL), time2gpst(obsw.data2[0].time, NULL));
         printf("GNSSOBS Sat: %d %d %d\n",obsw.data0[0].sat,\
      obsw.data1[0].sat, obsw.data2[0].sat);
        printf("GNSSOBS P: %lf %lf %lf\n",obsw.data0[0].P[0],\
-     obsw.data1[0].P[0], obsw.data2[0].P[0]);
-       
+     obsw.data1[0].P[0], obsw.data2[0].P[0]); 
      }
-    
     printf("GNSSSOL TIMES: %lf %lf %lf\n",time2gpst(solw[insgnssopt.gnssw-1].time, NULL),\
     time2gpst(solw[insgnssopt.gnssw-2].time, NULL), time2gpst(solw[insgnssopt.gnssw-3].time, NULL));
-
     printf("GNSSSOL dtr: %lf %lf %lf\n", solw[insgnssopt.gnssw-1].dtrr,\
     solw[insgnssopt.gnssw-2].dtrr, solw[insgnssopt.gnssw-3].dtrr);
     printf("GNSSSOL pos: %lf %lf %lf\n", solw[insgnssopt.gnssw-1].rr[0],\
     solw[insgnssopt.gnssw-1].rr[1], solw[insgnssopt.gnssw-1].rr[2]);
+    */
 
    /* Global gnss counters */ 
-   gnss_w_counter++;
+   gnss_w_counter++; 
 
-   /* Free memory */
-   insfree(&insc);
+   /* Free memory */ 
+   insfree(&insc);  
 
  printf("\n *****************  CORE ENDS ***********************\n");
 }
@@ -2920,10 +3080,10 @@ int argc; // Size of file or options?
 /* Global structures initialization */
 insgnssopt.mode = 1; /* Tightly=1, or Loosley=0 coupled solution */
 insgnssopt.Tact_or_Low = 1;       /* Type of inertial, tact=1, low=0 */
-insgnssopt.scalePN = 1;             /* use extended Process noise model */
+insgnssopt.scalePN = 0;             /* use extended Process noise model */ 
 insgnssopt.gnssw = 3; 
 insgnssopt.insw = 10;
-insgnssopt.exphi = 1;             /* use precise system propagate matrix for ekf */
+insgnssopt.exphi = 1;              /* use precise system propagate matrix for ekf */
 /* ins sthocastic process noises: */
 insgnssopt.baproopt=INS_RANDOM_WALK;
 insgnssopt.bgproopt=INS_RANDOM_WALK;
@@ -2931,10 +3091,10 @@ insgnssopt.saproopt=INS_RANDOM_WALK;
 insgnssopt.sgproopt=INS_RANDOM_WALK;
 solw=(sol_t*)malloc(sizeof(sol_t)*insgnssopt.gnssw);  /* gnss solution structure window size allocation */
 insw=(ins_states_t*)malloc(sizeof(ins_states_t)*insgnssopt.insw);   /* ins states window size allocation */
-
-strcpy(filopt.trace,tracefname);
-
-/* Global TC_KF_INS_GNSS output files  */
+ 
+strcpy(filopt.trace,tracefname); 
+   
+/* Global TC_KF_INS_GNSS output files  */   
 out_PVA=fopen("../out/out_PVA.txt","w");
 out_clock_file=fopen("../out/out_clock_file.txt","w");
 out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
@@ -2971,7 +3131,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/igs19674.*  ../data/SEPT
 
 /* PPP-Kinematic  4th experimet - GPS AND GLONASS */
  //char *argv[] = {"./rnx2rtkp", "../data/LOG__040.18o", "../data/BRDC00IGS_R_20181930000_01D_MN.rnx", "../data/grm20094.clk", "../data/grm20094.sp3", "-o", "../out/PPP_bmo.pos", "-k", "../config/opts3.conf", "-x", "5"};
-
+ 
  //char *comlin = "./rnx2rtkp ../data/LOG__040.18o ../data/BRDC00IGS_R_20181930000_01D_MN.rnx ../data/igs20094.* -o ../out/PPP_mod_exp4.pos -k ../config/opts3.conf";
 // Command line
 
@@ -2986,7 +3146,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/igs19674.*  ../data/SEPT
 
 /* PPP-Kinematic  Kinematic Positioning dataset  March 21, 2019 GPS */
 char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/APS_center.19N", "../data/igs20452.clk","../data/igs20452.sp3", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
-
+ 
 /* PPP-AR Kinematic
 char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};
 
@@ -3005,11 +3165,11 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
    char *comlin = "./rnx2rtkp /home/emerson/Desktop/rtk_simul/unbj_constrain_test/unbj0600.16o /home/emerson/Desktop/rtk_simul/unbj_constrain_test/brdc0600.16n /home/emerson/Desktop/rtk_simul/unbj_constrain_test/igs18861.sp3 -o /home/emerson/Desktop/rtk_simul/unbj_constrain_test/sol_unbj1.pos -k /home/emerson/Desktop/rtk_simul/opts3.conf"; // Command line
 */
 
- //argc= sizeof(comlin) / sizeof(char);
+ //argc= sizeof(comlin) / sizeof(char);  
     argc=11;
 
     prcopt.mode  =PMODE_KINEMA;
-  //  prcopt.navsys=SYS_GPS|SYS_GLO;
+  //  prcopt.navsys=SYS_GPS|SYS_GLO;   
     prcopt.refpos=1;
     prcopt.glomodear=1;
     solopt.timef=0;

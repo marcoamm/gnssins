@@ -260,6 +260,7 @@ typedef struct {  /* GNSS/INS processing options */
   int mode;               /* Tightly=1, or Loosley=0 coupled solution */
   int Tact_or_Low;       /* Type of inertial, tact=1, low=0 */
   int Nav_or_KF;          /* Type of solution: Navigation sol:0 KF Integrated sol:1   */
+  int ins_ini;           /* Ins intialization: 0: no 1: yes   */
   int gnssw, insw;         /* GNSS and INS measurement window sizes */
   int lever[3];           /* lever arm from gps antenna to ins center */
   int scalePN;            /* Scale process noise for irregular dt */
@@ -398,7 +399,12 @@ extern void nsat ();
 
 /* geodetic and positioning functions ----------------------------------------*/
 extern d2lgs(double lat, double h, double* pos, double* e);
+extern void pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
+                    insgnss_opt_t *insopt, int n, const nav_t *nav);
 extern void undiffppp(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav);
+extern void detslp_ll(rtk_t *rtk, const obsd_t *obs, int n);
+extern void detslp_gf(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav);
+extern void detslp_mw(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav);
 
 #ifdef __cplusplus
 }
