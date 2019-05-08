@@ -2395,12 +2395,14 @@ void gnssbuffer(sol_t *sol, obsd_t *data, int n){
 void insbuffer(ins_states_t *insc){
   int i;
   printf("INS_meas: iter: %d window: %d\n", ins_w_counter, insgnssopt.insw);
+
   if(ins_w_counter >= insgnssopt.insw ){
     for(i=0;i<insgnssopt.insw-1;i++){
       insw[i]=insw[i+1];
     }
     insw[insgnssopt.insw-1]=*insc;    
   }else{
+    ins_buffinit(&insw+ins_w_counter, insc->nx);
     insw[ins_w_counter]=*insc;
   }
 }
@@ -2689,7 +2691,7 @@ int init_inspva(sol_t *sol, ins_states_t *insc){
 
 /* Update ins states and measurements */
 void insupdt(ins_states_t *ins){
-  int i;
+  int i,j;
    /* States update */
    ins->ptime = ins->time;
    for(i=0;i<3;i++){
@@ -2738,7 +2740,7 @@ extern void insinit(ins_states_t *ins, insgnss_opt_t *insopt, prcopt_t *opt)
 
     trace(3,"insinit :\n");
 
-    ins->nx=insgnssopt.mode<1?15:ppptcnx(opt);
+    ins->nb=ins->nx=insgnssopt.mode<1?15:ppptcnx(opt);
    // ins->nb=opt->mode<=PMODE_FIXED?NR(opt):0; //what is its use??  
     ins->dt=0.0;
     ins->x=zeros(ins->nx,1);
@@ -2754,6 +2756,23 @@ extern void insinit(ins_states_t *ins, insgnss_opt_t *insopt, prcopt_t *opt)
     getP0(insopt, ins->P, ins->nx);
     //getP0(insopt, ins->Pa, ins->nx);    
  
+}
+/* initialize buffer */
+extern void ins_buffinit(ins_states_t *ins, int nx) 
+{
+  int i;
+    trace(3,"insinit :\n");
+
+    ins->nx=nx;
+    ins->x=zeros(nx,1);
+    for (i = 0; i < nx; i++) ins->x[i]=0.0;
+    
+    ins->P=zeros(nx,nx);
+    ins->P0=zeros(nx,nx);
+    ins->xa=zeros(nx,1);
+    ins->F =eye  (nx); 
+    ins->Pa=zeros(nx,nx);
+ 
 }   
 
 /* free ins control ------------------------------------------------------------
@@ -2766,12 +2785,71 @@ extern void insfree(ins_states_t *ins)
     trace(3,"insfree :\n"); 
 
     ins->nx=ins->nb=0;
-    free(ins->x ); ins->x =NULL;
-    free(ins->P ); ins->P =NULL;
-    free(ins->P0); ins->P0 =NULL;
-    free(ins->xa); ins->xa=NULL;
-    free(ins->F ); ins->F =NULL;
-    free(ins->Pa); ins->Pa=NULL;
+    free(ins->x ); ins->x =NULL;printf("Here 0\n");
+    free(ins->P ); ins->P =NULL; printf("Here 1\n");
+    free(ins->P0); ins->P0 =NULL; printf("Here 2\n");
+    free(ins->xa); ins->xa=NULL; printf("Here 3\n");
+    free(ins->F ); ins->F =NULL; printf("Here 4\n");
+    free(ins->Pa); ins->Pa=NULL; printf("Here 5\n");
+}
+
+extern void print_ins_pva(ins_states_t *ins){
+  int i,j;
+
+  printf("ins->re and ins->pre:\n");
+  for (i=0;i<3;i++) printf("%lf ", ins->re[i]);
+  printf("\n");
+  for (i=0;i<3;i++) printf("%lf ", ins->pre[i]);
+  printf("\n");
+
+  printf("ins->ve and ins->pve:\n");
+  for (i=0;i<3;i++) printf("%lf ", ins->ve[i]);
+  printf("\n");
+  for (i=0;i<3;i++) printf("%lf ", ins->pve[i]);
+  printf("\n");
+
+  printf("ins->Cbe and ins->pCbe:\n");
+  for (i=0;i<3;i++) {
+    for (j=0;j<3;j++){
+      printf("%lf ", ins->Cbe[i*3+j]);
+    }
+    printf("\n");
+  }
+  for (i=0;i<3;i++) {
+    for (j=0;j<3;j++){
+      printf("%lf ", ins->pCbe[i*3+j]); 
+    }
+    printf("\n");
+  }
+
+  printf("x:\n");
+  for (j = 0; j < ins->nx; j++) printf("%lf,",ins->x[j]); printf("\n");
+  printf("xa:\n");
+  for (j = 0; j < ins->nx; j++) printf("%lf,",ins->xa[j]); printf("\n");
+
+  printf("P:\n");
+  for (j = 0; j < ins->nx; j++) printf("%lf,",ins->P[j*ins->nx+j]); 
+  printf("\n");
+
+   printf("P0:\n");
+  for (j = 0; j < ins->nx; j++) printf("%lf,",ins->P0[j*ins->nx+j]); 
+  printf("\n");
+}
+extern void memset_ins_pva(ins_states_t *ins){
+  int i,j;
+
+  for (i=0;i<3;i++){
+    ins->re[i]=ins->pre[i]=0.0;
+    ins->ve[i]=ins->pve[i]=0.0;
+    ins->rn[i]=ins->prn[i]=0.0;
+    ins->vn[i]=ins->pvn[i]=0.0;
+  }
+   for (i=0;i<9;i++){
+    ins->Cbe[i]=ins->pCbe[i]=0.0;
+    ins->Cbn[i]=ins->pCbn[i]=0.0;
+  }
+
+
 }
 
 /* Core function -------------------------------------------------------------
@@ -2794,7 +2872,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   printf("\n *****************  CORE BEGINS ***********************\n");
 
   /* initialize ins state */
-  insinit(&insc, &insgnssopt, opt);
+  insinit(&insc, &insgnssopt, opt); 
 
   /* initialize ins/gnss parameter default uncertainty */
   ig_paruncinit(&insgnssopt);
@@ -2815,51 +2893,28 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     }
     
     if(core_count>0){
-      memset(&insc, 0, sizeof(insc)); 
+      memset_ins_pva(&insc); 
     }
 
     /* Initialize ins states with previous state from ins buffer */
       if(ins_w_counter>insgnssopt.insw-1){
-    printf("insw.re: %lf %lf %lf\n", insw[insgnssopt.insw-1].pre[0],insw[insgnssopt.insw-1].pre[1],insw[insgnssopt.insw-1].pre[2] );
-    printf("insw.ve: %lf %lf %lf\n", insw[insgnssopt.insw-1].pve[0],insw[insgnssopt.insw-1].pve[1],insw[insgnssopt.insw-1].pve[2] );
-    printf("pCbew:\n");
-    for (i = 0; i < 3; i++){
-      for (j = 0; j < 3; j++){
-        printf("%lf, ", insw[insgnssopt.insw-1].pCbe[i * 3 + j]); /* code */
-       }
-     printf("];\n"); 
-    }
+        print_ins_pva(&insw+insgnssopt.insw-1);
        insc=insw[insgnssopt.insw-1];
       }else {
-    printf("insw.re: %lf %lf %lf\n", insw[ins_w_counter-1].pre[0],insw[ins_w_counter-1].pre[1],insw[ins_w_counter-1].pre[2] );
-    printf("insw.ve: %lf %lf %lf\n", insw[ins_w_counter-1].pve[0],insw[ins_w_counter-1].pve[1],insw[ins_w_counter-1].pve[2] );
-    printf("pCbew:\n");
-    for (i = 0; i < 3; i++){
-      for (j = 0; j < 3; j++){
-        printf("%lf, ", insw[ins_w_counter-1].pCbe[i * 3 + j]); /* code */
-       }
-     printf("];\n"); 
-    }
-
         if(ins_w_counter>1) {
-          printf(" ** Passing values here **\n");
+          print_ins_pva(&insw+ins_w_counter-1);
           insc=insw[ins_w_counter-1];
-          for (i = 0; i < 3; i++) insc.pre[i]=insw[ins_w_counter-1].pre[i];
+         // for (i = 0; i < 3; i++) insc.pre[i]=insw[ins_w_counter-1].pre[i];
           //insc.pre=insw[ins_w_counter-1].re;
         }
       }
 
-      printf("ins.nx: %d\n", insc.nx);
-      printf("ins.data.fb0: %lf %lf %lf\n", insc.pdata.fb0[0],insc.pdata.fb0[1],insc.pdata.fb0[2] );
-      printf("ins.data.wibb0: %lf %lf %lf\n", insc.pdata.wibb0[0],insc.pdata.wibb0[1],insc.pdata.wibb0[2] );
-
+      print_ins_pva(&insc);
+  
 
     /* input ins */ 
     if(!inputimu(&insc, week)) {printf(" ** End of imu file **\n"); break;}
 
-     printf("ins.data.fb: %lf %lf %lf\n", insc.data.fb[0],insc.data.fb[1],insc.data.fb[2] );
-     printf("ins.data.wibb: %lf %lf %lf\n", insc.data.wibb[0],insc.data.wibb[1],insc.data.wibb[2] );
-    
     if (ins_w_counter >= 1){
       insc.dt = insc.time - insc.ptime;
     }
@@ -2879,24 +2934,14 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     }else{ 
       /* INS Navigation and/or INS/GNSS Integration */
 
+
       
       /* initial ins states */
-      // Here it's where the PVA initialization with the alignment is done
-      printf("Ins initialization condition: %d %d\n", gnss_w_counter, insgnssopt.ins_ini); 
+      // Here it's where the PVA initialization with the alignment is done 
       if (gnss_w_counter>2 && insgnssopt.ins_ini!=1){ 
         //150 means 1s of ins data, thus perform initialization only in the beginning 
         if(init_inspva(solw, &insc)){
-        printf(" ** Ins initialization ok: %lf **\n", insc.time);
-        printf("ins.re1: %lf %lf %lf\n", insc.pre[0],insc.pre[1],insc.pre[2] );
-        printf("ins.ve1: %lf %lf %lf\n", insc.pve[0],insc.pve[1],insc.pve[2] );
-     for (i = 0; i < 3; i++)
-     {
-       for (j = 0; j < 3; j++)
-       {
-         printf("%lf, ", insc.pCbe[i * 3 + j]); /* code */ 
-        }
-        printf("];\n"); 
-    } 
+          printf(" ** Ins initialization ok: %lf **\n", insc.time);
           insgnssopt.ins_ini=1;
         }else{
           printf(" ** Ins initialization error: %lf **\n", insc.time);
@@ -2915,21 +2960,12 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       /* Integration */
       if (insgnssopt.mode){ // Add condition: if less than four satellites mode=0;
          /* Tightly-coupled ins/gnss */
-         TC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
-      }else{  
+         //TC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
+      }else{   
          /* Loosley-coupled ins/gnss */
          LC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag); 
       }
  
-     /* printf("P: \n");   
-      for (i = 0; i < insc.nx; i++)
-      {
-        for (j = 0; j < insc.nx; j++)
-        {
-          printf("%lf ", insc.P[i*insc.nx+j]); 
-        }
-        printf("\n");
-      }*/
 
       if (ins_w_counter > 500)  
       {
@@ -2963,32 +2999,19 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
     } // end If INS time ahead of GNSS condition
 
+
+    /*  printf("Peso: %lf %lf\n", insc.P[4], insc.P[392]);   
+      for (i = 0; i < insc.nx; i++)
+      {
+        for (j = 0; j < insc.nx; j++)
+        {
+          printf("%lf",insc.P[i*insc.nx+j]); 
+        }
+        printf("\n");
+      }*/
+
      /* Update ins states and measurements */ 
      insupdt(&insc);
-
-     printf("\nIns after structure update\n");    
-     printf("ins.re: %lf %lf %lf\n", insc.re[0],insc.re[1],insc.re[2] );
-     printf("ins.ve: %lf %lf %lf\n", insc.ve[0],insc.ve[1],insc.ve[2] );
-     printf("ins->Cbe=[");
-    for (i = 0; i < 3; i++) 
-     {
-       for (j = 0; j < 3; j++)
-          {
-      printf("%lf, ", insc.Cbe[i * 3 + j]); /* code */
-          }
-               printf("];\n");
-    }
-     printf("ins.pre: %lf %lf %lf\n", insc.pre[0],insc.pre[1],insc.pre[2] );
-     printf("ins.pve: %lf %lf %lf\n", insc.pve[0],insc.pve[1],insc.pve[2] );
-     printf("ins->pCbe=[");
-    for (i = 0; i < 3; i++) 
-     {
-       for (j = 0; j < 3; j++)
-          {
-      printf("%lf, ", insc.pCbe[i * 3 + j]); /* code */
-          }
-               printf("];\n");
-    }
 
      /* Add current ins measurement to buffer */
      insbuffer(&insc);
@@ -3257,7 +3280,9 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
  ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
  if (!ret) fprintf(stderr,"%40s\r","");
  
- free(solw); free(insw);
+  for (i=0;i<insgnssopt.insw;i++) insfree(insw+i);
+  //insfree(&insw);
+  free(solw); free(insw);
 
  /* ins navigation only */
  //imu_tactical_navigation(imu_tactical);
