@@ -1785,7 +1785,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     double pos[3], vel[3];
 
     printf("rtkpos  : time=%s n=%d\n",time_str(obs[0].time,3),n);
-    printf("obs=\n"); traceobs(4,obs,n);
+    traceobs(4,obs,n);
     /*trace(5,"nav=\n"); tracenav(5,nav);*/
 
     /* set base staion position */
@@ -1797,7 +1797,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     for (nr=0;nu+nr<n&&obs[nu+nr].rcv==2;nr++) ;
 
     time=rtk->sol.time; /* previous epoch */
-   printf("Rtkpos here1\n");
+   
     /* rover position by single point positioning */
     if (!pntpos(obs,nu,nav,&rtk->opt,&rtk->sol,NULL,rtk->ssat,msg)) {
         errmsg(rtk,"point pos error (%s)\n",msg);

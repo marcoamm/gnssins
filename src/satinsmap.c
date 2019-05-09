@@ -12,6 +12,12 @@
 #include "satinsmap.h"
 //#include "INS_GNSS.h"
 
+/* constants -----------------------------------------------------------------*/
+#define MAXVEL      0.1           /* max velocity for using non-holonomic constraint */
+#define MAXGYRO     (10.0*D2R)    /* max rotation speed for using non-holonomic constraint */
+#define VARVEL      SQR(0.05)     /* initial variance of receiver vel ((m/s)^2) */
+#define MINZC       15            /* min count for zero velocity update once */
+
 
 /* global variables ----------------------------------------------------------*/
 FILE *fp_lane;       /* Lane coordinate file pointer */
@@ -1267,6 +1273,17 @@ void UpdateMp(const obs_t *Obs, const nav_t *Nav)
     }
     //ReadWaitEnd();
 }
+/* transpose matrix-----------------------------------------------------------
+ * args   : double  *A      I   matrix
+ *          int      n      I   rows of transpose matrix
+ *          int      m      I   cols of transpose matrix
+ *          double  *At     O   transpose of matrix
+ * return : none
+ * --------------------------------------------------------------------------*/
+extern void matt(const double *A,int n,int m,double *At)
+{
+    int i,j; for (i=0;i<n;i++) for (j=0;j<m;j++) At[i+j*n]=A[j+i*m];
+}
 
 /* Convert row order matrix into column order ----------------------------
  * args    :  double *A   I  input matrix in row order to convert
@@ -1378,34 +1395,29 @@ extern void getaccl(const double *fib,const double *Cbe,const double *re,
 /* close loop for non-holonomic constraint-----------------------------------*/
 extern void clp(ins_states_t *ins,const insgnss_opt_t *opt,const double *x)
 {
-    int i,iba,nba,ibg,nbg,isg,nsg,isa,nsa;
+    int i;
     double *I=eye(3),fibc[3],omgbc[3],ang[3];
-
-    iba=xiBa(opt); nba=xnBa(opt);
-    ibg=xiBg(opt); nbg=xnBg(opt);
-    //isg=xiSg(opt); nsg=xnSg(opt);
-    //isa=xiSa(opt); nsa=xnSa(opt);
 
     /* close-loop attitude correction */
     corratt(x,ins->Cbe);
 
     /* close-loop velocity and position correction */
-    ins->ve[0]-=x[xiV(opt)+0];
-    ins->ve[1]-=x[xiV(opt)+1];
-    ins->ve[2]-=x[xiV(opt)+2];
+    ins->ve[0]-=x[xiV()+0];
+    ins->ve[1]-=x[xiV()+1];
+    ins->ve[2]-=x[xiV()+2];
 
-    ins->re[0]-=x[xiP(opt)+0];
-    ins->re[1]-=x[xiP(opt)+1];
-    ins->re[2]-=x[xiP(opt)+2];
+    ins->re[0]-=x[xiP()+0];
+    ins->re[1]-=x[xiP()+1];
+    ins->re[2]-=x[xiP()+2];
 
     /* close-loop accl and gyro bias */
-    ins->data.ba[0]+=x[iba+0];
-    ins->data.ba[1]+=x[iba+1];
-    ins->data.ba[2]+=x[iba+2];
+    ins->data.ba[0]+=x[xiBa()+0];
+    ins->data.ba[1]+=x[xiBa()+1];
+    ins->data.ba[2]+=x[xiBa()+2];
 
-    ins->data.bg[0]+=x[ibg+0];
-    ins->data.bg[1]+=x[ibg+1];
-    ins->data.bg[2]+=x[ibg+2];
+    ins->data.bg[0]+=x[xiBg()+0];
+    ins->data.bg[1]+=x[xiBg()+1];
+    ins->data.bg[2]+=x[xiBg()+2];
 
     /* close-loop residual scale factors of gyro and accl */
     //for (i=isg;i<isg+nsg;i++) ins->Mg[i-isg+(i-isg)*3]+=x[i];
@@ -1486,7 +1498,7 @@ void clp1(pva_t *PVA_sol, const double *x)
  *            int flag         I   static flag (1: static, 0: motion)
  * return  : 1 (ok) or 0 (fail)
  * ---------------------------------------------------------------------------*/
-extern int zvu(pva_t *PVA_sol, const um7pack_t *imu, int nx)
+extern int zvu1(pva_t *PVA_sol, const um7pack_t *imu, int nx)
 {
     int info=0,i, j;
     static int nz=0;
@@ -1596,7 +1608,7 @@ static void jacobian_prot_pang(const double *Cbe,double *S)
 
 
 /* measurement sensitive-matrix for non-holonomic----------------------------*/
-static int bldnhc(const um7pack_t *imu, const double *Cbe,
+static int bldnhc1(const um7pack_t *imu, const double *Cbe,
                   const double *ve,int nx,double *v,double *H,double *R)
 {
   int i, j, nv,IA,IV;
@@ -1686,7 +1698,7 @@ for (i=0;i<3;i++) {
  *            imud_t* imu      I   imu measurement data
  * return  : 1 (ok) or 0 (fail)
  * ---------------------------------------------------------------------------*/
-extern int nhc(pva_t *PVA_sol, const um7pack_t *imu, int nx)
+extern int nhc1(pva_t *PVA_sol, const um7pack_t *imu, int nx)
 {
     int info=0,nv,i,j;
     double *H,*HT,*v,*R,*x, *P;
@@ -1708,7 +1720,7 @@ extern int nhc(pva_t *PVA_sol, const um7pack_t *imu, int nx)
        printf("\n");
      }
 
-    nv=bldnhc(imu,PVA_sol->Cbe,PVA_sol->ve,nx,v,H,R);
+    nv=bldnhc1(imu,PVA_sol->Cbe,PVA_sol->ve,nx,v,H,R);
 
     printf("H_matrix row\n");
      for (i = 0; i < 2; i++) {
@@ -2122,7 +2134,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   if(imu_obs_prev.sec > 0.0 )   //&& PVA_prev_sol.Nav_or_KF==1){
   {
   /* Non-holonomic constraints  */
-  nhc(&PVA_prev_sol, &imu_curr_meas, 17);
+  nhc1(&PVA_prev_sol, &imu_curr_meas, 17);
 
   }
 
@@ -2141,7 +2153,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    /* Zero velocity update */
    if (zvu_counter++>10) {
      printf("ZVU UPDATE: counter: %d", zvu_counter);
-     zvu(&PVA_prev_sol, &imu_curr_meas, 17);
+     zvu1(&PVA_prev_sol, &imu_curr_meas, 17);
      zvu_counter=0;
    }
    }else{
@@ -2236,7 +2248,7 @@ if (gnss_vel) {
     //for (j=0;j<3;j++) ned_ini_vel[j]=0.0;
 
     /* Zero velocity update */
-    zvu(&PVA_prev_sol, &imu_curr_meas, 17);
+    zvu1(&PVA_prev_sol, &imu_curr_meas, 17);
 
     }
 
@@ -2366,7 +2378,7 @@ static int inputimu(ins_states_t *ins, int week){
 /* Stores gnss measurement and observation to structure buffer by time */
 void gnssbuffer(sol_t *sol, obsd_t *data, int n){
   int i, stat=0;
-  printf("GNSS_meas: iter: %d window: %d\n", gnss_w_counter, insgnssopt.gnssw);
+  //printf("GNSS_meas: iter: %d window: %d\n", gnss_w_counter, insgnssopt.gnssw);
 
   if(gnss_w_counter >= insgnssopt.gnssw ){
      for(i=0;i<insgnssopt.gnssw-1;i++){
@@ -2390,20 +2402,31 @@ void gnssbuffer(sol_t *sol, obsd_t *data, int n){
   }
 }
 
+void insbufferpass(ins_states_t *insin, ins_states_t *insout){
+  int i,j;
+
+  matcpy(insin->x,insout->x,insout->nx,1);
+  matcpy(insin->P,insout->P,insout->nx,insout->nx);
+  matcpy(insin->P0,insout->P0,insout->nx,insout->nx);
+
+}
+
 
 /* Stores ins measurement to structure buffer by time */
 void insbuffer(ins_states_t *insc){
   int i;
-  printf("INS_meas: iter: %d window: %d\n", ins_w_counter, insgnssopt.insw);
-
+  //printf("INS_meas: iter: %d window: %d\n", ins_w_counter, insgnssopt.insw);
   if(ins_w_counter >= insgnssopt.insw ){
     for(i=0;i<insgnssopt.insw-1;i++){
       insw[i]=insw[i+1];
+      insbufferpass(insw+i, insw+i+1);
     }
-    insw[insgnssopt.insw-1]=*insc;    
+    insw[insgnssopt.insw-1]=*insc; 
+    insbufferpass(insc, insw+insgnssopt.insw-1);
   }else{
-    ins_buffinit(&insw+ins_w_counter, insc->nx);
+    ins_buffinit(insw+ins_w_counter, insc->nx);
     insw[ins_w_counter]=*insc;
+    insbufferpass(insc, insw+ins_w_counter);
   }
 }
 
@@ -2424,7 +2447,7 @@ extern void ned2xyz(const double *pos,double *Cne)
 
 /* estimate heading using the navigation frame velocity-----------------------
  * args   :  double *vel  I  velocity in navigation frame (ned-frame)
- * return :  heading (rad)
+ * return :  heading (rad) 
  * --------------------------------------------------------------------------*/
 extern double vel2head(const double *vel)
 {
@@ -2535,7 +2558,7 @@ extern void gapv2ipv(const double *pos,const double *vel,const double *Cbe,
 extern int coarse_align(gtime_t time,const double *rr,const double *vr,
                      ins_states_t *insc)
 {
-    double llh[3],vn[3],C[9],rpy[3]={0}, sineyaw, coseyaw;
+    double llh[3],vn[3],C[9],rpy[3]={0}, sineyaw, coseyaw; 
     int i;
 
     trace(3,"coarse_align: time=%s\n",time_str(time,4));
@@ -2703,7 +2726,7 @@ void insupdt(ins_states_t *ins){
     ins->pCbn[i]=ins->Cbn[i]; ins->pCbe[i]=ins->Cbe[i]; 
    }
    for(i=0;i<6;i++) ins->pdtr[i]=ins->dtr[i];
-   ins->pdtrr=ins->dtrr;
+   ins->pdtrr=ins->dtrr;  
  
    /* Measurements update*/
    ins->pdata=ins->data;
@@ -2746,9 +2769,9 @@ extern void insinit(ins_states_t *ins, insgnss_opt_t *insopt, prcopt_t *opt)
     ins->x=zeros(ins->nx,1);
     ins->P=zeros(ins->nx,ins->nx);
     ins->P0=zeros(ins->nx,ins->nx);
-    ins->xa=zeros(ins->nb,1);
+   // ins->xa=zeros(ins->nb,1);
     ins->F =eye  (ins->nx); 
-    ins->Pa=zeros(ins->nb,ins->nb);
+   // ins->Pa=zeros(ins->nb,ins->nb);
 
     /* initialize parameter indices */
     initPNindex(opt);
@@ -2764,14 +2787,12 @@ extern void ins_buffinit(ins_states_t *ins, int nx)
     trace(3,"insinit :\n");
 
     ins->nx=nx;
-    ins->x=zeros(nx,1);
-    for (i = 0; i < nx; i++) ins->x[i]=0.0;
-    
+    ins->x=zeros(nx,1);    
     ins->P=zeros(nx,nx);
     ins->P0=zeros(nx,nx);
-    ins->xa=zeros(nx,1);
+   // ins->xa=zeros(nx,1);
     ins->F =eye  (nx); 
-    ins->Pa=zeros(nx,nx);
+   // ins->Pa=zeros(nx,nx);
  
 }   
 
@@ -2784,13 +2805,13 @@ extern void insfree(ins_states_t *ins)
 {
     trace(3,"insfree :\n"); 
 
-    ins->nx=ins->nb=0;
-    free(ins->x ); ins->x =NULL;printf("Here 0\n");
-    free(ins->P ); ins->P =NULL; printf("Here 1\n");
-    free(ins->P0); ins->P0 =NULL; printf("Here 2\n");
-    free(ins->xa); ins->xa=NULL; printf("Here 3\n");
-    free(ins->F ); ins->F =NULL; printf("Here 4\n");
-    free(ins->Pa); ins->Pa=NULL; printf("Here 5\n");
+    ins->nx=ins->nb=0;ins->x =NULL;
+    free(ins->x );  ins->P =NULL;
+    free(ins->P );   ins->P0 =NULL;
+    free(ins->P0);  ins->F = NULL;
+   // free(ins->xa); ins->xa=NULL; printf("Here 3\n"); 
+    free(ins->F );   
+   // free(ins->Pa); ins->Pa=NULL; printf("Here 5\n");
 }
 
 extern void print_ins_pva(ins_states_t *ins){
@@ -2824,8 +2845,6 @@ extern void print_ins_pva(ins_states_t *ins){
 
   printf("x:\n");
   for (j = 0; j < ins->nx; j++) printf("%lf,",ins->x[j]); printf("\n");
-  printf("xa:\n");
-  for (j = 0; j < ins->nx; j++) printf("%lf,",ins->xa[j]); printf("\n");
 
   printf("P:\n");
   for (j = 0; j < ins->nx; j++) printf("%lf,",ins->P[j*ins->nx+j]); 
@@ -2849,7 +2868,199 @@ extern void memset_ins_pva(ins_states_t *ins){
     ins->Cbn[i]=ins->pCbn[i]=0.0;
   }
 
+}
+/* measurement sensitive-matrix for non-holonomic----------------------------*/
+static int bldnhc(const insgnss_opt_t *opt,const imuraw_t *imu,const double *Cbe,
+                  const double *ve,int nx,double *v,double *H,double *R)
+{
+    int i,nv,IA,IV;
+    double C[9],T[9],vb[3],r[2],S[9];
+    double T1[9];
 
+    trace(3,"bldnhc:\n");
+
+    IA=xiA(); IV=xiV();
+
+    /* velocity in body-frame */
+    matmul("TN",3,1,3,1.0,Cbe,ve,0.0,vb);
+
+    skewsym3(ve,C);
+    matmul("TN",3,3,3,1.0,Cbe,C,0.0,T);
+    matt(Cbe,3,3,C);
+
+#if UPD_IN_EULER
+    jacobian_prot_pang(Cbe,S);
+    matcpy(T1,T,3,3);
+    matmul("NN",3,3,3,1.0,T1,S,0.0,T);
+#endif
+    /* build residual vector */
+    for (nv=0,i=1;i<3;i++) {
+
+        /* check velocity measurement */
+        if (fabs(vb[i])>MAXVEL) {
+            trace(2,"too large velocity measurement\n");
+            continue;
+        }
+        /* check gyro measurement */
+        if (fabs(norm(imu->wibb,3))>30.0*D2R) {
+            trace(2,"too large vehicle turn\n");
+            continue;
+        }
+        H[IA+nv*nx]=T[i]; H[IA+1+nv*nx]=T[i+3]; H[IA+2+nv*nx]=T[i+6];
+        H[IV+nv*nx]=C[i]; H[IV+1+nv*nx]=C[i+3]; H[IV+2+nv*nx]=C[i+6];
+        
+        v[nv  ]=vb[i];
+        r[nv++]=VARVEL;
+    }
+    for (i=0;i<nv;i++) R[i+i*nv]=r[i];
+    return nv;
+}
+/* using non-holonomic constraint for ins navigation---------------------------
+ * args    :  insstate_t* ins  IO  ins state
+ *            insopt_t* opt    I   ins options
+ *            imud_t* imu      I   imu measurement data
+ * return  : 1 (ok) or 0 (fail)
+ * ---------------------------------------------------------------------------*/
+extern int nhc(ins_states_t *ins,const insgnss_opt_t *opt)
+{
+    const imuraw_t *imu=&ins->data;
+    int nx=ins->nx,info=0,nv;
+    double *H,*v,*R,*x;  
+
+    trace(3,"nhc:\n");
+
+    H=zeros(2,nx); R=zeros(2,2);
+    v=zeros(2,1); x=zeros(1,nx);
+
+    nv=bldnhc(opt,imu,ins->Cbe,ins->ve,nx,v,H,R);
+    if (nv>0) {
+
+        /* kalman filter */
+        info=filter(x,ins->P,H,v,R,nx,nv);
+
+        /*  check ok? */
+        if (info) {
+            trace(2,"non-holonomic constraint filter fail\n");
+            info=0;
+        }
+        else {
+            /* solution ok */
+            //ins->stat=INSS_NHC; 
+            info=1;
+            clp(ins,opt,x);
+            trace(3,"use non-holonomic constraint ok\n");
+        }
+    }
+    free(H); free(v);
+    free(R); free(x);
+    return info;
+}
+/* zero velocity update for ins navigation -----------------------------------
+ * args    :  insstate_t *ins  IO  ins state
+ *            insopt_t *opt    I   ins options
+ *            imud_t *imu      I   imu measurement data
+ *            int flag         I   static flag (1: static, 0: motion)
+ * return  : 1 (ok) or 0 (fail)
+ * ---------------------------------------------------------------------------*/
+extern int zvu(ins_states_t *ins,const insgnss_opt_t *opt,int flag)
+{
+    imuraw_t *imu=&ins->data;
+    int nx=ins->nx,info=0;
+    static int nz=0;
+    double *x,*H,*R,*v,I[9]={-1,0,0,0,-1,0,0,0,-1};
+
+    trace(3,"zvu:\n");
+
+   // flag&=nz++>MINZC?nz=0,true:false;
+
+    if (!flag) return info;
+
+    x=zeros(1,nx); H=zeros(3,nx);
+    R=zeros(3,3); v=zeros(3,1);
+
+    /* sensitive matrix */
+    asi_blk_mat(H,3,nx,I,3,3,0,3);
+
+    /* variance matrix */
+    R[0]=R[4]=R[8]=VARVEL;
+
+    v[0]=ins->ve[0];
+    v[1]=ins->ve[1];
+    v[2]=ins->ve[2]; /* residual vector */
+
+    if (norm(v,3)<MAXVEL&&norm(imu->wibb,3)<MAXGYRO) {
+
+        /* ekf filter */
+        info=filter(x,ins->P,H,v,R,nx,3);
+
+        /* solution fail */
+        if (info) {
+            trace(2,"zero velocity update filter error\n");
+            info=0;
+        }
+        else {
+            /* solution ok */
+            //ins->stat=INSS_ZVU;
+            info=1;
+            clp(ins,opt,x);
+            trace(3,"zero velocity update ok\n");
+        }
+    }
+    free(x); free(H);
+    free(R); free(v);
+    return info;
+}
+/* ZUPT detection, based on   GREJNER-BRZEZINSKA et al. (2002) 
+  If static: ++zvu_counter else zvu=0 if not ---------------------------------------*/
+void detstc(ins_states_t *ins){
+  // horizontal velocity and gyro components tolerance leves based on static INS data:
+  double vn0, ve0, vn0std, ve0std, gyrx0, gyry0, gyrx0std, gyry0std;
+   vn0 = -0.002743902895411; ve0 = -0.002219817510341;
+   vn0std = 0.001958782893669; ve0std = 0.001549122618107;
+   gyrx0 = -0.000152716; gyry0 = 0.000386451;
+   gyrx0std = 0.000483409; gyry0std = 0.001271191;
+   printf("static detection \n");
+
+     if ( (fabs(ins->vn[0]) - vn0) <= 3*vn0std && (fabs(ins->vn[1]) - ve0) <= 3*ve0std ) {
+       zvu_counter++;
+       printf("static detection: yes: %d\n", zvu_counter);
+      }else {zvu_counter=0;printf("static detection: no: %d\n", zvu_counter);}
+}
+
+/* Output ins/gnss solution record to respective files */
+void outputinsgnsssol(ins_states_t *insc, insgnss_opt_t *opt, prcopt_t *gnssopt){
+  int i,j;
+
+  /* Output PVA solution     */
+  if (insc->ptime>0.0) {
+    fprintf(out_PVA,"%lf %.12lf %.12lf %lf %lf %lf %lf %lf %lf %lf %d\n",\
+    insc->time, insc->rn[0]*R2D, insc->rn[1]*R2D, insc->rn[2],\
+    insc->vn[0], insc->vn[1], insc->vn[2],
+    insc->an[0]*R2D,insc->an[1]*R2D,insc->an[2]*R2D, opt->Nav_or_KF);  
+  }
+  /* Generate KF uncertainty output record */
+  fprintf(out_KF_SD_file, "%lf ", insc->time);
+   for (i = 0; i < insc->nx; i++){
+     for (j = 0; j < insc->nx; j++){
+       (i==j?fprintf(out_KF_SD_file, "%lf ", sqrt(insc->P[i * insc->nx + j])):0);
+      }
+    }
+  fprintf(out_KF_SD_file, "%d\n", opt->Nav_or_KF);
+  
+  /* Generate clock output record */
+  if (xnRc(gnssopt)>1){
+    fprintf(out_clock_file, "%lf %lf %lf %lf %d\n", insc->time, insc->dtr[0], 
+    insc->dtr[1], insc->dtrr, opt->Nav_or_KF);
+  }else{
+    fprintf(out_clock_file, "%lf %lf %lf %d\n", insc->time, insc->dtr[0], 
+    insc->dtrr, opt->Nav_or_KF);
+  }  
+  /* Generate IMU bias output record */
+  fprintf(out_IMU_bias_file, "%lf %lf %lf %lf %.10lf %.10lf %.10lf %d\n", insc->time,
+        insc->data.ba[0], insc->data.ba[1], insc->data.ba[2],
+        insc->data.bg[0], insc->data.bg[1], insc->data.bg[2], 
+        opt->Nav_or_KF);
+     
 }
 
 /* Core function -------------------------------------------------------------
@@ -2898,18 +3109,16 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
     /* Initialize ins states with previous state from ins buffer */
       if(ins_w_counter>insgnssopt.insw-1){
-        print_ins_pva(&insw+insgnssopt.insw-1);
+        //print_ins_pva(insw+insgnssopt.insw-1);
        insc=insw[insgnssopt.insw-1];
       }else {
         if(ins_w_counter>1) {
-          print_ins_pva(&insw+ins_w_counter-1);
+         // print_ins_pva(insw+ins_w_counter-1);
           insc=insw[ins_w_counter-1];
          // for (i = 0; i < 3; i++) insc.pre[i]=insw[ins_w_counter-1].pre[i];
           //insc.pre=insw[ins_w_counter-1].re;
         }
-      }
-
-      print_ins_pva(&insc);
+      } 
   
 
     /* input ins */ 
@@ -2934,8 +3143,6 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     }else{ 
       /* INS Navigation and/or INS/GNSS Integration */
 
-
-      
       /* initial ins states */
       // Here it's where the PVA initialization with the alignment is done 
       if (gnss_w_counter>2 && insgnssopt.ins_ini!=1){ 
@@ -2960,57 +3167,35 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       /* Integration */
       if (insgnssopt.mode){ // Add condition: if less than four satellites mode=0;
          /* Tightly-coupled ins/gnss */
-         //TC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
+         TC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
       }else{   
          /* Loosley-coupled ins/gnss */
          LC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag); 
       }
- 
-
-      if (ins_w_counter > 500)  
-      {
-          //exit(0);
-      }  
-      
       
       /* Non-holonomic constraints */  
       if(insc.pdata.sec > 0.0 ){
-        //nhc(&PVA_prev_sol, &insc, 17); 
+        printf("nhc update\n");
+     //   nhc(&insc,&insgnssopt);
       }
-      /* Static detection */
-      if (zvu_counter++>10) {
+
+      detstc(&insc); 
+      printf("ZVU counter: %d\n", zvu_counter);
+      /* Zero velocity update */
+      if (zvu_counter>10) {
         printf("ZVU UPDATE: counter: %d", zvu_counter);
         /* Zero-velocity constraints */
-        //zvu(&PVA_prev_sol, &insc, 17);
-        zvu_counter=0;
-      }else{
-        zvu_counter=0;
+        //zvu(&insc,&insgnssopt,1);
       }
-      
-      /* Output PVA solution    
-      if (insc.ptime>0.0) {
-         fprintf(out_PVA,"%lf %.12lf %.12lf %lf %lf %lf %lf %lf %lf %lf %d\n",\
-         insc.time, insc.rn[0]*R2D, insc.rn[1]*R2D, insc.rn[2],\
-         insc.vn[0], insc.vn[1], insc.vn[2],
-         insc.an[0]*R2D,insc.an[1]*R2D,insc.an[2]*R2D, insgnssopt.Nav_or_KF);  
-      }
-      */
+
+       
+      /* Output PVA, clock, imu bias solution     */
+      outputinsgnsssol(&insc, &insgnssopt,&rtk->opt);
       
 
     } // end If INS time ahead of GNSS condition
 
-
-    /*  printf("Peso: %lf %lf\n", insc.P[4], insc.P[392]);   
-      for (i = 0; i < insc.nx; i++)
-      {
-        for (j = 0; j < insc.nx; j++)
-        {
-          printf("%lf",insc.P[i*insc.nx+j]); 
-        }
-        printf("\n");
-      }*/
-
-     /* Update ins states and measurements */ 
+     /* Update ins states and measurements */
      insupdt(&insc);
 
      /* Add current ins measurement to buffer */
@@ -3041,10 +3226,28 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   printf("\n ** Out of loop **\ngpst: %lf, imut: %lf, dt diff: %lf\n", gnss_time, insc.time, gnss_time-insc.time); 
 
+/*
+   if (insgnssopt.Nav_or_KF) {
+      // Integrated solution 
+      for (j=0;j<3;j++) insc.pre[j]=rtk->sol.rr[j];
+      ecef2pos(insc.pre,insc.prn);
+      for (j=0;j<3;j++) insc.pve[j]=rtk->sol.rr[j+3];
+      insc.pdtr[0]=rtk->sol.dtr[0]*CLIGHT;
+      insc.pdtrr=rtk->sol.dtrr;
+      insc.ptime=insc.ptctime = time2gpst(rtk->sol.time,NULL); 
+      // Add current ins measurement to buffer 
+     insbuffer(&insc);      
+    }else{
+      // Navigation solution 
+      insc.pdtr[0]=rtk->sol.dtr[0]*CLIGHT;
+      insc.pdtrr=rtk->sol.dtrr;
+      insc.ptime=insc.ptctime = time2gpst(rtk->sol.time,NULL);
+      // Add current ins measurement to buffer
+     insbuffer(&insc);
+    }
+   */
 
-   /* Initialize position from GNSS SPP */
-
-   /* Update */
+   /* Update */ 
    
     /*
     printf("Length: %d\n", sizeof(obsw) );
@@ -3106,7 +3309,7 @@ insgnssopt.Tact_or_Low = 1;       /* Type of inertial, tact=1, low=0 */
 insgnssopt.scalePN = 0;             /* use extended Process noise model */ 
 insgnssopt.gnssw = 3; 
 insgnssopt.insw = 10;
-insgnssopt.exphi = 1;              /* use precise system propagate matrix for ekf */
+insgnssopt.exphi = 0;              /* use precise system propagate matrix for ekf */
 /* ins sthocastic process noises: */
 insgnssopt.baproopt=INS_RANDOM_WALK;
 insgnssopt.bgproopt=INS_RANDOM_WALK;
@@ -3282,7 +3485,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
  
   for (i=0;i<insgnssopt.insw;i++) insfree(insw+i);
   //insfree(&insw);
-  free(solw); free(insw);
+  free(solw); free(insw); 
 
  /* ins navigation only */
  //imu_tactical_navigation(imu_tactical);

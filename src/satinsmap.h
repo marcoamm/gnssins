@@ -199,6 +199,7 @@ typedef struct {        /* Position, velocity and attitude structure (PVA) */
 
 typedef struct {      /* Position velocity and attitude solution structure */
   double time;             /* time (sec) */
+  double ptctime;         /* Previous integration time*/
   double dt;              /* time difference of previous ins update and current time */
   double vn[3],rn[3],an[3]; /*states in navigation frame */
   double ve[3],re[3],ae[3]; /*states in ecef frame */
@@ -302,7 +303,8 @@ extern FILE *out_KF_residuals;
 extern FILE *imu_tactical;
 extern int zvu_counter;
 extern int gnss_meas_w;
-extern int ins_meas_w;
+extern int gnss_w_counter;
+extern int ins_w_ounter;
 extern sol_t *solw;
 extern obsb_t obsw;
 extern ins_states_t *insw;
@@ -399,7 +401,7 @@ extern void nsat ();
 
 /* geodetic and positioning functions ----------------------------------------*/
 extern d2lgs(double lat, double h, double* pos, double* e);
-extern void pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
+extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
                     insgnss_opt_t *insopt, int n, const nav_t *nav);
 extern void undiffppp(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav);
 extern void detslp_ll(rtk_t *rtk, const obsd_t *obs, int n);
