@@ -421,7 +421,7 @@ static void testeclipse(const obsd_t *obs, int n, const nav_t *nav, double *rs)
     }
 }
 /* measurement error variance ------------------------------------------------*/
-extern double varerr(int sat, int sys, double el, int type, const prcopt_t *opt)
+static double varerr(int sat, int sys, double el, int type, const prcopt_t *opt)
 {
     double a,b,a2,b2,fact=1.0;
     double sinel=sin(el);
@@ -1349,7 +1349,7 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
          }
          else {
              v[nv]-=x[IC(1,opt)];
-             H[IC(1,opt)+nx*nv]=1.0;
+             H[IC(1,opt)+nx*nv]=1.0; 
          }
          if (opt->tropopt>=TROPOPT_EST) {
              for (k=0;k<(opt->tropopt>=TROPOPT_ESTG?3:1);k++) {
@@ -1382,7 +1382,7 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
 
      } // Phase and code loop (j)
 
-   } //sat loop (i)
+   } //sat loop (i) 
 
     for (i=0;i<nv;i++) for (j=0;j<nv;j++) {
         R[i+j*nv]=i==j?var[i]:0.0;
@@ -1726,7 +1726,7 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
 
         stat=SOLQ_PPP;
     }
-    if (stat==SOLQ_PPP) {
+    if (stat==SOLQ_PPP) { 
         /* postfit residuals */
         res_ppp(1,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel);
 

@@ -177,6 +177,8 @@ typedef struct {        /* IMU sensor measurements */
     double Gg[9];           /* g-dependent bias for a gyro triad */
     double fb0[3],wibb0[3]; /* uncorrected specific-force (b-frame)/angular rate (b-frame) */
     double fb[3],wibb[3];   /* corrected specific-force (b-frame)/angular rate (b-frame) */
+    double fbe[3], wibbe[3];  /* corrected specific-force (e-frame)/angular rate (e-frame) */
+    double fbn[3], wibbn[3];  /* corrected specific-force (n-frame)/angular rate (n-frame) */
     float  stdba[3], stdbg[3]; /* acc and gyro stds */
 } imuraw_t;
 
@@ -297,6 +299,8 @@ extern FILE *out_raw_fimu;
 extern FILE *out_PVA;
 extern FILE *out_clock_file;
 extern FILE *out_IMU_bias_file;
+extern FILE *out_tropo_file;
+extern FILE *out_amb_file;
 extern FILE *out_KF_SD_file;
 extern FILE *out_KF_state_error;
 extern FILE *out_KF_residuals;

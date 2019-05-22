@@ -1813,8 +1813,35 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
 
     /* INS/GNSS with MAP constrains - HERE BECAUSE I AM PROCESSING ONLY SPP UNTIL SP3 ARRIVES*/
     //core(rtk, obs, n, nav);
+
+    double cdiff=(double)fabs((rtk->sol.prevclk + rtk->sol.prevdrf*rtk->tt)-(rtk->sol.dtr[0]));
+
+    printf("Clock check: dt: %lf s! cdiff: %lf, tt: %lf\n", rtk->sol.dtr[0]*CLIGHT, cdiff, rtk->tt);
+
+      if (cdiff > 300000 && rtk->tt >= 0.0 ) {
+          printf("Clock coming in meters \n");
+         rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+      }else{
+        if (fabs(rtk->sol.dtr[0]) > 10000 ) {
+            printf("Clock coming in meters inside else \n");
+          rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+        }
+      }
+     
+      core1(rtk, obs, n, nav);
+
+      printf("Clock check after core1: dt: %lf s! \n", rtk->sol.dtr[0]);
+   
+      if (cdiff > 300000 && rtk->tt >= 0.0 ) {
+         rtk->sol.dtr[0]=rtk->sol.dtr[0]*CLIGHT;
+      }
+
+      rtk->sol.prevclk=rtk->sol.dtr[0];
+      rtk->sol.prevdrf=rtk->sol.dtrr;
+
+      printf("Clock check OUTPUT: dt: %lf s!!\n", rtk->sol.dtr[0]);
     
-    core1(rtk, obs, n, nav);
+    
 
     /* single point positioning */
     if (opt->mode==PMODE_SINGLE) {

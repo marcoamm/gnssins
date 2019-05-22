@@ -13,7 +13,7 @@
 #define NX(opt)     (IB(MAXSAT,opt)+1) /* number of estimated states */
 
 /* measurement error variance ------------------------------------------------*/
-static double varerr(int sat, int sys, double el, int type, const prcopt_t *opt)
+static double varerr1(int sat, int sys, double el, int type, const prcopt_t *opt)
 {
     double a,b,a2,b2,fact=1.0;
     double sinel=sin(el);

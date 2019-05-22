@@ -36,8 +36,8 @@ extern void imuaccplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(min)' \n"
               "set ylabel 'ACCELERATIONS (m/s/s)' \n"
 	      //"set xrange [0:40] \n"
- 	      //"set term postscript eps enhanced color\n"
-	      //"set output '%s accelerations3.ps'\n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s accelerations.ps'\n"
 	      "set autoscale \n"
         //"set yrange [-2.5:2.5] \n"
 	      "set grid \n", outpath[0]);
@@ -58,8 +58,8 @@ extern void imugyroplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(min)' \n"
               "set ylabel 'RATE GYROSCOPES (deg/s)' \n"
 	      "set xrange [0:40] \n"
- 	      //"set term postscript eps enhanced color\n"
-	      //"set output '%s gyroscopes3.ps'\n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s gyroscopes.ps'\n"
 	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
@@ -124,7 +124,7 @@ extern void imuposplot(char* filename){
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s positions_march_obstruction.ps'\n"
+	      "set output '%s positions.ps'\n"
         /* General view  */
         //"set yrange [45.942:45.9432] \n"  //BMO field general view
         //"set xrange [-66.6418:-66.6402] \n"
@@ -134,8 +134,8 @@ extern void imuposplot(char* filename){
         //"set autoscale \n"
         "set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
         "set xrange [-66.675:-66.63] \n"
-        "set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
-        "set xrange [-66.6455:-66.6355] \n" 
+        //"set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
+        //"set xrange [-66.6455:-66.6355] \n" 
         //"set yrange [45.93:45.94] \n"  // Highway
         //"set xrange [-66.66:-66.650] \n"
         //"set yrange [45.95:45.955] \n"  // UNB parking lot
@@ -146,8 +146,8 @@ extern void imuposplot(char* filename){
         //"set xrange [-66.645:-66.635] \n"
         //"set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
         //"set xrange [-66.6454:-66.618] \n"
-        "set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
-        "set xrange [-66.635:-66.63] \n"
+        //"set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
+        //"set xrange [-66.635:-66.63] \n"
         //"set yrange [45.95:45.955] \n"  // March 21 - Beggining
         //"set xrange [-66.645:-66.64] \n"
 	      "set grid \n", outpath[0]);
@@ -272,7 +272,7 @@ extern void KF_att_stds_plot(char* filename){
 	      "set yrange [0:0.5] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_att_std.ps'\n"
-	      "set autoscale \n"
+	      //"set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($2) w l title \"roll(x) std\" ,\
@@ -293,7 +293,7 @@ extern void KF_vel_stds_plot(char* filename){
 	      "set yrange [0:0.5] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_vel_std.ps.ps'\n"
-	      "set autoscale \n"
+	      //"set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($5) w l title \"x vel. std\" ,\
@@ -314,7 +314,7 @@ extern void KF_pos_stds_plot(char* filename){
 	      "set yrange [0:0.5] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_pos_std.ps'\n"
-	      "set autoscale \n"
+	      //"set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($8) w l title \"lat. std\" ,\
@@ -474,7 +474,7 @@ extern void KF_state_errors_plot_clk(char* filename){
  return;
 }
 
-
+/* Plot Kalman Filter residuals */
 extern void KF_residuals_plot(char* filename){
   FILE *fp;
   fp = fopen(filename,"r");
@@ -526,7 +526,7 @@ extern void KF_residuals_plot(char* filename){
      fprintf(gp1, "set xlabel 'TIME' \n"
                   "set ylabel 'DOPPLER RESIDUALS (m)' \n"
                  //"set autoscale \n"
-                 "set yrange [-20:20]\n"
+                 "set yrange [-2:2]\n"
                   "set key horiz \n"
                  "set key top center \n"
                  "set term postscript eps enhanced color\n"
@@ -556,6 +556,92 @@ extern void KF_residuals_plot(char* filename){
   fflush(gp1);
   fclose(gp1);
 fclose(fp);
+}
+
+/* Print tropo parameters */
+extern void tropo_plot(char* filename){
+ FILE * gp = popen ("gnuplot -persistent", "w");
+
+  /* Gnuplot plot commands   - PLotting INS data  */
+  fprintf(gp, "set xlabel 'TIME(s)' \n"
+	      "set ylabel 'TROPOSPHERIC DELAY (m)' \n"
+	      "set yrange [0:5] \n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s tropo_bias.ps'\n"
+	      //"set autoscale \n"
+	      "set grid \n", outpath[0]);
+
+  fprintf(gp,"plot '%s' u ($1):($2) w lp ps 0.7 title \"tropo. delay\" \n", filename);
+
+ fflush(gp);
+ fclose(gp);
+ return;
+}
+
+/* Print ambiguities */
+extern void amb_plot(char* filename){
+  FILE *fp;
+  fp = fopen(filename,"r");
+  char str[150];
+  double ti,tf,t,taux=0.0,vl1,vl2,vp1,vp2, value;
+  int i,j,sat=0,aux=0,count=0,countcand=0,eq,dif,cdd;
+  int prn[MAXSAT]={0};
+
+  /* Getting first sat to count the rest */
+  fgets(str, 150, fp);
+  sscanf(str, "%lf %d %lf", &t, &sat, &value);
+  prn[0]=sat;
+  count=1;//one value in the vector position count-1
+  ti=t;
+  /* Counting the number of satellite from file and storing at prn[] vector */
+  while ( fgets(str, 150, fp)!= NULL ){
+   sscanf(str, "%*lf %d %lf", &sat, &value);
+     eq=0;dif=0;
+     for (i = 0; i < count; i++) {
+       if (sat == prn[i]) {
+         eq++;
+         break;
+       }else dif++;
+    }
+    if (i==count&&value!=0) { //Add a new one
+      prn[count]=sat;
+      count++;
+    }
+  }
+
+  for (i = 0; i < count; i++){
+    printf("prn[%d]: %d\n", i, prn[i]);
+  }  
+
+  rewind(fp);
+
+  FILE * gp = popen ("gnuplot -persistent", "w"); 
+
+  i=0;
+  /* Gnuplot plot commands   - Pseudorange */
+  fprintf(gp,  "set xlabel 'TIME' \n"
+               "set ylabel 'AMBIGUITIES (m)' \n"
+               "set key horiz \n"
+               "set yrange [-20:20]\n"
+               //"set autoscale \n"
+               "set key top center \n"
+               "set term postscript eps enhanced color\n"
+               "set output '%s ambiguities.ps'\n"
+               "set grid \n",outpath[0]);
+
+
+  fprintf(gp,"plot '%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \"Sat %d\" ,\ ", filename,prn[i],prn[i]);
+
+  //lt rgb 'red'                                              0.7 title \"tropo. delay\" \n",
+
+   for (i = 1; i < count; i++) { //PRN loop
+     fprintf(gp,"'%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \"Sat. %d\",\ ", filename,prn[i],prn[i]);
+  }
+  //pointtype %d
+
+  fflush(gp);
+  fclose(gp);
+  fclose(fp);
 }
 
 /* map-matching plotting functions ------------------------------------*/

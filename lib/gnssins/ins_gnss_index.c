@@ -36,7 +36,7 @@ extern int xnRc(const prcopt_t* opt)
     return ((opt)->navsys<5?1:2);
 }
 /* get number of receiver clock drift (non-close-loop correction states) ----*/
-extern int xnRr() {return 1;}
+extern int xnRr() {return 0;} // NO CLOCK DRIFT IN PPP
 
 /* get number of tropo and phase bias are non-close-loop correction states
  * --------------------------------------------------------------------------*/
@@ -67,12 +67,12 @@ extern int xiRc()
 /* get index of receiver clock drift-----------------------------------------*/
 extern int xiRr(const prcopt_t* opt)
 {
-    return xiRc()+xnRc(opt);
+    return 0;//xiRc()+xnRc(opt);
 }
 /* get index of tropos (r:0=rov,1:ref)---------------------------------------*/
 extern int xiTr(const prcopt_t* opt)
 {
-    return  xiRr(opt)+xnRr();
+    return  xiRc()+xnRc(opt);
 }
 /* get index of phase bias (s:satno,f:freq)----------------------------------*/
 extern int xiBs(const prcopt_t* opt,int s)
