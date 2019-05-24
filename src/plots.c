@@ -272,7 +272,7 @@ extern void KF_att_stds_plot(char* filename){
 	      "set yrange [0:0.5] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_att_std.ps'\n"
-	      //"set autoscale \n"
+	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($2) w l title \"roll(x) std\" ,\
@@ -293,7 +293,7 @@ extern void KF_vel_stds_plot(char* filename){
 	      "set yrange [0:0.5] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_vel_std.ps.ps'\n"
-	      //"set autoscale \n"
+	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($5) w l title \"x vel. std\" ,\
@@ -314,7 +314,7 @@ extern void KF_pos_stds_plot(char* filename){
 	      "set yrange [0:0.5] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_pos_std.ps'\n"
-	      //"set autoscale \n"
+	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($8) w l title \"lat. std\" ,\
@@ -516,7 +516,7 @@ extern void KF_residuals_plot(char* filename){
                "set ylabel 'PSEUDORANGE RESIDUALS (m)' \n"
               //"set autoscale \n"
                "set key horiz \n"
-               "set yrange [-20:20]\n"
+               "set yrange [-10:10]\n"
               "set key top center \n"
               "set term postscript eps enhanced color\n"
              "set output '%s KF_pseudorange_residuals.ps'\n"
@@ -524,9 +524,9 @@ extern void KF_residuals_plot(char* filename){
 
       /* Gnuplot plot commands   - Carrier phase */
      fprintf(gp1, "set xlabel 'TIME' \n"
-                  "set ylabel 'DOPPLER RESIDUALS (m)' \n"
+                  "set ylabel 'PHASE RESIDUALS (m)' \n"
                  //"set autoscale \n"
-                 "set yrange [-2:2]\n"
+                 "set yrange [-10:10]\n"
                   "set key horiz \n"
                  "set key top center \n"
                  "set term postscript eps enhanced color\n"
@@ -534,19 +534,19 @@ extern void KF_residuals_plot(char* filename){
                  "set grid \n",outpath[0]);
 
 
-  fprintf(gp,"plot '%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \" Sat %d \",\ ",\
+  fprintf(gp,"plot '%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \" Sat %d \",\ ",\
   filename,prn[i],prn[i]);
 
-  fprintf(gp1,"plot '%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
+  fprintf(gp1,"plot '%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
   filename,prn[i],prn[i]);
 
   //lt rgb 'red'
 
    for (i = 1; i < count; i++) { //PRN loop
-     fprintf(gp,"'%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
+     fprintf(gp,"'%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
      filename,prn[i],prn[i]);
 
-     fprintf(gp1,"'%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
+     fprintf(gp1,"'%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
      filename,prn[i],prn[i]);
   }
   //pointtype %d
@@ -606,7 +606,7 @@ extern void amb_plot(char* filename){
     if (i==count&&value!=0) { //Add a new one
       prn[count]=sat;
       count++;
-    }
+    } 
   }
 
   for (i = 0; i < count; i++){
