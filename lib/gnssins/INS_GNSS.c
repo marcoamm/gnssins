@@ -5871,7 +5871,7 @@ void Nav_equations_ECEF1(ins_states_t *ins)
    % From (5.38), */
   for (i = 0; i < 3; i++)
     ins->re[i] = ins->pre[i] + (ins->ve[i] + ins->pve[i]) * 0.5 * tor_i;
-/*
+/**/
   printf("OUTPUT NAV: \n");
   double llh[3]={0.0};
   ecef2pos(ins->re,llh);
@@ -5888,7 +5888,7 @@ void Nav_equations_ECEF1(ins_states_t *ins)
       printf("%lf ", ins->Cbe[i * 3 + j]);
     }
     printf("\n");
-  }*/
+  }
   printf(" ********************* NAVIGATION EQUATIONS END ******************\n");
 }
 
@@ -6391,6 +6391,27 @@ extern void propinss(ins_states_t *ins, const insgnss_opt_t *opt, double dt,
   phi = mat(nx, nx);
 
   updstat(opt, ins, dt, ins->x, ins->P, phi, P, x, Q);
+
+ int i, j;
+//  printf("Phi:\n");
+//   for (i = 0; i < ins->nx; i++)
+//   {
+//     for (j = 0; j < ins->nx; j++)
+//     {
+//       printf("%lf ", phi[i * ins->nx + j]);
+//     }
+//   }
+//   printf("\n");
+
+   printf("\nQ:\n");
+  for (i = 0; i < 20; i++)
+  {
+    for (j = 0; j < 20; j++)
+    {
+      if(i==j) printf("%.15lf ", Q[i * ins->nx + j]); 
+    }
+  }
+  printf("\n");
   
     
   free(Q);  
@@ -6507,12 +6528,18 @@ static int chkpcov(int nx, const insgnss_opt_t *opt, double *P)
 {
   int i;
   double var = 0.0;
-  for (i = xiP(); i < xiP() + 3; i++)
+  for (i = xiP(); i < xiP() + 3; i++){
     var += SQRT(P[i + i * nx]);
+  }
 
-  if ((var / 3) > MAXVAR)
-    if (P)
+  printf("checkpcov: var summation: %lf\n", var);
+
+  if ((var / 3) > 100){
+    if (P){
+      printf("checkpcov: ok\n");
       getP0(opt, P, nx);
+    }
+  }
 }
 
 /* imu body position transform to gps antenna---------------------------------*/
@@ -7548,10 +7575,21 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
   /* Ins navigation */
   Nav_equations_ECEF1(insc);
 
+       printf("ins->P before checkpcov\n");
+  for (i = 0; i < insc->nx; i++)
+  {
+    for (j = 0; j < insc->nx; j++)
+    {
+      (i==j?printf("%lf ", insc->P[i * insc->nx + j]):0);
+    }
+  }
+  printf("\n GNSS time: %lf", gnss_time);
+
   /* propagate ins states */
   printf("Prop ins\n");
   propinss(insc, ig_opt, insc->dt, insc->x, insc->P);
   printf("Prop ins end\n");
+
 
   /* Checking input values  */
   chkpcov(nx, ig_opt, insc->P);

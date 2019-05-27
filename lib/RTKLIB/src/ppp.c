@@ -1266,6 +1266,7 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
     int i,j,k,sat,sys,nv=0,nx=rtk->nx,brk,tideopt;
 
     trace(3,"res_ppp : n=%d nx=%d\n",n,nx);
+    printf("res_ppp: %lf n=%d nx=%d\n",time2gpst(rtk->sol.time,NULL),n,nx);
 
     for (i=0;i<MAXSAT;i++) rtk->ssat[i].vsat[0]=0;
 
@@ -1320,15 +1321,20 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
             windupcorr(rtk->sol.time,rs+i*6,rr,&rtk->ssat[sat-1].phw);
         }
         /* ionosphere and antenna phase corrected measurements */
+        printf("if meas here:\n");
         if (!corrmeas(obs+i,nav,pos,azel+i*2,&rtk->opt,dantr,dants,
                       rtk->ssat[sat-1].phw,meas,varm,&brk)) {
+            printf("if meas error:\n");
             continue;
-        }
+        } 
 
         /* satellite clock and tropospheric delay */
         r+=-CLIGHT*dts[i*2]+dtrp;
 
         trace(5,"sat=%2d azel=%6.1f %5.1f dtrp=%.3f dantr=%6.3f %6.3f dants=%6.3f %6.3f phw=%6.3f\n",
+              sat,azel[i*2]*R2D,azel[1+i*2]*R2D,dtrp,dantr[0],dantr[1],dants[0],
+              dants[1],rtk->ssat[sat-1].phw);
+       printf("sat=%2d azel=%6.1f %5.1f dtrp=%.3f dantr=%6.3f %6.3f dants=%6.3f %6.3f phw=%6.3f\n",
               sat,azel[i*2]*R2D,azel[1+i*2]*R2D,dtrp,dantr[0],dantr[1],dants[0],
               dants[1],rtk->ssat[sat-1].phw);
 
@@ -1340,6 +1346,7 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
          for (k=0;k<nx;k++) H[k+nx*nv]=0.0;
 
          v[nv]=meas[j]-r;
+         printf("RES 0: %lf\n", v[nv]);
 
          for (k=0;k<3;k++) H[k+nx*nv]=-e[k];
 
@@ -1351,6 +1358,7 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
              v[nv]-=x[IC(1,opt)];
              H[IC(1,opt)+nx*nv]=1.0; 
          }
+         printf("RES 1: %lf\n", v[nv]);
          if (opt->tropopt>=TROPOPT_EST) {
              for (k=0;k<(opt->tropopt>=TROPOPT_ESTG?3:1);k++) {
                  H[IT(opt)+k+nx*nv]=dtdx[k];
@@ -1360,11 +1368,16 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
              v[nv]-=x[IB(obs[i].sat,opt)];
              H[IB(obs[i].sat,opt)+nx*nv]=1.0;
          }
-
+         printf("RES 2: %lf\n", v[nv]);
          var[nv]=varerr(obs[i].sat,sys,azel[1+i*2],j,opt)+varm[j]+vare[i]+vart;
+
+         printf("sat: %d, var[%d]: %lf, sys: %d, azel: %lf, varm: %lf, vare: %lf, vart: %lf\n", \
+         obs[i].sat, nv, var[nv], sys, azel[1+i*2], varm[j], vare[i], vart);
 
          if (j==0) rtk->ssat[sat-1].resc[0]=v[nv];
          else      rtk->ssat[sat-1].resp[0]=v[nv];
+
+         printf("Meas: %lf Modeled: %lf RES.: %lf\n", meas[j], r, v[nv]);
 
          /* test innovation */
 #if 0
@@ -1381,6 +1394,9 @@ static int res_ppp(int iter, const obsd_t *obs, int n, const double *rs,
          nv++;
 
      } // Phase and code loop (j)
+
+     printf("%lf %2d %lf %lf\n", time2gpst(obs[i].time, NULL),
+            sat, v[nv-2], v[nv-1]);
 
    } //sat loop (i) 
 
