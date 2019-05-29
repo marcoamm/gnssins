@@ -6390,29 +6390,7 @@ extern void propinss(ins_states_t *ins, const insgnss_opt_t *opt, double dt,
   Q = mat(nx, nx);
   phi = mat(nx, nx);
 
-  updstat(opt, ins, dt, ins->x, ins->P, phi, P, x, Q);
-
- int i, j;
-//  printf("Phi:\n");
-//   for (i = 0; i < ins->nx; i++)
-//   {
-//     for (j = 0; j < ins->nx; j++)
-//     {
-//       printf("%lf ", phi[i * ins->nx + j]);
-//     }
-//   }
-//   printf("\n");
-
-   printf("\nQ:\n");
-  for (i = 0; i < 20; i++)
-  {
-    for (j = 0; j < 20; j++)
-    {
-      if(i==j) printf("%.15lf ", Q[i * ins->nx + j]); 
-    }
-  }
-  printf("\n");
-  
+  updstat(opt, ins, dt, ins->x, ins->P, phi, P, x, Q);  
     
   free(Q);  
   free(phi);   
@@ -7050,7 +7028,7 @@ static int ppp_res(int post, const obsd_t *obs, int n, const double *rs,
      } // Phase and code loop (j)
 
      /* KF residuals output */
-     fprintf(out_KF_residuals, "%lf %2d %lf %lf\n", time2gpst(obs[i].time, NULL),
+     if(post) fprintf(out_KF_residuals, "%lf %2d %lf %lf\n", time2gpst(obs[i].time, NULL),
             sat, v[nv-2], v[nv-1]);
 
    } //sat loop (i)
@@ -7590,9 +7568,25 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
   propinss(insc, ig_opt, insc->dt, insc->x, insc->P);
   printf("Prop ins end\n");
 
+  for (i = 0; i < insc->nx; i++)
+  {
+    if (insc->P[i * insc->nx + i] < 0.0 ){
+      printf("NEGATIVE VALUE AT P[%d]",i * insc->nx + i);
+      //exit(0);
+    }
+  }
 
   /* Checking input values  */
   chkpcov(nx, ig_opt, insc->P);
+
+         printf("ins->P after checkpcov\n");
+  for (i = 0; i < insc->nx; i++)
+  {
+    for (j = 0; j < insc->nx; j++)
+    {
+      (i==j?printf("%lf ", insc->P[i * insc->nx + j]):0);
+    }
+  }
 
   if (nav_or_int)
   {

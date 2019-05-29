@@ -124,7 +124,7 @@ extern void imuposplot(char* filename){
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s positions_obst.ps'\n"
+	      "set output '%s positions_beg.ps'\n"
         /* General view  */
         //"set yrange [45.942:45.9432] \n"  //BMO field general view
         //"set xrange [-66.6418:-66.6402] \n"
@@ -148,8 +148,8 @@ extern void imuposplot(char* filename){
         //"set xrange [-66.6454:-66.618] \n"
         "set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
         "set xrange [-66.635:-66.63] \n"
-        // "set yrange [45.95:45.955] \n"  // March 21 - Beggining
-        // "set xrange [-66.645:-66.64] \n"
+        "set yrange [45.95:45.955] \n"  // March 21 - Beggining
+        "set xrange [-66.645:-66.64] \n"
 	      "set grid \n", outpath[0]);
 
         // Obstructions: 396546.04 < $1 < , Off-road: 396838.72 - end

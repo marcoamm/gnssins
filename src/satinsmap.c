@@ -3033,17 +3033,19 @@ extern int zvu(ins_states_t *ins,const insgnss_opt_t *opt,int flag)
   If static: ++zvu_counter else zvu=0 if not ---------------------------------------*/
 void detstc(ins_states_t *ins){
   // horizontal velocity and gyro components tolerance leves based on static INS data:
-  double vn0, ve0, vn0std, ve0std, gyrx0, gyry0, gyrx0std, gyry0std;
+  double vn0, ve0, vn0std, ve0std, gyrx0, gyry0, gyrx0std, gyry0std,vnveRes;
    vn0 = -0.002743902895411; ve0 = -0.002219817510341;
    vn0std = 0.001958782893669; ve0std = 0.001549122618107;
    gyrx0 = -0.000152716; gyry0 = 0.000386451;
    gyrx0std = 0.000483409; gyry0std = 0.001271191;
+   vnveRes = 10*(sqrt((vn0std*vn0std-ve0std*ve0std)));
    printf("static detection \n");
 
-     if ( (fabs(ins->vn[0]) - vn0) <= 3*vn0std && (fabs(ins->vn[1]) - ve0) <= 3*ve0std ) {
+   //  if ( (fabs(ins->vn[0]) - vn0) <= 3*vn0std && (fabs(ins->vn[1]) - ve0) <= 3*ve0std ) {
+    if ( norm(ins->vn, 2) < 1.0 ) {
        zvu_counter++;
        printf("static detection: yes: %d, t:%lf\n", zvu_counter, ins->time);
-      }else {zvu_counter=0;printf("static detection: no: %d\n", zvu_counter);}
+      }else {zvu_counter=0;printf("static detection: no: %d\n", zvu_counter);} 
 }
 
 /* Output imu raw data to file */
@@ -3128,8 +3130,8 @@ void pvclkCovfromgnss(rtk_t *rtk, ins_states_t *ins){
   ins->P[IP*nx+IP+2]=ins->P[(IP+2)*nx+IP]=rtk->sol.qr[5];          /* zx or ue */
 }
 
-/* GNSS solution quality check, return 1 if it passess */
-int gnssQC(rtk_t *rtk){
+/* GNSS solution quality check, return 1 if it passess */  
+int gnssQC(rtk_t *rtk, int nsat){
   int i,j;
   double gnss_xyz_cov[6], P[9], pos[3], Qposenu[9], gnss_ned_cov[3];
 
@@ -3150,10 +3152,10 @@ int gnssQC(rtk_t *rtk){
   gnss_ned_cov[1]=Qposenu[0];
   gnss_ned_cov[2]=Qposenu[8];
 
-  printf("GNSS quality check: %lf, %lf \n",norm(gnss_ned_cov,2), rtk->sol.gdop[0]);
+  printf("GNSS quality check: %lf, %lf Nsat: %d\n",norm(gnss_ned_cov,2), rtk->sol.gdop[0], nsat);
 
-  if (norm(gnss_ned_cov,2)<5.0){
-    if (rtk->sol.gdop[0]<4.0)
+  if (norm(gnss_ned_cov,2)<15.0){ //for SPP a reasonable value is 15 m, for others 5 m
+    if (rtk->sol.gdop[0]<4.0) 
     {
       printf("GNSS quality check ok\n");
       return 1;      
@@ -3281,9 +3283,9 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       flag=interp_ins2gpst(gnss_time, &insc); 
 
       /* GNSS solution quality check */
-      if(flag) flag=gnssQC(rtk);
+      if(flag) flag=gnssQC(rtk, n);
 
-      //if (flag) 
+      //if (flag)  
 
       /* Integration */
       if (insgnssopt.mode){ // Add condition: if less than four satellites mode=0;
@@ -3307,7 +3309,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
         printf("ZVU UPDATE: counter: %d, t: %lf", zvu_counter, insc.time);  
         /* Zero-velocity constraints */
         zvu(&insc,&insgnssopt,1); 
-        zvu_counter=0;
+        zvu_counter=0; 
       }  
 
       /* Output PVA, clock, imu bias solution     */
@@ -3320,11 +3322,11 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     /* Re-initializing ins with gnss solution when integration occurs */
      if (insgnssopt.Nav_or_KF==1){
       for(i=0;i<3;i++) insc.re[i]=rr[i];
-      for(i=0;i<3;i++) insc.ve[i]=ve[i]; 
+      for(i=0;i<3;i++) insc.ve[i]=ve[i];  
       /* Clock solution */
       insc.dtr[0]=rtk->sol.dtr[0]*CLIGHT; 
       update_ins_state_n(&insc);  
-      /* Gnss solution covariance to ins */
+      /* Gnss solution covariance to ins */ 
       pvclkCovfromgnss(rtk, &insc); 
     }
  
