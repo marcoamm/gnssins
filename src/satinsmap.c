@@ -3690,6 +3690,8 @@ tropo_plot(tropo_file);
  char amb_file[]="../out/out_amb_bias.txt"; 
  amb_plot(amb_file);                                  
 
+/*call for analysis script*/
+system("./../analysis.analysis.sh");
 
 /* Plot IMU ra measurements
 char imu_raw_meas[]="../out/out_raw_imu.txt";
