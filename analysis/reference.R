@@ -144,7 +144,7 @@ grid()
 dev.off();
 
 jpeg("Hist_Horizontal.jpg", width = 700, height = 700)
-hist(hz[hz<=30],col="blue",main="Horizontal differences",xlab="m", xlim=c(0,20),
+hist(hz[hz<=30],col="blue",main="Horizontal differences",xlab="m", xlim=c(mean(hz)-7,mean(hz)+7),
      cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5,breaks=30)
 grid()
 dev.off();
@@ -157,7 +157,7 @@ grid()
 dev.off();
 
 jpeg("Hist_Vertical.jpg", width = 700, height = 700)
-hist(up,col="red",main="Vertical differences",xlab="m", xlim=c(0,20),
+hist(up,col="red",main="Vertical differences",xlab="m", xlim=c(mean(up)-7,mean(up)+7),
      cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5,breaks=30)
 grid()
 dev.off();
