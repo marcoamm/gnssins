@@ -34,6 +34,7 @@ ins_states_t *insw;   /* ins states buffer */
 int zvu_counter = 0;
 int gnss_w_counter = 0;
 int ins_w_counter = 0;
+int dz_counter = 0;
 const double Omge[9]={0,OMGE,0,-OMGE,0,0,0,0,0}; /* (5.18) */
 
 char *outpath1[] = {"../out/"};  
@@ -1816,12 +1817,12 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
    vn0 = -0.002743902895411; ve0 = -0.002219817510341;
    vn0std = 0.001958782893669; ve0std = 0.001549122618107;
    gyrx0 = -0.000152716; gyry0 = 0.000386451;
-   gyrx0std = 0.000483409; gyry0std = 0.001271191;
+   gyrx0std = 0.000483409; gyry0std = 0.001271191;  
 
   printf("\n *****************  CORE BEGINS ***********************\n");
 
   /* Update with previous solution */
-  imu_obs_prev=imu_obs_global;
+  imu_obs_prev=imu_obs_global; 
   PVA_prev_sol=pva_global;
   PVA_prev_sol.t_s=pvagnss.sec; /* last state/GNSS estimation time */
 
@@ -2034,6 +2035,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
   /* local apparent gravity vector */
   appgrav(llh_pos, gan, wiee);
+
 
   /* Coarse alignment or use of previous solution? */
   /* Levelling and gyrocompassing, update imu->aea[] vector */
@@ -2341,6 +2343,10 @@ static int inputimu(ins_states_t *ins, int week){
     for (j= 0;j<3;j++) ins->data.fb0[j]=ins->data.fb0[j]*Gcte;
     for (j=0;j<3;j++) ins->data.wibb0[j]=ins->data.wibb0[j]*D2R;
 
+    /* Turn-on bias on x and y axis */
+    // ins->data.fb0[0]=ins->data.fb0[0]-0.869565;//-0.850372;
+    // ins->data.fb0[1]=ins->data.fb0[1]+0.193414;//+0.200865;
+
     if (check==NULL) {
       /* end of file */
       printf("END OF INS FILE: %s\n", check);
@@ -2411,8 +2417,6 @@ void insbufferpass(ins_states_t *insin, ins_states_t *insout){
   matcpy(insin->P0,insout->P0,insout->nx,insout->nx);
 
 }
-
-
 /* Stores ins measurement to structure buffer by time */
 void insbuffer(ins_states_t *insc){
   int i;
@@ -2429,6 +2433,15 @@ void insbuffer(ins_states_t *insc){
     insw[ins_w_counter]=*insc;
     insbufferpass(insc, insw+ins_w_counter);
   }
+}
+
+/* Stores last 10 values on a vector by sliding them*/
+extern void windowSlider(double *vec, int size, double value){
+  int i;
+    for(i=0;i<size-1;i++){ 
+      vec[i]=vec[i+1];
+    }
+    vec[size]=value; 
 }
 
 /* conversion matrix of ned frame to ecef frame--------------------------------
@@ -3154,16 +3167,42 @@ int gnssQC(rtk_t *rtk, int nsat){
 
   printf("GNSS quality check: %lf, %lf Nsat: %d\n",norm(gnss_ned_cov,2), rtk->sol.gdop[0], nsat);
 
-  if (norm(gnss_ned_cov,2)<15.0){ //for SPP a reasonable value is 15 m, for others 5 m
+  if (norm(gnss_ned_cov,2)<20.0){ //for SPP a reasonable value is 15 m, for others 5 m
     if (rtk->sol.gdop[0]<4.0) 
     {
       printf("GNSS quality check ok\n");
       return 1;      
     }
+    return 1;
   }
   printf("GNSS quality check fail\n");
   return 0;               
 }  
+
+void biascalib(ins_states_t *ins){
+  int i,j;
+  double gan[3]={0.0}, wiee[3]={0.0};
+  printf("bias calibration\n");
+
+    /* Earth rotation vector in e-frame	*/
+  wiee[0]=0;wiee[1]=0;wiee[2]=OMGE;
+
+  /* local apparent gravity vector */
+  appgrav(ins->rn, gan, wiee);
+
+  /* GYRO static detection
+   if ( (fabs(imu_curr_meas.g[0]) - gyrx0 <= 3*gyrx0std) && (fabs(imu_curr_meas.g[1]) - gyry0) <= 3*gyry0std ) {
+     printf("Static.zupt.gyr: %lf, Dif|g-g0|=%lf <= %lf and %lf < %lf \n",PVA_prev_sol.sec, \
+   (fabs(imu_curr_meas.g[0]) - gyrx0), 3*gyrx0std, (fabs(imu_curr_meas.g[1]) - gyry0), 3*gyry0std );
+   }
+*/
+
+  for (i=0;i<insgnssopt.insw;i++){
+    printf("acc: %lf, %lf, %lf, %lf\n", insw[i].data.sec, insw[i].data.fb[0],insw[i].data.fb[1],insw[i].data.fb[2]);
+    printf("gyr: %lf, %lf, %lf, %lf\n", insw[i].data.sec, insw[i].data.wibb[0],insw[i].data.wibb[1],insw[i].data.wibb[2]);
+  }
+
+}
 
 /* Core function -------------------------------------------------------------
 * Description: Receive raw GNSS and INS data and determine a PVA solution
@@ -3283,7 +3322,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       flag=interp_ins2gpst(gnss_time, &insc); 
 
       /* GNSS solution quality check */
-      if(flag) flag=gnssQC(rtk, n);
+      if(flag) flag=gnssQC(rtk, n); 
 
       //if (flag)  
 
@@ -3306,6 +3345,8 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       printf("ZVU counter: %d\n", zvu_counter);
       /* Zero velocity update */ 
       if (zvu_counter>10) {
+        /* Bias estimation */
+        biascalib(&insc);
         printf("ZVU UPDATE: counter: %d, t: %lf", zvu_counter, insc.time);  
         /* Zero-velocity constraints */
         zvu(&insc,&insgnssopt,1); 
@@ -3429,9 +3470,9 @@ out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
 //imu_tactical=fopen("../data/imu_ascii_new_1.txt", "r");
 imu_tactical=fopen("../data/imu_ascii_new_timesync2.txt", "r");
-fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");  
+fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");   
  
-rewind(imu_tactical);                                                   
+rewind(imu_tactical);                                                 
 
 
 
@@ -3476,7 +3517,7 @@ char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/APS_center.19N"
 
 //char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/GRG0MGXFIN_20190780000_01D_30S_CLK.CLK","../data/GRG0MGXFIN_20190780000_01D_15M_ORB.SP3", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
  
-/* PPP-AR Kinematic
+/* PPP-AR Kinematic   
 char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};
 
 char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT2640.17N -o ../out/exp1_PPP_amb_mod_constr.pos -k ../config/opts3.conf";
@@ -3567,7 +3608,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
         }
         else if (!strcmp(argv[i],"-l")&&i+3<argc) {
             prcopt.refpos=0;
-            for (j=0;j<3;j++) pos[j]=atof(argv[++i]);
+            for (j=0;j<3;j++) pos[j]=atof(argv[++i]); 
             for (j=0;j<2;j++) pos[j]*=D2R;
             pos2ecef(pos,prcopt.rb);
         }
@@ -3583,8 +3624,8 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
 /* Start rnx2rtkp processing  ----------------------------------- --*/ 
 /* Processing ------------------------------------------------------*/
- ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
- if (!ret) fprintf(stderr,"%40s\r","");
+  ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
+  if (!ret) fprintf(stderr,"%40s\r","");
  
   for (i=0;i<insgnssopt.insw;i++) insfree(insw+i); 
   free(solw); free(insw); 
@@ -3593,8 +3634,8 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
  //imu_tactical_navigation(imu_tactical);
 
  /* Closing global files          */
-  //fclose(fp_lane);
-  //fclose (fimu);
+  fclose(fp_lane);
+  fclose (fimu);
   fclose(out_PVA);
   fclose(out_clock_file);
   fclose(out_IMU_bias_file); 
@@ -3605,7 +3646,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   fclose(imu_tactical);
   fclose(out_KF_state_error); 
   fclose(out_KF_residuals);  
-  fclose(fimu);                    
+  fclose(fimu);                      
 
 /*
   char posfile[]="../out/out_PVA.txt";
@@ -3617,17 +3658,17 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
 
 /* INS/GNSS plots  */ 
-char out_raw_fimu[]="../out/out_raw_imu.txt"; 
-imuaccplot(out_raw_fimu);
+ char out_raw_fimu[]="../out/out_raw_imu.txt";   
+ imuaccplot(out_raw_fimu);
 imugyroplot(out_raw_fimu);
 char gyrofile[]="../out/out_PVA.txt";  
 imueulerplot(gyrofile);
 char velfile[]="../out/out_PVA.txt"; 
 imuvelplot(velfile);
-char posfile[]="../out/out_PVA.txt";
+char posfile[]="../out/out_PVA.txt"; 
 imuposplot(posfile);
 char imu_bias[]="../out/out_IMU_bias.txt";        
-imuaccbiasplot(imu_bias); 
+imuaccbiasplot(imu_bias);  
 imugyrobiasplot(imu_bias);
 char imu_KF_stds[]="../out/out_KF_SD.txt"; 
 KF_att_stds_plot(imu_KF_stds);
@@ -3646,8 +3687,8 @@ char imu_KF_res[]="../out/out_KF_residuals.txt";
 KF_residuals_plot(imu_KF_res);
 char tropo_file[]="../out/out_tropo_bias.txt";
 tropo_plot(tropo_file);
-char amb_file[]="../out/out_amb_bias.txt"; 
-amb_plot(amb_file);                                  
+ char amb_file[]="../out/out_amb_bias.txt"; 
+ amb_plot(amb_file);                                  
 
 
 /* Plot IMU ra measurements

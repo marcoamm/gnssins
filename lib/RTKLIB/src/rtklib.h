@@ -863,6 +863,8 @@ typedef struct {        /* solution type */
     float age;          /* age of differential (s) */
     float ratio;        /* AR ratio factor for valiation */
     double gdop[4];       /* gdop value for INS/GNSS TC itnegration */
+    double *C;       /* 10 epochs of squared residuals values */
+    int pCsize;
 } sol_t;
 
 typedef struct {        /* solution buffer type */

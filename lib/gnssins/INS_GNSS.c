@@ -6660,7 +6660,7 @@ static void udclk_ppp(rtk_t *rtk, ins_states_t *ins)
 /* temporal update of tropospheric parameters --------------------------------*/
 static void udtrop_ppp(rtk_t *rtk, int nx, ins_states_t *ins)
 {
-    double pos[3],azel[]={0.0,PI/2.0},ztd,var;
+    double pos[3],azel[]={0.0,PI/2.0},ztd,var,zhd;
     int i=xiTr(&rtk->opt),j;
     
     trace(3,"udtrop_ppp:\n");
@@ -7162,17 +7162,6 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
     printf("Before PPP integration:\n");
   printf("x vector:\n");
   for (j = 0; j < nx; j++) printf("%lf ", insp->x[j]); 
-/*
-  printf("\nP\n");
-  for (i = 0; i < nx; i++)
-  {
-    for (j = 0; j < nx; j++)
-    {
-      (i==j?printf("%.15lf ", insp->P[i*nx + j]):0);
-    }
-  }
-  printf("\n");
-  */
 
     //x=insp->x;
     //P=insp->P;
@@ -7184,23 +7173,14 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
         insp2antp(insp,insopt,rr);        
         //matcpy(xp,x,nx,1);
         matcpy(Pp,insp->P,nx,nx);
-/*
-          printf("\nPp before\n");
-  for (i = 0; i < nx; i++)
-  {
-    for (j = 0; j < nx; j++)
-    {
-      (i==j?printf("%.15lf ", Pp[i*nx + j]):0);
-    }
-  }
-  printf("\n");
-     */
+
         /* prefit residuals */
         if (!(nv=ppp_res(0,obs,n,rs,dts,var,svh,dr,exc,nav,xp,rtk,v,H,R,azel,rr,insopt,insp))) {
             trace(2,"%s ppp (%d) no valid obs data\n",str,i+1);
             break;
         }
-        printf("PPP nv: %d \n", nv);
+        printf("PPP nv: %d \n", nv); 
+
         /* measurement update of ekf states */
         if ((info=filter(xp,Pp,H,v,R,nx,nv))) {
             trace(2,"%s ppp (%d) filter error info=%d\n",str,i+1,info);
@@ -7578,15 +7558,6 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
 
   /* Checking input values  */
   chkpcov(nx, ig_opt, insc->P);
-
-         printf("ins->P after checkpcov\n");
-  for (i = 0; i < insc->nx; i++)
-  {
-    for (j = 0; j < insc->nx; j++)
-    {
-      (i==j?printf("%lf ", insc->P[i * insc->nx + j]):0);
-    }
-  }
 
   if (nav_or_int)
   {

@@ -386,7 +386,7 @@ if (abs(xcpy[0]-imu->Ba[0]) && abs(xcpy[1]-imu->Ba[1]) &&
 //puts("\n");
 
 free(la);free(lga);
-free(xcpy);free(witr);
+free(xcpy);free(witr); 
 
 }
 

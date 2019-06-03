@@ -36,10 +36,10 @@ extern void imuaccplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(min)' \n"
               "set ylabel 'ACCELERATIONS (m/s/s)' \n"
 	      //"set xrange [0:40] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s accelerations.ps'\n"
+ 	      //"set term postscript eps enhanced color\n"
+	      //"set output '%s accelerations.ps'\n"
 	      "set autoscale \n"
-        //"set yrange [-2.5:2.5] \n"
+        "set yrange [-2.5:2.5] \n"
 	      "set grid \n", outpath[0]);
 
  fprintf(gp,"plot '%s' u ($1):($4) w l title \"acc. z\" ,\
@@ -124,7 +124,7 @@ extern void imuposplot(char* filename){
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s positions_beg.ps'\n"
+	      "set output '%s positions_obst.ps'\n"
         /* General view  */
         //"set yrange [45.942:45.9432] \n"  //BMO field general view
         //"set xrange [-66.6418:-66.6402] \n"
@@ -144,12 +144,12 @@ extern void imuposplot(char* filename){
         //"set xrange [-66.65:-66.64] \n"
         //"set yrange [45.97:45.98] \n"  // Northside
         //"set xrange [-66.645:-66.635] \n"
-        //"set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
-        //"set xrange [-66.6454:-66.618] \n"
+        "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
+        "set xrange [-66.6454:-66.618] \n"
         "set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
         "set xrange [-66.635:-66.63] \n"
-        "set yrange [45.95:45.955] \n"  // March 21 - Beggining
-        "set xrange [-66.645:-66.64] \n"
+        // "set yrange [45.95:45.955] \n"  // March 21 - Beggining
+        // "set xrange [-66.645:-66.64] \n"
 	      "set grid \n", outpath[0]);
 
         // Obstructions: 396546.04 < $1 < , Off-road: 396838.72 - end
@@ -269,7 +269,7 @@ extern void KF_att_stds_plot(char* filename){
   /* Gnuplot plot commands   - PLotting INS data  */
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'ATTITUDE STDs' \n"
-	      "set yrange [0:0.5] \n"
+	      "set yrange [0:1] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_att_std.ps'\n"
 	      "set autoscale \n"
@@ -311,10 +311,10 @@ extern void KF_pos_stds_plot(char* filename){
   /* Gnuplot plot commands   - PLotting INS data  */
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'POSITION STDs' \n"
-	      "set yrange [0:0.5] \n"
+	      "set yrange [0:20] \n"
  	      "set term postscript eps enhanced color\n"
 	      "set output '%s KF_pos_std.ps'\n"
-	      "set autoscale \n"
+	      //"set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($8) w l title \"lat. std\" ,\

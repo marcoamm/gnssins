@@ -910,6 +910,7 @@ static double prectrop(gtime_t time, const double *pos, const double *azel,
     }
     dtdx[0]=m_w;
     *var=SQR(0.01);
+    printf("trop.zhd.zwd: %lf %lf %lf %lf %lf %lf\n",time2gpst(time,NULL), m_h*zhd, m_w*(x[0]-zhd), zhd, (x[0]-zhd), x[0] );
     return m_h*zhd+m_w*(x[0]-zhd);
 }
 /* phase and code residuals --------------------------------------------------*/
@@ -1741,10 +1742,40 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
         trace(4,"x(%d)=",i+1); tracemat(4,xp,1,NR(opt),13,4);
 
         stat=SOLQ_PPP;
-    }
+    }  
+    
     if (stat==SOLQ_PPP) { 
         /* postfit residuals */
         res_ppp(1,obs,n,rs,dts,var,svh,nav,xp,rtk,v,H,R,azel);
+
+    /* Storing squared residuals */
+    printf("Here vec: 0 nv: %d\n", nv);
+    for (size_t i = 0; i < nv; i++){
+        printf("res.v: %lf ",v[i]);
+    }
+    printf("/n");
+
+    double *Ccpy, Z[nv*nv];
+
+    matcpy(Ccpy,rtk->sol.C,rtk->sol.pCsize,rtk->sol.pCsize);
+    matmul("NT",nv,nv,1,1.0,v,v,0.0,Z);       /* Q=H'*P*H+R */
+
+    if (nv==rtk->sol.pCsize)
+    {
+        /* code */
+    }
+    
+    
+    if (dz_counter<10){
+        rtk->sol.dzSQ[dz_counter]= norm(v,nv)*norm(v,nv);
+        dz_counter++;
+        printf("Here 1\n");
+        printf("Squared residuals: t:%lf = %lf\n", time2gpst(rtk->sol.time,NULL), rtk->sol.dzSQ[dz_counter]);
+    }else{
+        windowSlider(rtk->sol.dzSQ, 10, (norm(v,nv)*norm(v,nv)) );
+        printf("Here 1\n");
+        printf("Squared residuals: t:%lf = %lf\n", time2gpst(rtk->sol.time,NULL), rtk->sol.dzSQ[dz_counter]);
+    }
 
         /* update state and covariance matrix */
         matcpy(rtk->x,xp,rtk->nx,1);

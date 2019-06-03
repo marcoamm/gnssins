@@ -1816,7 +1816,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
 
     // double cdiff=(double)fabs((rtk->sol.prevclk + rtk->sol.prevdrf*rtk->tt)-(rtk->sol.dtr[0]));
 
-    // printf("Clock check: dt: %lf s! cdiff: %lf, tt: %lf\n", rtk->sol.dtr[0]*CLIGHT, cdiff, rtk->tt);
+    //  printf("Clock check: dt: %lf s! cdiff: %lf, tt: %lf\n", rtk->sol.dtr[0]*CLIGHT, cdiff, rtk->tt);
 
     //   if (cdiff > 300000 && rtk->tt >= 0.0 ) {
     //       printf("Clock coming in meters \n");
@@ -1864,24 +1864,24 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
          rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
        }*/
 
-      double cdiff=(double)fabs((rtk->sol.prevclk + rtk->sol.prevdrf*rtk->tt)-(rtk->sol.dtr[0]));
+    //   double cdiff=(double)fabs((rtk->sol.prevclk + rtk->sol.prevdrf*rtk->tt)-(rtk->sol.dtr[0]));
 
-      if (cdiff < 300000 && rtk->tt >= 0.0 ) {
-         rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
-      }else{
-        if (fabs(rtk->sol.dtr[0]) > 10000 ) {
-          rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
-        }
-      }
+    //   if (cdiff < 300000 && rtk->tt >= 0.0 ) {
+    //      rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+    //   }else{
+    //     if (fabs(rtk->sol.dtr[0]) > 10000 ) {
+    //       rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+    //     }
+    //   }
       
-      core1(rtk, obs, n, nav); 
+    //   core1(rtk, obs, n, nav); 
 
-      if (cdiff < 300000 && rtk->tt >= 0.0 ) {
-         rtk->sol.dtr[0]=rtk->sol.dtr[0]*CLIGHT;
-      }
+    //   if (cdiff < 300000 && rtk->tt >= 0.0 ) {
+    //      rtk->sol.dtr[0]=rtk->sol.dtr[0]*CLIGHT;
+    //   }
 
-      rtk->sol.prevclk=rtk->sol.dtr[0];
-      rtk->sol.prevdrf=rtk->sol.dtrr;
+    //   rtk->sol.prevclk=rtk->sol.dtr[0];
+    //   rtk->sol.prevdrf=rtk->sol.dtrr;
 
        /* loosley coupled inertial gnss integration  */
       // printf("GNSS TIME BEFORE: %lf\n", time2gpst(rtk->sol.time,NULL));

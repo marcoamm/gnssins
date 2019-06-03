@@ -313,6 +313,7 @@ extern sol_t *solw;
 extern obsb_t obsw;
 extern ins_states_t *insw;
 extern insgnss_opt_t insgnssopt;
+extern int dz_counter;
 extern const double Omge[9]; /* earth rotation matrix in i/e-frame (5.18) */
 
 /* global states index -------------------------------------------------------*/
@@ -341,6 +342,7 @@ extern int showmsg(char *format, ...);
 extern void settspan(gtime_t ts, gtime_t te);
 extern void settime(gtime_t time);
 extern void vec2skew (double *vec, double *W);
+extern void windowSlider(double *vec, int size, double value);
 
 /* map-matching functions	*/
 void extern inibuff ();
