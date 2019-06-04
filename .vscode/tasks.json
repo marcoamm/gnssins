@@ -1,0 +1,16 @@
+{
+    "tasks": [
+        {
+            "type": "shell",
+            "label": "Makefile",
+            "command": "make",
+            "args": [
+                ""
+            ],
+            "options": {
+                "cwd": "/home/marco/Documents/code/gnssins/src"
+            }
+        }
+    ],
+    "version": "2.0.0"
+}
