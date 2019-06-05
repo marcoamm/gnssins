@@ -6384,13 +6384,22 @@ static void updstat(const insgnss_opt_t *opt, ins_states_t *ins, const double dt
 extern void propinss(ins_states_t *ins, const insgnss_opt_t *opt, double dt,
                      double *x, double *P)
 {
-  int nx = ins->nx;
+  int nx = ins->nx, i;
   double *phi, *Q;
 
   Q = mat(nx, nx);
   phi = mat(nx, nx);
 
-  updstat(opt, ins, dt, ins->x, ins->P, phi, P, x, Q);  
+  /* using adapted Q */
+  if (dz_counter>=10){
+    printf("Number of last 10 epoch residuals: \n");
+    for(i=0;i<10;i++) printf("%d ", (resid.data[i].nv)/2);
+    /* code */
+    updstat(opt, ins, dt, ins->x, ins->P, phi, P, x, resid.Q);
+
+  }else{
+    updstat(opt, ins, dt, ins->x, ins->P, phi, P, x, Q);
+  }  
     
   free(Q);  
   free(phi);   
@@ -7033,10 +7042,19 @@ static int ppp_res(int post, const obsd_t *obs, int n, const double *rs,
 
    } //sat loop (i)
 
+   if (dz_counter>=10){
+     matmul33("NNT", H, insc->P, H, nv, nx, nx, nv, R);
+     for (i=0;i<nv;i++) for (j=0;j<nv;j++) {
+        R[i+j*nv]=resid.C[i+j*nv]-R[i+j*nv];
+     }
 
-    for (i=0;i<nv;i++) for (j=0;j<nv;j++) {
+   }else{
+     for (i=0;i<nv;i++) for (j=0;j<nv;j++) {
         R[i+j*nv]=i==j?var[i]:0.0;
-    }
+     }
+   } 
+
+
     trace(5,"x=\n"); tracemat(5,x, 1,nx,8,3);
     trace(5,"v=\n"); tracemat(5,v, 1,nv,8,3);
     trace(5,"H=\n"); tracemat(5,H,nx,nv,8,3);
@@ -7123,11 +7141,10 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
 {
     const prcopt_t *opt=&rtk->opt;
     double *rs,*dts,*var,*v,*H,*R,*azel,*xp,*Pp,dr[3]={0},std[3];
-    double *x,*P,rr[3];
+    double *x,*P,rr[3], *K;
     char str[32];
     int i,j,nv,info=0,svh[MAXOBS],exc[MAXOBS]={0},stat=SOLQ_SINGLE,tc;
-    int nx=insp->nx;
-    
+    int nx=insp->nx;    
     
     time2str(obs[0].time,str,2);
     printf("pppos   : time=%s nx=%d n=%d\n",str,insp->nx,n);
@@ -7154,13 +7171,14 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
         tidedisp(gpst2utc(obs[0].time),rtk->x,opt->tidecorr==1?1:7,&nav->erp,
                  opt->odisp[0],dr);
     }
-    nv=insp->nx*2;//rtk->opt.nf*2;
+    nv=n*rtk->opt.nf*2;//insp->nx*2;
     xp=zeros(insp->nx,1); Pp=zeros(insp->nx,insp->nx);
     v=mat(nv,1); H=mat(insp->nx,nv); R=mat(nv,nv);
+    K=mat(nx,nv);
 
     printf("ppp observations: nv=%d, parameters=%d\n",nv, insp->nx);
     printf("Before PPP integration:\n");
-  printf("x vector:\n");
+    printf("x vector:\n");
   for (j = 0; j < nx; j++) printf("%lf ", insp->x[j]); 
 
     //x=insp->x;
@@ -7182,46 +7200,32 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
         printf("PPP nv: %d \n", nv); 
 
         /* measurement update of ekf states */
-        if ((info=filter(xp,Pp,H,v,R,nx,nv))) {
+        if((info=filter_adap(xp,Pp,H,v,R,nx,nv,K)) ) {
             trace(2,"%s ppp (%d) filter error info=%d\n",str,i+1,info);
             info=0;
             break;
+
         }
-     /* printf("H\n"); */
-  for (i = 0; i < nv; i++)
-  {
-    for (j = 0; j < insp->nx; j++)
-    {
-      printf("%lf ", H[i * insp->nx + j]); //i * insp->nx + j , j * nv + i
-    }
-    printf("\n");
-  }
-/*
-    printf("R\n");
-  for (i = 0; i < nv; i++)
-  {
-    for (j = 0; j < nv; j++)
-    {
-      //printf("%lf ", R[j * insp->nx + i]);
-      (i==j?printf("%lf ", R[j*nv + i]):0);
-    }
-    printf("\n");
-  }
-  */
-  printf("v\n");
-  for (i = 0; i < nv; i++) printf("%lf ", v[i]);
-  printf("\n");
-    printf("x vector after fisrt\n");
-  for (j = 0; j < nx; j++) printf("%.15lf ", xp[j]); 
-  printf("\nPp after\n");
-  for (i = 0; i < nx; i++)
-  {
-    for (j = 0; j < nx; j++)
-    {
-      (i==j?printf("%.15lf ", Pp[i*nx + j]):0);
-    }
-  }
-  printf("\n");
+        // if ((info=filter(xp,Pp,H,v,R,nx,nv))) {
+        //     trace(2,"%s ppp (%d) filter error info=%d\n",str,i+1,info);
+        //     info=0;
+        //     break;
+        // }
+
+        printf("v\n");
+        for (i = 0; i < nv; i++) printf("%lf ", v[i]);
+        printf("\n");
+          printf("x vector after fisrt\n");
+        for (j = 0; j < nx; j++) printf("%.15lf ", xp[j]); 
+        printf("\nPp after\n");
+        for (i = 0; i < nx; i++)
+        {
+          for (j = 0; j < nx; j++)
+          {
+            (i==j?printf("%.15lf ", Pp[i*nx + j]):0);
+          }
+        }
+        printf("\n");
 
         /* postfit residuals */
         if (ppp_res(i+1,obs,n,rs,dts,var,svh,dr,exc,nav,xp,rtk,v,H,R,azel,rr,insopt,insp)) {
@@ -7238,18 +7242,132 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
           
             break;
         }
-    }
-  printf("After PPP integration:\n");
- /* printf("H\n");
- 
-  for (i = 0; i < nv; i++)
-  {
-    for (j = 0; j < insp->nx; j++)
-    {
-      printf("%lf ", H[i * insp->nx + j]); //i * insp->nx + j , j * nv + i
+     }
+    /* Storing squared residuals */
+    printf("Here vec: 0 nv: %d\n", nv);
+    for (size_t i = 0; i < nv; i++){
+        printf("res.v: %lf ",v[i]);
     }
     printf("\n");
-  }*/
+    
+
+    double Ccpy[MAXSAT*MAXSAT*4], dz[MAXSAT*2], Z[MAXSAT*MAXSAT*4];
+
+    printf("Here 1\n");
+
+    for (i=0;i<n&&i<MAXOBS;i++) {
+        if (!rtk->ssat[obs[i].sat-1].vsat[0]){
+            dz[(obs[i].sat-1)]=dz[(obs[i].sat-1)+1]=0.0;
+            continue;
+        }
+        dz[(obs[i].sat-1)]=rtk->ssat[obs[i].sat-1].resc[0];
+        dz[(obs[i].sat-1)+1]=rtk->ssat[obs[i].sat-1].resp[0];
+    }
+
+    matmul("NT",MAXSAT*2,MAXSAT*2,1,1.0,dz,dz,0.0,Z);
+
+    if (dz_counter<9){
+        matcpy(Ccpy,resid.C,MAXSAT*2,MAXSAT*2);
+        printf("Here 4\n");   
+        for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.C[i]=Ccpy[i]+Z[i];
+        for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.data[dz_counter].Cj[i]=Z[i];            
+        resid.data[dz_counter].nv=nv;
+        dz_counter++;
+        
+    }else{
+        /* Compute average */
+        if (dz_counter>9){ /* dz_counter > 9 */
+            matcpy(Ccpy,resid.C,MAXSAT*2,MAXSAT*2);
+            for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.C[i]=Ccpy[i]-(resid.data[dz_counter%10].Cj[i])/10.0+(Z[i])/10.0;
+            for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.data[dz_counter%10].Cj[i] = Z[i];
+            resid.data[dz_counter%10].nv=nv;
+            dz_counter++;
+            printf("Here 5, dz_counter: %d, rest of division: %d\n", dz_counter, dz_counter%10);
+            
+        }else{ /* dz_counter == 9 */
+            matcpy(Ccpy,resid.C,MAXSAT*2,MAXSAT*2);
+            for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.C[i]=(Ccpy[i]+Z[i])/10.0;
+            for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.data[dz_counter].Cj[i] = Z[i];
+            resid.data[dz_counter].nv=nv;
+            dz_counter++;
+            printf("Here 6\n");
+        }
+    }
+
+    //printf("NumberOf previous and current nv nx: %d, %d, %d, %d", )
+
+  //       printf("Z:\n");
+  //     for (i = 0; i < MAXSAT*2; i++)
+  // {
+  //   for (j = 0; j < MAXSAT*2; j++)
+  //   {
+  //     (i==j?printf("%lf ", Z[i + j*MAXSAT*2]):0);
+  //   }
+  //   printf("\n");
+  // }
+
+  //         printf("resid.C:\n");
+  //     for (i = 0; i < MAXSAT*2; i++)
+  // {
+  //   for (j = 0; j < MAXSAT*2; j++)
+  //   {
+  //     (i==j?printf("%lf ", resid.C[i + j*MAXSAT*2]):0);
+  //   }
+  //   printf("\n");  
+  // }
+
+
+
+     if(dz_counter>=9){
+        double Caux[nv*nv];
+        int satvec[nv/2],k=0,l=0,c=0;
+
+     for(i=0;i<nv/2;i++) satvec[i]=0;
+    for(i=0;i<nv*nv;i++) Caux[i]=0.0;
+
+    for (i=0;i<n&&i<MAXOBS;i++) {
+      if (!rtk->ssat[obs[i].sat-1].vsat[0]){
+            continue;
+        }
+        satvec[k++]=(int)obs[i].sat-1;
+    }
+
+    printf("Satvec\n");
+    for(i=0;i<nv/2;i++) printf("%d ", satvec[i]);
+    printf("\n");
+ 
+    printf("C_aux:\n");
+    for (i=0;i<nv;i+=2) {
+        for(j=0;j<nv;j+=2){          
+            for(l=0; l<2; l++) {
+              for(c=0;c<2;c++){
+                Caux[(i+l)*nv+(j+c)]=resid.C[(satvec[i/2]+l)*(MAXSAT*2)+(satvec[j/2]+c)];
+                //printf("[%d]:%lf ",(i+l)*nv+(j+c), Caux[(i+l)*nv+(j+c)]); 
+              }
+            }
+        }
+         //printf("\n");
+     }
+
+       matmul33("NNT", K, Caux, K, nx, nv, nv, nv, resid.Q);
+
+      //for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.Q[]=
+
+    }
+
+    printf("out\n");
+
+  printf("After PPP integration:\n");
+  printf("resid.Q\n");
+ 
+  // for (i = 0; i < (18+MAXSAT); i++)
+  // {
+  //   for (j = 0; j < (18+MAXSAT); j++)
+  //   {
+  //     printf("%lf ", resid.Q[i * (18+MAXSAT) + j]); //i * insp->nx + j , j * nv + i
+  //   }
+  //   printf("\n");
+  // }
 /*
     printf("R\n");
   for (i = 0; i < nv; i++)
@@ -7302,7 +7420,7 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
 
     }
     free(rs); free(dts); free(var); free(azel);
-    free(xp); free(Pp); free(v); free(H); free(R);
+    free(xp); free(Pp); free(v); free(H); free(R); free(K);
 
     printf("ppp solution info: %d\n",info);
     return info;

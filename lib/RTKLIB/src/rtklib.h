@@ -863,8 +863,6 @@ typedef struct {        /* solution type */
     float age;          /* age of differential (s) */
     float ratio;        /* AR ratio factor for valiation */
     double gdop[4];       /* gdop value for INS/GNSS TC itnegration */
-    double *C;       /* 10 epochs of squared residuals values */
-    int pCsize;
 } sol_t;
 
 typedef struct {        /* solution buffer type */
@@ -1305,6 +1303,8 @@ extern int  smoother(const double *xf, const double *Qf, const double *xb,
                      const double *Qb, int n, double *xs, double *Qs);
 extern void matprint (const double *A, int n, int m, int p, int q);
 extern void matfprint(const double *A, int n, int m, int p, int q, FILE *fp);
+extern int filter_adap(double *x, double *P, const double *H, const double *v,
+                  const double *R, int n, int m, double *K);
 
 /* time and string functions -------------------------------------------------*/
 extern double  str2num(const char *s, int i, int n);

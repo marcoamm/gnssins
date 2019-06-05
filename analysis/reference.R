@@ -1,6 +1,6 @@
 rm(list=ls()) 
 options(digits=12)
-setwd('/home/marco/Documents/code/gnssins/analysis')
+#setwd('/home/marco/Documents/code/gnssins/analysis')
 
 
 xyz2lla <- function(x, y, z) {

@@ -35,6 +35,7 @@ int zvu_counter = 0;
 int gnss_w_counter = 0;
 int ins_w_counter = 0;
 int dz_counter = 0;
+res_t resid={0};
 const double Omge[9]={0,OMGE,0,-OMGE,0,0,0,0,0}; /* (5.18) */
 
 char *outpath1[] = {"../out/"};  
@@ -2341,11 +2342,11 @@ static int inputimu(ins_states_t *ins, int week){
 
     /* raw acc. to m/s*s and rate ve locity from degrees to radians  */
     for (j= 0;j<3;j++) ins->data.fb0[j]=ins->data.fb0[j]*Gcte;
-    for (j=0;j<3;j++) ins->data.wibb0[j]=ins->data.wibb0[j]*D2R;
+    for (j=0;j<3;j++) ins->data.wibb0[j]=ins->data.wibb0[j]*D2R; 
 
     /* Turn-on bias on x and y axis */
-    // ins->data.fb0[0]=ins->data.fb0[0]-0.869565;//-0.850372;
-    // ins->data.fb0[1]=ins->data.fb0[1]+0.193414;//+0.200865;
+    //  ins->data.fb0[0]=ins->data.fb0[0]-0.869565;//-0.850372;
+    //  ins->data.fb0[1]=ins->data.fb0[1]+0.193414;//+0.200865;
 
     if (check==NULL) {
       /* end of file */
@@ -2513,13 +2514,13 @@ extern void skewsym3x(double x,double y,double z,double *C)
 {
     C[0]=0.0; C[3]=-z;  C[6]=y;
     C[1]=z;   C[4]=0.0; C[7]=-x;
-    C[2]=-y;  C[5]=x;   C[8]=0.0;
+    C[2]=-y;  C[5]=x;   C[8]=0.0; 
 }
 /* set all matrix elements to zero ------------------------------------------*/
 extern void setzero(double *A,int n,int m)
 {
     int i,j;
-    for (i=0;i<n;i++) for (j=0;j<m;j++) A[i*m+j]=0.0;
+    for (i=0;i<n;i++) for (j=0;j<m;j++) A[i*m+j]=0.0; 
 }
 /* D=A*B*C---------------------------------------------------------------------*/
 extern void matmul33(const char *tr,const double *A,const double *B,const double *C,
@@ -3365,7 +3366,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       for(i=0;i<3;i++) insc.re[i]=rr[i];
       for(i=0;i<3;i++) insc.ve[i]=ve[i];  
       /* Clock solution */
-      insc.dtr[0]=rtk->sol.dtr[0]*CLIGHT; 
+      //insc.dtr[0]=rtk->sol.dtr[0]*CLIGHT; 
       update_ins_state_n(&insc);  
       /* Gnss solution covariance to ins */ 
       pvclkCovfromgnss(rtk, &insc); 
@@ -3455,7 +3456,12 @@ insgnssopt.saproopt=INS_RANDOM_WALK;
 insgnssopt.sgproopt=INS_RANDOM_WALK;
 solw=(sol_t*)malloc(sizeof(sol_t)*insgnssopt.gnssw);  /* gnss solution structure window size allocation */
 insw=(ins_states_t*)malloc(sizeof(ins_states_t)*insgnssopt.insw);   /* ins states window size allocation */
- 
+
+/* Residuals structure */
+resid.nv_w=10;
+resid.data=(res_epoch_t*)malloc(sizeof(res_epoch_t)*resid.nv_w);  /* residuals structure window size allocation */
+
+
 strcpy(filopt.trace,tracefname); 
    
 /* Global TC_KF_INS_GNSS output files          */
@@ -3628,17 +3634,17 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   if (!ret) fprintf(stderr,"%40s\r","");
  
   for (i=0;i<insgnssopt.insw;i++) insfree(insw+i); 
+  free(resid.data);
   free(solw); free(insw); 
 
  /* ins navigation only */
  //imu_tactical_navigation(imu_tactical);
 
  /* Closing global files          */
-  fclose(fp_lane);
-  fclose (fimu);
+  //fclose(fp_lane);
   fclose(out_PVA);
   fclose(out_clock_file);
-  fclose(out_IMU_bias_file); 
+  fclose(out_IMU_bias_file);  
   fclose(out_tropo_file);
   fclose(out_amb_file);
   fclose(out_KF_SD_file);
@@ -3655,10 +3661,10 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   imueulerplot(gyrofile);                            */
 
 /* Other function call after processing ------------------------------*/
-
+ 
 
 /* INS/GNSS plots  */ 
- char out_raw_fimu[]="../out/out_raw_imu.txt";   
+ char out_raw_fimu[]="../out/out_raw_imu.txt";     
  imuaccplot(out_raw_fimu);
 imugyroplot(out_raw_fimu);
 char gyrofile[]="../out/out_PVA.txt";  
@@ -3691,7 +3697,7 @@ tropo_plot(tropo_file);
  amb_plot(amb_file);                                  
 
 /*call for analysis script*/
-system("./../analysis.analysis.sh");
+system("./../analysis/analysis.sh");
 
 /* Plot IMU ra measurements
 char imu_raw_meas[]="../out/out_raw_imu.txt";

@@ -286,6 +286,20 @@ typedef struct {        /* observation data buffer */
     obsd_t data2[MAXSAT];
 } obsb_t;
 
+typedef struct {        /* Epoch residuals data */
+    double time;    /* epoch in gps week*/
+    int nv;         /* number of residuos */
+    double Cj[MAXSAT*MAXSAT*4];    /* squared PPP residuals values */
+} res_epoch_t;
+
+typedef struct {        /* Residuals data buffer */
+    int nv_w;         /* size of window */
+    res_epoch_t *data;  /* residual structure */
+    double C[MAXSAT*MAXSAT*4];
+    double Q[(18+MAXSAT)*(18+MAXSAT)];  /* Q (nx,nx) matrix from averaged C */
+    double R[MAXSAT*MAXSAT*4];          /* R (n,n) matrix from averaged C */
+} res_t;
+
 
 
 /* global variables ----------------------------------------------------------*/
@@ -313,6 +327,7 @@ extern sol_t *solw;
 extern obsb_t obsw;
 extern ins_states_t *insw;
 extern insgnss_opt_t insgnssopt;
+extern res_t resid;
 extern int dz_counter;
 extern const double Omge[9]; /* earth rotation matrix in i/e-frame (5.18) */
 
