@@ -2337,6 +2337,9 @@ static int inputimu(ins_states_t *ins, int week){
     sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &ins->time, &ins->data.fb0[2],\
     &ins->data.fb0[1],&ins->data.fb0[0], &ins->data.wibb0[2],&ins->data.wibb0[1],\
     &ins->data.wibb0[0]);
+    
+    ins->time=ins->time+16; /* Accounting for leap seconds */
+    ins->data.sec=ins->time;
 
     ins->data.time=gpst2time(week, ins->time);
 
@@ -2373,7 +2376,7 @@ static int inputimu(ins_states_t *ins, int week){
    ((double)imu_curr_meas.internal_time\
    -floor((double)imu_curr_meas.internal_time));
    }
-   ins->time=imu_curr_meas.sec;
+   ins->data.sec=ins->time=imu_curr_meas.sec;
    for (i=0;i<3;i++) ins->data.fb0[i]=imu_curr_meas.a[i];
    for (i=0;i<3;i++) ins->data.wibb0[i]=imu_curr_meas.g[i];
    ins->data.time=gpst2time(week, imu_curr_meas.sec);
@@ -2408,6 +2411,7 @@ void gnssbuffer(sol_t *sol, obsd_t *data, int n){
     else {for (i=0;i<n;i++) obsw.data2[i]=data[i]; 
     obsw.n2=n;}
   }
+
 }
 
 void insbufferpass(ins_states_t *insin, ins_states_t *insout){
@@ -2424,13 +2428,19 @@ void insbuffer(ins_states_t *insc){
   //printf("INS_meas: iter: %d window: %d\n", ins_w_counter, insgnssopt.insw);
   if(ins_w_counter >= insgnssopt.insw ){
     for(i=0;i<insgnssopt.insw-1;i++){
+      //insw[i].data.sec=insw[i+1].data.sec;
+      //insw[i].data=insw[i+1].data;
       insw[i]=insw[i+1];
       insbufferpass(insw+i, insw+i+1);
     }
+    //insw[insgnssopt.insw-1].data.sec=insc->data.sec;
+    //insw[insgnssopt.insw-1].data=insc->data; 
     insw[insgnssopt.insw-1]=*insc; 
     insbufferpass(insc, insw+insgnssopt.insw-1);
   }else{
     ins_buffinit(insw+ins_w_counter, insc->nx);
+    //insw[insgnssopt.insw-1].data.sec=insc->data.sec;
+    //insw[insgnssopt.insw-1].data=insc->data;
     insw[ins_w_counter]=*insc;
     insbufferpass(insc, insw+ins_w_counter);
   }
@@ -3178,12 +3188,19 @@ int gnssQC(rtk_t *rtk, int nsat){
   }
   printf("GNSS quality check fail\n");
   return 0;               
-}  
+}
 
-void biascalib(ins_states_t *ins){
-  int i,j;
-  double gan[3]={0.0}, wiee[3]={0.0};
-  printf("bias calibration\n");
+/* Stationary detection based on imu measurements buffer  *******************************
+  return: 1: static, 0: no static */
+int statImumeas(ins_states_t *ins){
+  double gan[3]={0.0}, wiee[3]={0.0}, llh[3]={0.0};
+  int i;
+
+  printf("bias calibration: current meas time: %lf ins_counter: %d\n",ins->data.sec, ins_w_counter);
+
+  ecef2pos(solw[insgnssopt.gnssw-1].rr, llh);
+
+  printf("gnss time: %lf\n", time2gpst(solw[insgnssopt.gnssw-1].time,NULL));
 
     /* Earth rotation vector in e-frame	*/
   wiee[0]=0;wiee[1]=0;wiee[2]=OMGE;
@@ -3191,17 +3208,49 @@ void biascalib(ins_states_t *ins){
   /* local apparent gravity vector */
   appgrav(ins->rn, gan, wiee);
 
-  /* GYRO static detection
-   if ( (fabs(imu_curr_meas.g[0]) - gyrx0 <= 3*gyrx0std) && (fabs(imu_curr_meas.g[1]) - gyry0) <= 3*gyry0std ) {
-     printf("Static.zupt.gyr: %lf, Dif|g-g0|=%lf <= %lf and %lf < %lf \n",PVA_prev_sol.sec, \
-   (fabs(imu_curr_meas.g[0]) - gyrx0), 3*gyrx0std, (fabs(imu_curr_meas.g[1]) - gyry0), 3*gyry0std );
-   }
-*/
+  printf("Position: %lf, %lf, %lf \n", ins->rn[0]*R2D, ins->rn[1]*R2D, ins->rn[2]);
+  printf("GNSS pos: %lf, %lf, %lf \n", llh[0]*R2D, llh[1]*R2D, llh[2]); 
+  //printf("Gravidade: %lf test quantity: %lf < \n", gn(ins->rn[0], ins->rn[2]), norm(ins->data.fb0,3) - gn(ins->rn[0], ins->rn[2]) );
 
-  for (i=0;i<insgnssopt.insw;i++){
-    printf("acc: %lf, %lf, %lf, %lf\n", insw[i].data.sec, insw[i].data.fb[0],insw[i].data.fb[1],insw[i].data.fb[2]);
-    printf("gyr: %lf, %lf, %lf, %lf\n", insw[i].data.sec, insw[i].data.wibb[0],insw[i].data.wibb[1],insw[i].data.wibb[2]);
+  /* Velocity threshold: as low as 0.0075 m/s per axis (norm=0.0129) for aviagtion-grade 
+  and 0.5 m/s (norm=0.8660) for consumer-grade sensors  */
+ 
+ printf("Grav.: %lf %d %d %d %d\n", ins->data.sec, (norm(ins->data.fb0,3) - gn(ins->rn[0], ins->rn[2]))<0.9?-1:0, norm(ins->vn, 3)<0.9?1:2, \
+  norm(solw[insgnssopt.gnssw-1].rr+3,3)<0.9?3:4, norm(ins->data.wibb0,3)<MAXGYRO?5:6 );
+
+   /* GYRO static detection
+    if( (fabs(imu_curr_meas.g[0]) - gyrx0 <= 3*gyrx0std) && (fabs(imu_curr_meas.g[1]) - gyry0) <= 3*gyry0std ) {
+      printf("Static.zupt.gyr: %lf, Dif|g-g0|=%lf <= %lf and %lf < %lf \n",PVA_prev_sol.sec, \
+      (fabs(imu_curr_meas.g[0]) - gyrx0), 3*gyrx0std, (fabs(imu_curr_meas.g[1]) - gyry0), 3*gyry0std );
+     } 
+   */
+
+  if (ins_w_counter>10){
+    for (i=0;i<insgnssopt.insw;i++){ 
+     // printf("acc0: %lf, %lf, %lf, %lf\n", insw[i].data.sec, insw[i].data.fb0[0],insw[i].data.fb0[1],insw[i].data.fb0[2]);
+      //printf("acc: %lf, %lf, %lf, %lf\n", insw[i].data.sec, insw[i].data.fb[0],insw[i].data.fb[1],insw[i].data.fb[2]);
+      printf("gyr: %lf, %lf, %lf, %lf\n", insw[i].data.sec, insw[i].data.wibb[0],insw[i].data.wibb[1],insw[i].data.wibb[2]);
+      if (norm(insw[i].data.wibb,3)<MAXGYRO) {
+              printf("Gyro not turning: %lf\n",insw[i].data.sec);
+      }else{
+        printf("Gyro turning: %lf\n",insw[i].data.sec);
+      }
+    }
   }
+
+   /* check velocity */
+   // if (norm(vel,3)>MAXVEL&&norm(imu->wibb,3)<MAXGYRO) {
+    
+
+
+}
+
+/* Quasi_stationary IMU calibration  ************************************************/
+void biascalib(ins_states_t *ins){
+  int i,j;
+
+  statImumeas(ins);
+
 
 }
 
@@ -3259,12 +3308,16 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
         //printf("After filling ins buffer: %d\n", insgnssopt.insw-1);
         //print_ins_pva(insw+insgnssopt.insw-1);
        insc=insw[insgnssopt.insw-1];
+       insc.data=insw[insgnssopt.insw-1].data;
+       insc.data.sec=insw[insgnssopt.insw-1].data.sec;
        }else {
          /* First epoch */
         if(ins_w_counter>1) {
           //printf("Before filling ins buffer: %d\n", ins_w_counter-1);
           //print_ins_pva(insw+ins_w_counter-1);
           insc=insw[ins_w_counter-1];
+          insc.data=insw[ins_w_counter-1].data;
+          insc.data.sec=insw[ins_w_counter-1].data.sec;
         }
        }  
 
@@ -3344,11 +3397,15 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
       detstc(&insc);  
       printf("ZVU counter: %d\n", zvu_counter);
+
+      if(insgnssopt.ins_ini){
+        biascalib(&insc);
+      }
+      
       /* Zero velocity update */ 
       if (zvu_counter>10) {
         /* Bias estimation */
-        biascalib(&insc);
-        printf("ZVU UPDATE: counter: %d, t: %lf", zvu_counter, insc.time);  
+        printf("ZVU UPDATE: counter: %d, t: %lf", zvu_counter, insc.time); 
         /* Zero-velocity constraints */
         zvu(&insc,&insgnssopt,1); 
         zvu_counter=0; 
@@ -3363,17 +3420,17 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
     /* Re-initializing ins with gnss solution when integration occurs */
      if (insgnssopt.Nav_or_KF==1){
-      for(i=0;i<3;i++) insc.re[i]=rr[i];
-      for(i=0;i<3;i++) insc.ve[i]=ve[i];  
+      for(i=0;i<3;i++) insc.re[i]=rtk->sol.rr[i];
+      for(i=0;i<3;i++) insc.ve[i]=rtk->sol.rr[i+3];  
       /* Clock solution */
-      //insc.dtr[0]=rtk->sol.dtr[0]*CLIGHT; 
+      //insc.dtr[0]=rtk->sol.dtr[0]*CLIGHT;  
       update_ins_state_n(&insc);  
       /* Gnss solution covariance to ins */ 
       pvclkCovfromgnss(rtk, &insc); 
     }
  
     /* Zeroing closed-loop states */
-     for (i=0;i<xnCl();i++) insc.x[i]=0.0; 
+     for (i=0;i<xnCl();i++) insc.x[i]=0.0;  
 
      /* Update ins states and measurements */  
      insupdt(&insc);

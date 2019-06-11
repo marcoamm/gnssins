@@ -5742,7 +5742,7 @@ void Nav_equations_ECEF1(ins_states_t *ins)
   printf(" ********************* NAVIGATION EQUATIONS ******************\nINPUT: \n");
   printf("tor_i= %f;\n", tor_i);
   printf("ins->pre=[%lf; %lf; %lf];\n", ins->pre[0], ins->pre[1], ins->pre[2]);
-  printf("llh: %lf, %lf, %lf\n", ins->prn[0]*R2D, ins->prn[1]*R2D, ins->prn[0]);
+  printf("llh: %lf, %lf, %lf\n", ins->prn[0]*R2D, ins->prn[1]*R2D, ins->prn[2]);
   printf("ins->pve=[%lf; %lf; %lf];\n", ins->pve[0], ins->pve[1], ins->pve[2]);
   printf("ins->data.fb=[%lf; %lf; %lf];\n", ins->data.fb[0], ins->data.fb[1], ins->data.fb[2]);
   printf("ins->data.wibb=[%lf, %lf, %lf];\n", ins->data.wibb[0], ins->data.wibb[1], ins->data.wibb[2]);
@@ -5757,16 +5757,6 @@ void Nav_equations_ECEF1(ins_states_t *ins)
     }
     printf("];\n");
   }
-   printf("ins->P\n");
-  for (i = 0; i < ins->nx; i++)
-  {
-    for (j = 0; j < ins->nx; j++)
-    {
-      (i==j?printf("%lf ", ins->P[i * ins->nx + j]):0);
-    }
-  }
-  printf("\n");
-
   /* Begins     */
 
   /* ATTITUDE UPDATE  */
@@ -5872,10 +5862,13 @@ void Nav_equations_ECEF1(ins_states_t *ins)
   for (i = 0; i < 3; i++)
     ins->re[i] = ins->pre[i] + (ins->ve[i] + ins->pve[i]) * 0.5 * tor_i;
 /**/
+  update_ins_state_n(ins);
+
   printf("OUTPUT NAV: \n");
   double llh[3]={0.0};
   ecef2pos(ins->re,llh);
   printf("P: %lf, %lf, %lf\n", ins->re[0], ins->re[1], ins->re[2]);
+  printf("Pn: %lf, %lf, %lf\n", ins->rn[0]*R2D, ins->rn[1]*R2D, ins->rn[2]);
   printf("llh: %lf, %lf, %lf\n", llh[0]*R2D, llh[1]*R2D, llh[2]);
   printf("V: %lf, %lf, %lf\n", ins->ve[0], ins->ve[1], ins->ve[2]);
   printf("Ba=[%lf; %lf; %lf];\n", ins->data.ba[0], ins->data.ba[1], ins->data.ba[2]);
@@ -6673,7 +6666,7 @@ static void udtrop_ppp(rtk_t *rtk, int nx, ins_states_t *ins)
     int i=xiTr(&rtk->opt),j;
     
     trace(3,"udtrop_ppp:\n");
-    printf("udtrop_ppp:\n");
+    printf("udtrop_ppp: %lf\n", ins->x[i]);
     
     if (ins->x[i]==0.0) {
       
@@ -6687,7 +6680,7 @@ static void udtrop_ppp(rtk_t *rtk, int nx, ins_states_t *ins)
         }
     }
     else {
-      printf("If state is not zero:\n");
+      printf("If state is not zero: \n");
         ins->P[i+i*nx]+=SQR(rtk->opt.prn[2])*fabs(rtk->tt);
         
         if (rtk->opt.tropopt>=TROPOPT_ESTG) {
@@ -7182,7 +7175,18 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
   for (j = 0; j < nx; j++) printf("%lf ", insp->x[j]); 
 
     //x=insp->x;
-    //P=insp->P;
+    //P=insp->P;.
+
+    /* if the std of the seed position exists then use the seed */
+    if (rtk->opt.seed[3]>0) {
+    //for (i=0;i<3;i++) insp->x[xiP()+i]=rtk->opt.seed[i]; /* position */
+    for (i=0;i<3;i++) insp->re[i]=rtk->opt.seed[i]; /* position */
+    for (i=0;i<3;i++) rtk->sol.rr[i]=rtk->opt.seed[i]; /* position */
+    for (i=0;i<3;i++) rtk->sol.rr[i+3]=insp->x[xiV()+i]=0.0; /* velocity - start as static*/
+    for (i=0;i<3;i++) insp->P[(xiP()+i)+(xiP()+i)*insp->nx]=rtk->opt.seed[3]; 
+    for (i=0;i<3;i++) insp->P[(xiV()+i)+(xiV()+i)*insp->nx]=0.0; 
+    rtk->opt.seed[3]=-1;
+    }
     matcpy(xp,insp->x,nx,1);
 
     /* ins/gnss filter iteration */
@@ -7272,7 +7276,7 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
         for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.C[i]=Ccpy[i]+Z[i];
         for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.data[dz_counter].Cj[i]=Z[i];            
         resid.data[dz_counter].nv=nv;
-        dz_counter++;
+       // dz_counter++;
         
     }else{
         /* Compute average */
@@ -7281,7 +7285,7 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
             for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.C[i]=Ccpy[i]-(resid.data[dz_counter%10].Cj[i])/10.0+(Z[i])/10.0;
             for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.data[dz_counter%10].Cj[i] = Z[i];
             resid.data[dz_counter%10].nv=nv;
-            dz_counter++;
+            //dz_counter++;
             printf("Here 5, dz_counter: %d, rest of division: %d\n", dz_counter, dz_counter%10);
             
         }else{ /* dz_counter == 9 */
@@ -7289,7 +7293,7 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
             for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.C[i]=(Ccpy[i]+Z[i])/10.0;
             for(i=0;i<(MAXSAT*MAXSAT*4);i++) resid.data[dz_counter].Cj[i] = Z[i];
             resid.data[dz_counter].nv=nv;
-            dz_counter++;
+           // dz_counter++;
             printf("Here 6\n");
         }
     }
@@ -7459,7 +7463,7 @@ extern int chksdri(const double *vel,int n)
     double *head=mat(n,1),hstd=0.0;
 
     for (i=0;i<n;i++) {
-        //head[i]=vel2head(vel+3*i);
+        head[i]=vel2head(vel+3*i);
         head[i]=atan2(vel[i*3+1],fabs(vel[i*3+0])<1E-4?1E-4:vel[i*3+0]);
       }
     hstd=stds(head,n);
@@ -7505,15 +7509,20 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
 
     /* check gps solution status */
     for (i=0;i<NPOS;i++) {
-        if (solw[i].stat==0) return 0;
+        if (solw[i].stat==0)  {
+          free(vel);
+          trace(3,"no recheck attitude\n");
+          return 0;
+          }
     }
-    /* recheck ins attitude if need */
 
+    /* recheck ins attitude if need */
     if (gnss_w_counter>=insgnssopt.gnssw) {
 
         /* velocity for trajectory*/
         if (norm(solw[i-1].rr+3, 3)){
           /* Velocity from solution */
+          printf("Velocity from solution\n");
           for (i=NPOS;i>0;i--) {
               for (j=0;j<3;j++) {
                 vel[3*(NPOS-i)+j]=solw[insgnssopt.gnssw-i].rr[j+3];
@@ -7521,6 +7530,7 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
            }
          }else{
               /* Velocity from position */
+              printf("Velocity from position\n");
               for (i=NPOS;i>=2;i--) {
                 if ((dt=timediff(solw[i-1].time,solw[i-2].time))>3.0
                   ||fabs(dt)<=1E-5) {
@@ -7532,20 +7542,26 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
               }
            }
 
-        
-        for (i = 0; i < NPOS; i++)
-        {
-          printf("Solw.v: %lf %lf %lf \n", solw[i].rr[3],solw[i].rr[4],solw[i].rr[5] );
-          printf("Vel: %lf %lf %lf \n", vel[3*i+0],vel[3*i+1],vel[3*i+2] );
-        }
+        /* velocity convert to attitude */
+            ecef2pos(solw[NPOS-1].rr,llh);
+            ned2xyz(llh,C);
+
+        ecef2pos(solw[NPOS-1].rr,llh);
+        ned2xyz(llh,C);
+        /* yaw */
+         matmul("TN",3,1,3,1.0,C,vel,0.0,vn);
+
+          printf("Solw.ve: %lf %lf %lf \n", solw[NPOS-1].rr[3],solw[NPOS-1].rr[4],solw[NPOS-1].rr[5] );
+          printf("Vn: %lf %lf %lf \n", vn[3*i+0],vn[3*i+1],vn[3*i+2]);
+
         
         /* check velocity whether is straight driving  */
         if (!chksdri(vel,NPOS-1)) {
             trace(2,"no straight driving\n");
-            printf("no straight driving\n");
+            printf("no straight driving: \n");
             return 0;
         }
-        printf("straight driving\n");
+        printf("straight driving %lf\n");
         /* check velocity */
         if (norm(vel,3)>MAXVEL
             &&norm(imu->wibb,3)<MAXGYRO) {
@@ -7603,7 +7619,7 @@ extern void update_ins_state_n(ins_states_t *ins)
     matmul("TN",3,3,3,1.0,Cne,ins->Cbe,0.0,ins->Cbn);
     /* get attitude in _nb from Cbe */
     getatt(ins,ins->an);
-    matmul("TN",3,1,3,1.0,Cne,ins->ve ,0.0,ins->vn );
+    matmul("TN",3,1,3,1.0,Cne,ins->ve ,0.0,ins->vn);
 
     /* acceleration */
     matmul("TN",3,1,3,1.0,Cne,ins->data.fbe,0.0,ins->data.fbn);
@@ -7721,7 +7737,8 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
 
   printf("OUTPUT OF INTEGRATED OR NAVIGATED SOLUTION: %lf\n", insc->time);
   printf("P: %lf, %lf, %lf\n", insc->re[0], insc->re[1], insc->re[2]);
-  printf("llh: %lf, %lf, %lf\n", insc->rn[0]*R2D, insc->rn[1]*R2D, insc->re[0]);
+    printf("pllh: %lf, %lf, %lf\n", insc->prn[0]*R2D, insc->prn[1]*R2D, insc->prn[2]);
+  printf("llh: %lf, %lf, %lf\n", insc->rn[0]*R2D, insc->rn[1]*R2D, insc->rn[2]);
   printf("V: %lf, %lf, %lf\n", insc->ve[0], insc->ve[1], insc->ve[2]);
   printf("Ba=aft[%lf; %lf; %lf] t:%lf, %d\n", insc->data.ba[0], insc->data.ba[1], insc->data.ba[2],insc->time, ig_opt->Nav_or_KF);
   printf("Bg=aft[%lf, %lf, %lf]t:%lf, %d\n", insc->data.bg[0], insc->data.bg[1], insc->data.bg[2],insc->time, ig_opt->Nav_or_KF);

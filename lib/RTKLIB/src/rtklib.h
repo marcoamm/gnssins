@@ -1022,6 +1022,7 @@ typedef struct {        /* processing options type */
     int  syncsol;       /* solution sync mode (0:off,1:on) */
     double odisp[2][6*11]; /* ocean tide loading parameters {rov,base} */
     exterr_t exterr;    /* extended receiver error model */
+    double seed[4];   /* initial position x,y,z and stds */
 } prcopt_t;
 
 typedef struct {        /* solution options type */

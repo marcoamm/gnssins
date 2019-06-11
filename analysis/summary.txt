@@ -1,7 +1,7 @@
 Analysis summary:
 
 Horizontal average bias: 
-1.49110880624259  m
+22.4661385089975  m
 
 Horizontal RMS: 
-1.42119980286651  m
+639.411568542692  m
