@@ -31,6 +31,67 @@ extern "C" {
 
 /* constants -----------------------------------------------------------------*/
 
+/* constants  */
+#define GME         3.986004415E+14 /* earth gravitational constant */
+#define GMS         1.327124E+20    /* sun gravitational constant */
+#define GMM         4.902801E+12    /* moon gravitational constant */
+
+#define MIN_NSAT_SOL 4              /* min satellite number for solution */
+
+#define MAXDT 3600.0 /* max time difference for ins-gnss coupled */
+#define MAXVAR 1E10  /* max variance for reset covariance matrix */
+#define STD_POS 2.5  /* pos-std-variance of gnss positioning (m)*/
+#define STD_VEL 0.1  /* vel-std-variance of gnss positioning (m/s) */
+
+#define VAR_POS     SQR(60.0)       /* init variance receiver position (m^2) */
+#define VAR_VEL     SQR(10.0)       /* init variance of receiver vel ((m/s)^2) */
+#define VAR_ACC     SQR(10.0)       /* init variance of receiver acc ((m/ss)^2) */
+#define VAR_CLK     SQR(10.0)       /* init variance receiver clock (m^2) */
+#define VAR_ZTD     SQR( 0.6)       /* init variance ztd (m^2) */
+#define VAR_GRA     SQR(0.01)       /* init variance gradient (m^2) */
+#define VAR_DCB     SQR(30.0)       /* init variance dcb (m^2) */
+#define VAR_BIAS    SQR(60.0)       /* init variance phase-bias (m^2) */
+#define VAR_IONO    SQR(60.0)       /* init variance iono-delay */
+#define VAR_GLO_IFB SQR( 0.6)       /* variance of glonass ifb */
+
+#define ERR_SAAS    0.3             /* saastamoinen model error std (m) */
+#define ERR_BRDCI   0.5             /* broadcast iono model error factor */
+#define ERR_CBIAS   0.3             /* code bias error std (m) */
+#define REL_HUMI    0.7             /* relative humidity for saastamoinen model */
+#define GAP_RESION  120             /* default gap to reset ionos parameters (ep) */
+
+#define MAXINOP 1000.0      /* max innovations for updates ins states */
+#define MAXINOV 100.0       /* max innovations for updates ins states */
+#define MAXVEL 5.0          /* max velocity for refine attitude */
+#define MINVEL 3.0          /* min velocity for refine attitude */
+#define MAXGYRO (5.0 * D2R) /* max gyro measurement for refine attitude */
+#define MAXANG 3.0          /* max angle for refine attitude */
+#define MAXUPDTIMEINT 60.0  /* max update time internal is same as correlation time */
+#define MAXSYNDIFF 1.0      /* max time difference of ins and gnss time synchronization */
+#define CORRETIME 360.0     /* correlation time for gauss-markov process */
+#define MAXROT (10.0 * D2R) /* max rotation of vehicle when velocity matching alignment */
+#define MAXSOLS 5           /* max number of solutions for reboot lc  */
+#define MAXDIFF 10.0        /* max time difference between solution */
+#define MAXVARDIS (10.0)    /* max variance of disable estimated state */
+#define REBOOT 1            /* ins loosely coupled reboot if always update fail */
+#define USE_MEAS_COV 0      /* use measurement covariance {xx,yy,zz,xy,xz,yz} for update, not just {xx,yy,zz} */
+#define CHKNUMERIC 1        /* check numeric for given value */
+#define NOINTERP 0          /* no interpolate ins position/velocity when gnss measurement if need */
+#define COR_IN_ROV 0        /* correction attitude in rotation vector,otherwise in euler angles */
+
+#define NNAC 3 /* number of accl process noise */
+#define NNGY 3 /* number of gyro process noise */
+#define NNBA 3 /* number of accl bias process noise */
+#define NNBG 3 /* number of gyro bias process noise */
+#define NNPX (NNBA + NNBG + NNAC + NNGY)
+#define INAC 0                    /* index of accl process noise */
+#define INGY NNAC                 /* index of gyro process noise */
+#define INBA (NNAC + NNGY)        /* index of accl bias process noise */
+#define INBG (NNAC + NNGY + NNBA) /* index of gyro bias process noise */
+
+#define CORRETIME 360.0 /* correlation time for gauss-markov process */
+#define ORDERS 10       /* orders of approximate exponential of matrix */
+
 /* Earth parameters */
 #define RE_GRS80    6378137.0           /* earth semimajor axis (GRS80) (m) */
 #define FE_GRS80    (1.0/298.257222101) /* earth flattening (GRS80) */

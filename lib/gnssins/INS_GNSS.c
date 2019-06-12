@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
@@ -12,71 +13,6 @@
 #include "INS_GNSS.h"
 #include "../../src/satinsmap.h"
 
-/* constants  */
-#define GME         3.986004415E+14 /* earth gravitational constant */
-#define GMS         1.327124E+20    /* sun gravitational constant */
-#define GMM         4.902801E+12    /* moon gravitational constant */
-
-#define MIN_NSAT_SOL 4              /* min satellite number for solution */
-
-#define MAXDT 3600.0 /* max time difference for ins-gnss coupled */
-#define MAXVAR 1E10  /* max variance for reset covariance matrix */
-#define STD_POS 2.5  /* pos-std-variance of gnss positioning (m)*/
-#define STD_VEL 0.1  /* vel-std-variance of gnss positioning (m/s) */
-
-#define VAR_POS     SQR(60.0)       /* init variance receiver position (m^2) */
-#define VAR_VEL     SQR(10.0)       /* init variance of receiver vel ((m/s)^2) */
-#define VAR_ACC     SQR(10.0)       /* init variance of receiver acc ((m/ss)^2) */
-#define VAR_CLK     SQR(10.0)       /* init variance receiver clock (m^2) */
-#define VAR_ZTD     SQR( 0.6)       /* init variance ztd (m^2) */
-#define VAR_GRA     SQR(0.01)       /* init variance gradient (m^2) */
-#define VAR_DCB     SQR(30.0)       /* init variance dcb (m^2) */
-#define VAR_BIAS    SQR(60.0)       /* init variance phase-bias (m^2) */
-#define VAR_IONO    SQR(60.0)       /* init variance iono-delay */
-#define VAR_GLO_IFB SQR( 0.6)       /* variance of glonass ifb */
-
-#define ERR_SAAS    0.3             /* saastamoinen model error std (m) */
-#define ERR_BRDCI   0.5             /* broadcast iono model error factor */
-#define ERR_CBIAS   0.3             /* code bias error std (m) */
-#define REL_HUMI    0.7             /* relative humidity for saastamoinen model */
-#define GAP_RESION  120             /* default gap to reset ionos parameters (ep) */
-
-#define MAXINOP 1000.0      /* max innovations for updates ins states */
-#define MAXINOV 100.0       /* max innovations for updates ins states */
-#define MAXVEL 5.0          /* max velocity for refine attitude */
-#define MINVEL 3.0          /* min velocity for refine attitude */
-#define MAXGYRO (5.0 * D2R) /* max gyro measurement for refine attitude */
-#define MAXANG 3.0          /* max angle for refine attitude */
-#define MAXUPDTIMEINT 60.0  /* max update time internal is same as correlation time */
-#define MAXSYNDIFF 1.0      /* max time difference of ins and gnss time synchronization */
-#define CORRETIME 360.0     /* correlation time for gauss-markov process */
-#define MAXROT (10.0 * D2R) /* max rotation of vehicle when velocity matching alignment */
-#define MAXSOLS 5           /* max number of solutions for reboot lc  */
-#define MAXDIFF 10.0        /* max time difference between solution */
-#define MAXVARDIS (10.0)    /* max variance of disable estimated state */
-#define REBOOT 1            /* ins loosely coupled reboot if always update fail */
-#define USE_MEAS_COV 0      /* use measurement covariance {xx,yy,zz,xy,xz,yz} for update, not just {xx,yy,zz} */
-#define CHKNUMERIC 1        /* check numeric for given value */
-#define NOINTERP 0          /* no interpolate ins position/velocity when gnss measurement if need */
-#define COR_IN_ROV 0        /* correction attitude in rotation vector,otherwise in euler angles */
-
-#define NNAC 3 /* number of accl process noise */
-#define NNGY 3 /* number of gyro process noise */
-#define NNBA 3 /* number of accl bias process noise */
-#define NNBG 3 /* number of gyro bias process noise */
-#define NNPX (NNBA + NNBG + NNAC + NNGY)
-#define INAC 0                    /* index of accl process noise */
-#define INGY NNAC                 /* index of gyro process noise */
-#define INBA (NNAC + NNGY)        /* index of accl bias process noise */
-#define INBG (NNAC + NNGY + NNBA) /* index of gyro bias process noise */
-
-#define CORRETIME 360.0 /* correlation time for gauss-markov process */
-#define ORDERS 10       /* orders of approximate exponential of matrix */
-
-/* struct declaration -------------------------------------------------------*/
-
-
-/* Functions declaration  -------------------------------------*/
 
 /* number of estimated insppptc states ------------------------------------------------*/
 extern int ppptcnx(const prcopt_t *opt)
@@ -115,18 +51,6 @@ extern void initPNindex(const prcopt_t *opt)
   NN = xnB();
 }
 
-/* Utility ----------------------------------------------------------*/
-static inline int8_t sign(double val)
-{
-  /* Corresponding sign() function in Matlab
-  From: https://forum.arduino.cc/index.php?topic=37804.0 solution*/
-  if (val < 0.0)
-    return -1;
-  if (val > 0.0)
-    return 1;
-  return 0;
-}
-
 /* precise tropospheric model ------------------------------------------------*/
 static double prectrop(gtime_t time, const double *pos, const double *azel,
                        const prcopt_t *opt, const double *x, double *dtdx,
@@ -157,1634 +81,6 @@ static double prectrop(gtime_t time, const double *pos, const double *azel,
   return m_h * zhd + m_w * (x[0] - zhd);
 }
 
-void Initialize_INS_GNSS_LCKF_consumer_grade_IMU(initialization_errors *initialization_errors,
-                                                 IMU_errors *IMU_errors, GNSS_config *GNSS_config, LC_KF_config *LC_KF_config)
-{
-  int i;
-  /*%SCRIPT Tightly coupled INS/GNSS demo:
-%   Profile_1 (60s artificial car motion with two 90 deg turns)
-%   Consumer-grade IMU
-%
-% Software for use with "Principles of GNSS, Inertial, and Multisensor
-% Integrated Navigation Systems," Second Edition.
-%
-% Created 12/4/12 by Paul Groves
-
-% Copyright 2012, Paul Groves
-% License: BSD; see license.txt for details     */
-
-  /* Constants  */
-  double deg_to_rad = 0.01745329252;
-  double rad_to_deg = 1 / deg_to_rad;
-  double micro_g_to_meters_per_second_squared = 9.80665E-6;
-
-  /* CONFIGURATION */
-  /* Input truth motion profile filename
-input_profile_name = 'Profile_2.csv'; */
-  /* Output motion profile and error filenames
-output_profile_name = 'INS_GNSS_Demo_9_Profile.csv';
-output_errors_name = 'INS_GNSS_Demo_9_Errors.csv';  */
-
-  /* Attitude initialization error (deg, converted to rad; @N,E,D) */
-  initialization_errors->delta_eul_nb_n[0] = -0.5 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[1] = 0.4 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[2] = 2 * deg_to_rad; /* rad */
-
-  /* Attitude initialization error (deg, converted to rad; @N,E,D) From um7 datasheet - static values */
-  initialization_errors->delta_eul_nb_n[0] = 1 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[1] = 1 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[2] = 3 * deg_to_rad; /* rad */
-
-  /* Accelerometer biases (micro-g, converted to m/s^2; body axes) */
-  IMU_errors->b_a[0] = 9000 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[1] = -13000 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[2] = 8000 * micro_g_to_meters_per_second_squared;
-  /* Gyro biases (deg/hour, converted to rad/sec; body axes) */
-  IMU_errors->b_g[0] = -180 * deg_to_rad / 3600;
-  IMU_errors->b_g[0] = 260 * deg_to_rad / 3600;
-  IMU_errors->b_g[0] = -160 * deg_to_rad / 3600;
-  /* Gyro biases (deg/s, converted to rad/sec; body axes)  From um7 */
-  IMU_errors->b_a[0] = 0.75 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[1] = 0.75 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[2] = 1.5 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_g[0] = 20 * deg_to_rad;
-  IMU_errors->b_g[0] = 20 * deg_to_rad;
-  IMU_errors->b_g[0] = 20 * deg_to_rad;
-  /* Accelerometer scale factor and cross coupling errors (ppm, converted to
- unitless; body axes) */
-  IMU_errors->M_a[0] = 50000 * 1E-6;
-  IMU_errors->M_a[1] = -15000 * 1E-6;
-  IMU_errors->M_a[2] = 10000 * 1E-6;
-  IMU_errors->M_a[3] = -7500 * 1E-6;
-  IMU_errors->M_a[4] = -60000 * 1E-6;
-  IMU_errors->M_a[5] = 12500 * 1E-6;
-  IMU_errors->M_a[6] = -12500 * 1E-6;
-  IMU_errors->M_a[7] = 5000 * 1E-6;
-  IMU_errors->M_a[8] = 20000 * 1E-6;
-  /* Gyro scale factor and cross coupling errors (ppm, converted to unitless;
-/* body axes) */
-  IMU_errors->M_g[0] = 40000 * 1E-6;
-  IMU_errors->M_a[1] = -14000 * 1E-6;
-  IMU_errors->M_g[2] = 12500 * 1E-6;
-  IMU_errors->M_g[3] = 0 * 1E-6;
-  IMU_errors->M_a[4] = -30000 * 1E-6;
-  IMU_errors->M_g[5] = -7500 * 1E-6;
-  IMU_errors->M_g[6] = 0 * 1E-6;
-  IMU_errors->M_a[7] = 0 * 1E-6;
-  IMU_errors->M_g[8] = -17500 * 1E-6;
-
-  /* Gyro g-dependent biases (deg/hour/g, converted to rad-sec/m; body axes) */
-  IMU_errors->G_g[0] = 90 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[1] = -110 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[2] = -60 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[3] = -50 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[4] = 190 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[5] = -160 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[6] = 30 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[7] = 110 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[8] = -130 * deg_to_rad / (3600 * 9.80665);
-
-  /* Accelerometer noise root PSD (micro-g per root Hz, converted to m s^-1.5) */
-  IMU_errors->accel_noise_root_PSD = 1000 * micro_g_to_meters_per_second_squared;
-  /* Accelerometer noise root PSD (micro-g per root Hz, converted to m s^-1.5) FROM um7 datasheet */
-  IMU_errors->accel_noise_root_PSD = 400 * micro_g_to_meters_per_second_squared;
-  /* Gyro noise root PSD (deg per root hour, converted to rad s^-0.5) */
-  IMU_errors->gyro_noise_root_PSD = 1 * deg_to_rad / 60.0;
-  /* Gyro noise root PSD (deg per second root Hz, converted to rad s^-0.5)  From um7 datasheet */
-  IMU_errors->gyro_noise_root_PSD = 0.005 * deg_to_rad;
-  /* Accelerometer quantization level (m/s^2) */
-  IMU_errors->accel_quant_level = 1E-1;
-  /* Gyro quantization level (rad/s) */
-  IMU_errors->gyro_quant_level = 2E-3;
-
-  /* Interval between GNSS epochs (s) */
-  GNSS_config->epoch_interval = 0.5;
-
-  /* Initial estimated position (m; ECEF) */
-  GNSS_config->init_est_r_ea_e[0] = 0;
-  GNSS_config->init_est_r_ea_e[1] = 0;
-  GNSS_config->init_est_r_ea_e[2] = 0;
-
-  /* Number of satellites in constellation */
-  GNSS_config->no_sat = 30;
-  /* Orbital radius of satellites (m) */
-  GNSS_config->r_os = 2.656175E7;
-  /* Inclination angle of satellites (deg) */
-  GNSS_config->inclination = 55;
-  /* Longitude offset of constellation (deg) */
-  GNSS_config->const_delta_lambda = 0;
-  /* Timing offset of constellation (s) */
-  GNSS_config->const_delta_t = 0;
-
-  /* Mask angle (deg) */
-  GNSS_config->mask_angle = 10;
-  /* Signal in space error SD (m) *Give residual where corrections are applied */
-  GNSS_config->SIS_err_SD = 1;
-  /* Zenith ionosphere error SD (m) *Give residual where corrections are applied */
-  GNSS_config->zenith_iono_err_SD = 2;
-  /* Zenith troposphere error SD (m) *Give residual where corrections are applied*/
-  GNSS_config->zenith_trop_err_SD = 0.2;
-  /* Code tracking error SD (m) *Can extend to account for multipath */
-  GNSS_config->code_track_err_SD = 1;
-  /* Range rate tracking error SD (m/s) *Can extend to account for multipath */
-  GNSS_config->rate_track_err_SD = 0.02;
-  /* Receiver clock offset at time=0 (m); */
-  GNSS_config->rx_clock_offset = 10000;
-  /* Receiver clock drift at time=0 (m/s); */
-  GNSS_config->rx_clock_drift = 100;
-
-  /* Initial attitude uncertainty per axis (deg, converted to rad) */
-  for (i = 0; i < 3; i++)
-    LC_KF_config->init_att_unc[i] = D2R * 2;
-  /* Initial velocity uncertainty per axis (m/s) */
-  for (i = 0; i < 3; i++)
-    LC_KF_config->init_vel_unc[i] = 0.1;
-  /* Initial position uncertainty per axis (m) */
-  for (i = 0; i < 3; i++)
-    LC_KF_config->init_pos_unc[i] = 10;
-  /* Initial accelerometer bias uncertainty per instrument (micro-g, converted
-/* to m/s^2) */
-  LC_KF_config->init_b_a_unc = 10000 * micro_g_to_meters_per_second_squared;
-  /* Initial gyro bias uncertainty per instrument (deg/hour, converted to rad/sec)*/
-  LC_KF_config->init_b_g_unc = 200 * deg_to_rad / 3600;
-
-  /* Gyro noise PSD (deg^2 per hour, converted to rad^2/s) */
-  LC_KF_config->gyro_noise_PSD = 0.01 * 0.01;
-  /* Accelerometer noise PSD (micro-g^2 per Hz, converted to m^2 s^-3) */
-  LC_KF_config->accel_noise_PSD = 0.2 * 0.2;
-  /* % NOTE: A large noise PSD is modeled to account for the scale-factor and
-% cross-coupling errors that are not directly included in the Kalman filter
-% model*/
-  /* Accelerometer bias random walk PSD (m^2 s^-5) */
-  LC_KF_config->accel_bias_PSD = 1.0E-5;
-  /* Gyro bias random walk PSD (rad^2 s^-3) */
-  LC_KF_config->gyro_bias_PSD = 4.0E-11;
-
-  /* Pseudo-range measurement noise SD (m) */
-  LC_KF_config->pos_meas_SD = 2.5;
-  /* Pseudo-range rate measurement noise SD (m/s) */
-  LC_KF_config->vel_meas_SD = 0.1;
-}
-
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-void Initialize_INS_GNSS_TCKF_consumer_grade_IMU(initialization_errors *initialization_errors,
-                                                 IMU_errors *IMU_errors, GNSS_config *GNSS_config, TC_KF_config *TC_KF_config)
-{
-  int i;
-  /*%SCRIPT Tightly coupled INS/GNSS demo:
-%   Profile_1 (60s artificial car motion with two 90 deg turns)
-%   Consumer-grade IMU
-%
-% Software for use with "Principles of GNSS, Inertial, and Multisensor
-% Integrated Navigation Systems," Second Edition.
-%
-% Created 12/4/12 by Paul Groves
-
-% Copyright 2012, Paul Groves
-% License: BSD; see license.txt for details     */
-
-  /* Constants  */
-  double deg_to_rad = 0.01745329252;
-  double rad_to_deg = 1 / deg_to_rad;
-  double micro_g_to_meters_per_second_squared = 9.80665E-6;
-
-  /* CONFIGURATION */
-  /* Input truth motion profile filename
-input_profile_name = 'Profile_2.csv'; */
-  /* Output motion profile and error filenames
-output_profile_name = 'INS_GNSS_Demo_9_Profile.csv';
-output_errors_name = 'INS_GNSS_Demo_9_Errors.csv';  */
-
-  /* Attitude initialization error (deg, converted to rad; @N,E,D) */
-  initialization_errors->delta_eul_nb_n[0] = -0.5 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[1] = 0.4 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[2] = 2 * deg_to_rad; /* rad */
-
-  /* Attitude initialization error (deg, converted to rad; @N,E,D) From um7 datasheet - static values */
-  initialization_errors->delta_eul_nb_n[0] = 1 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[1] = 1 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[2] = 3 * deg_to_rad; /* rad */
-
-  /* Accelerometer biases (micro-g, converted to m/s^2; body axes) */
-  IMU_errors->b_a[0] = 9000 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[1] = -13000 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[2] = 8000 * micro_g_to_meters_per_second_squared;
-  /* Gyro biases (deg/hour, converted to rad/sec; body axes) */
-  IMU_errors->b_g[0] = -180 * deg_to_rad / 3600;
-  IMU_errors->b_g[0] = 260 * deg_to_rad / 3600;
-  IMU_errors->b_g[0] = -160 * deg_to_rad / 3600;
-  /* Gyro biases (deg/s, converted to rad/sec; body axes)  From um7 */
-  IMU_errors->b_a[0] = 0.75 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[1] = 0.75 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[2] = 1.5 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_g[0] = 20 * deg_to_rad;
-  IMU_errors->b_g[0] = 20 * deg_to_rad;
-  IMU_errors->b_g[0] = 20 * deg_to_rad;
-  /* Accelerometer scale factor and cross coupling errors (ppm, converted to
- unitless; body axes) */
-  IMU_errors->M_a[0] = 50000 * 1E-6;
-  IMU_errors->M_a[1] = -15000 * 1E-6;
-  IMU_errors->M_a[2] = 10000 * 1E-6;
-  IMU_errors->M_a[3] = -7500 * 1E-6;
-  IMU_errors->M_a[4] = -60000 * 1E-6;
-  IMU_errors->M_a[5] = 12500 * 1E-6;
-  IMU_errors->M_a[6] = -12500 * 1E-6;
-  IMU_errors->M_a[7] = 5000 * 1E-6;
-  IMU_errors->M_a[8] = 20000 * 1E-6;
-  /* Gyro scale factor and cross coupling errors (ppm, converted to unitless;
-/* body axes) */
-  IMU_errors->M_g[0] = 40000 * 1E-6;
-  IMU_errors->M_a[1] = -14000 * 1E-6;
-  IMU_errors->M_g[2] = 12500 * 1E-6;
-  IMU_errors->M_g[3] = 0 * 1E-6;
-  IMU_errors->M_a[4] = -30000 * 1E-6;
-  IMU_errors->M_g[5] = -7500 * 1E-6;
-  IMU_errors->M_g[6] = 0 * 1E-6;
-  IMU_errors->M_a[7] = 0 * 1E-6;
-  IMU_errors->M_g[8] = -17500 * 1E-6;
-
-  /* Gyro g-dependent biases (deg/hour/g, converted to rad-sec/m; body axes) */
-  IMU_errors->G_g[0] = 90 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[1] = -110 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[2] = -60 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[3] = -50 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[4] = 190 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[5] = -160 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[6] = 30 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[7] = 110 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[8] = -130 * deg_to_rad / (3600 * 9.80665);
-
-  /* Accelerometer noise root PSD (micro-g per root Hz, converted to m s^-1.5) */
-  IMU_errors->accel_noise_root_PSD = 1000 * micro_g_to_meters_per_second_squared;
-  /* Accelerometer noise root PSD (micro-g per root Hz, converted to m s^-1.5) FROM um7 datasheet */
-  IMU_errors->accel_noise_root_PSD = 400 * micro_g_to_meters_per_second_squared;
-  /* Gyro noise root PSD (deg per root hour, converted to rad s^-0.5) */
-  IMU_errors->gyro_noise_root_PSD = 1 * deg_to_rad / 60.0;
-  /* Gyro noise root PSD (deg per second root Hz, converted to rad s^-0.5)  From um7 datasheet */
-  IMU_errors->gyro_noise_root_PSD = 0.005 * deg_to_rad;
-  /* Accelerometer quantization level (m/s^2) */
-  IMU_errors->accel_quant_level = 1E-1;
-  /* Gyro quantization level (rad/s) */
-  IMU_errors->gyro_quant_level = 2E-3;
-
-  /* Interval between GNSS epochs (s) */
-  GNSS_config->epoch_interval = 0.5;
-
-  /* Initial estimated position (m; ECEF) */
-  GNSS_config->init_est_r_ea_e[0] = 0;
-  GNSS_config->init_est_r_ea_e[1] = 0;
-  GNSS_config->init_est_r_ea_e[2] = 0;
-
-  /* Number of satellites in constellation */
-  GNSS_config->no_sat = 30;
-  /* Orbital radius of satellites (m) */
-  GNSS_config->r_os = 2.656175E7;
-  /* Inclination angle of satellites (deg) */
-  GNSS_config->inclination = 55;
-  /* Longitude offset of constellation (deg) */
-  GNSS_config->const_delta_lambda = 0;
-  /* Timing offset of constellation (s) */
-  GNSS_config->const_delta_t = 0;
-
-  /* Mask angle (deg) */
-  GNSS_config->mask_angle = 10;
-  /* Signal in space error SD (m) *Give residual where corrections are applied */
-  GNSS_config->SIS_err_SD = 1;
-  /* Zenith ionosphere error SD (m) *Give residual where corrections are applied */
-  GNSS_config->zenith_iono_err_SD = 2;
-  /* Zenith troposphere error SD (m) *Give residual where corrections are applied*/
-  GNSS_config->zenith_trop_err_SD = 0.2;
-  /* Code tracking error SD (m) *Can extend to account for multipath */
-  GNSS_config->code_track_err_SD = 1;
-  /* Range rate tracking error SD (m/s) *Can extend to account for multipath */
-  GNSS_config->rate_track_err_SD = 0.02;
-  /* Receiver clock offset at time=0 (m); */
-  GNSS_config->rx_clock_offset = 10000;
-  /* Receiver clock drift at time=0 (m/s); */
-  GNSS_config->rx_clock_drift = 100;
-
-  /* Initial attitude uncertainty per axis (deg, converted to rad) */
-  for (i = 0; i < 3; i++)
-    TC_KF_config->init_att_unc[i] = D2R * 2.0;
-  /* Initial velocity uncertainty per axis (m/s) */
-  for (i = 0; i < 3; i++)
-    TC_KF_config->init_vel_unc[i] = 0.1;
-  /* Initial position uncertainty per axis (m) */
-  for (i = 0; i < 3; i++)
-    TC_KF_config->init_pos_unc[i] = 10.0;
-  /* Initial accelerometer bias uncertainty per instrument (micro-g, converted
-/* to m/s^2) */
-  TC_KF_config->init_b_a_unc = 10000.0 * micro_g_to_meters_per_second_squared;
-  /* Initial gyro bias uncertainty per instrument (deg/hour, converted to rad/sec)*/
-  TC_KF_config->init_b_g_unc = 200.0 * deg_to_rad / 3600.0;
-  /* Initial clock offset uncertainty per axis (m) */
-  TC_KF_config->init_clock_offset_unc = 10.0;
-  /* Initial clock drift uncertainty per axis (m/s) */
-  TC_KF_config->init_clock_drift_unc = 0.1;
-
-  /* Gyro noise PSD (deg^2 per hour, converted to rad^2/s) */
-  TC_KF_config->gyro_noise_PSD = 0.01 * 0.01;
-  /* Accelerometer noise PSD (micro-g^2 per Hz, converted to m^2 s^-3) */
-  TC_KF_config->accel_noise_PSD = 0.2 * 0.2;
-  /* % NOTE: A large noise PSD is modeled to account for the scale-factor and
-% cross-coupling errors that are not directly included in the Kalman filter
-% model*/
-  /* Accelerometer bias random walk PSD (m^2 s^-5) */
-  TC_KF_config->accel_bias_PSD = 1.0E-5;
-  /* Gyro bias random walk PSD (rad^2 s^-3) */
-  TC_KF_config->gyro_bias_PSD = 4.0E-11;
-  /* Receiver clock frequency-drift PSD (m^2/s^3) */
-  TC_KF_config->clock_freq_PSD = 1;
-  /* Receiver clock phase-drift PSD (m^2/s) */
-  TC_KF_config->clock_phase_PSD = 1;
-
-  /* Pseudo-range measurement noise SD (m) */
-  TC_KF_config->pseudo_range_SD = 2.5;
-  /* Pseudo-range rate measurement noise SD (m/s) */
-  TC_KF_config->range_rate_SD = 0.1;
-}
-
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-void Initialize_INS_GNSS_LCKF_tactical_grade_IMU(initialization_errors *initialization_errors,
-                                                 IMU_errors *IMU_errors, GNSS_config *GNSS_config, LC_KF_config *LC_KF_config)
-{
-  int i;
-  /*%INS_GNSS_Demo_9
-%SCRIPT Tightly coupled INS/GNSS demo:
-%   Profile_2 (175s car)
-%   Tactical-grade IMU
-%
-% Software for use with "Principles of GNSS, Inertial, and Multisensor
-% Integrated Navigation Systems," Second Edition.
-%
-% Created 27/5/12 by Paul Groves
-
-% Copyright 2012, Paul Groves
-% License: BSD; see license.txt for details   */
-
-  /* Constants  */
-  double deg_to_rad = 0.01745329252;
-  double rad_to_deg = 1 / deg_to_rad;
-  double micro_g_to_meters_per_second_squared = 9.80665E-6;
-
-  /* CONFIGURATION */
-  /* Input truth motion profile filename
-input_profile_name = 'Profile_2.csv'; */
-  /* Output motion profile and error filenames
-output_profile_name = 'INS_GNSS_Demo_9_Profile.csv';
-output_errors_name = 'INS_GNSS_Demo_9_Errors.csv';  */
-
-  /* Attitude initialization error (deg, converted to rad; @N,E,D) */
-  initialization_errors->delta_eul_nb_n[0] = -0.05 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[1] = 0.04 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[2] = 1 * deg_to_rad; /* rad */
-
-  /* Accelerometer biases (micro-g, converted to m/s^2; body axes) */
-  IMU_errors->b_a[0] = 900 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[1] = -1300 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[2] = 800 * micro_g_to_meters_per_second_squared;
-  /* Gyro biases (deg/hour, converted to rad/sec; body axes) */
-  IMU_errors->b_g[0] = -9 * deg_to_rad / 3600;
-  IMU_errors->b_g[0] = 13 * deg_to_rad / 3600;
-  IMU_errors->b_g[0] = -8 * deg_to_rad / 3600;
-  /* Accelerometer scale factor and cross coupling errors (ppm, converted to
- unitless; body axes) */
-  IMU_errors->M_a[0] = 500 * 1E-6;
-  IMU_errors->M_a[1] = -300 * 1E-6;
-  IMU_errors->M_a[2] = 200 * 1E-6;
-  IMU_errors->M_a[3] = -150 * 1E-6;
-  IMU_errors->M_a[4] = -600 * 1E-6;
-  IMU_errors->M_a[5] = 250 * 1E-6;
-  IMU_errors->M_a[6] = -250 * 1E-6;
-  IMU_errors->M_a[7] = 100 * 1E-6;
-  IMU_errors->M_a[8] = 450 * 1E-6;
-  /* Gyro scale factor and cross coupling errors (ppm, converted to unitless;
-/* body axes) */
-  IMU_errors->M_g[0] = 400 * 1E-6;
-  IMU_errors->M_a[1] = -300 * 1E-6;
-  IMU_errors->M_g[2] = 250 * 1E-6;
-  IMU_errors->M_g[3] = 0 * 1E-6;
-  IMU_errors->M_a[4] = -300 * 1E-6;
-  IMU_errors->M_g[5] = -150 * 1E-6;
-  IMU_errors->M_g[6] = 0 * 1E-6;
-  IMU_errors->M_a[7] = 0 * 1E-6;
-  IMU_errors->M_g[8] = -350 * 1E-6;
-
-  /* Gyro g-dependent biases (deg/hour/g, converted to rad-sec/m; body axes) */
-  IMU_errors->G_g[0] = 0.9 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[1] = -1.1 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[2] = -0.6 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[3] = -0.5 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[4] = 1.9 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[5] = -1.6 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[6] = 0.3 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[7] = 1.1 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[8] = -1.3 * deg_to_rad / (3600 * 9.80665);
-
-  /* Accelerometer noise root PSD (micro-g per root Hz, converted to m s^-1.5) */
-  IMU_errors->accel_noise_root_PSD = 100 * micro_g_to_meters_per_second_squared;
-  /* Gyro noise root PSD (deg per root hour, converted to rad s^-0.5) */
-  IMU_errors->gyro_noise_root_PSD = 0.01 * deg_to_rad / 60.0;
-  /* Accelerometer quantization level (m/s^2) */
-  IMU_errors->accel_quant_level = 1E-2;
-  /* Gyro quantization level (rad/s) */
-  IMU_errors->gyro_quant_level = 2E-4;
-
-  /* Interval between GNSS epochs (s) */
-  GNSS_config->epoch_interval = 0.5;
-
-  /* Initial estimated position (m; ECEF) */
-  GNSS_config->init_est_r_ea_e[0] = 0;
-  GNSS_config->init_est_r_ea_e[1] = 0;
-  GNSS_config->init_est_r_ea_e[2] = 0;
-
-  /* Number of satellites in constellation */
-  GNSS_config->no_sat = 30;
-  /* Orbital radius of satellites (m) */
-  GNSS_config->r_os = 2.656175E7;
-  /* Inclination angle of satellites (deg) */
-  GNSS_config->inclination = 55;
-  /* Longitude offset of constellation (deg) */
-  GNSS_config->const_delta_lambda = 0;
-  /* Timing offset of constellation (s) */
-  GNSS_config->const_delta_t = 0;
-
-  /* Mask angle (deg) */
-  GNSS_config->mask_angle = 10;
-  /* Signal in space error SD (m) *Give residual where corrections are applied */
-  GNSS_config->SIS_err_SD = 1;
-  /* Zenith ionosphere error SD (m) *Give residual where corrections are applied */
-  GNSS_config->zenith_iono_err_SD = 2;
-  /* Zenith troposphere error SD (m) *Give residual where corrections are applied*/
-  GNSS_config->zenith_trop_err_SD = 0.2;
-  /* Code tracking error SD (m) *Can extend to account for multipath */
-  GNSS_config->code_track_err_SD = 1;
-  /* Range rate tracking error SD (m/s) *Can extend to account for multipath */
-  GNSS_config->rate_track_err_SD = 0.02;
-  /* Receiver clock offset at time=0 (m); */
-  GNSS_config->rx_clock_offset = 10000;
-  /* Receiver clock drift at time=0 (m/s); */
-  GNSS_config->rx_clock_drift = 100;
-
-  /* Initial attitude uncertainty per axis (deg, converted to rad) */
-  for (i = 0; i < 3; i++)
-    LC_KF_config->init_att_unc[i] = D2R * 1;
-  /* Initial velocity uncertainty per axis (m/s) */
-  for (i = 0; i < 3; i++)
-    LC_KF_config->init_vel_unc[i] = 0.1;
-  /* Initial position uncertainty per axis (m) */
-  for (i = 0; i < 3; i++)
-    LC_KF_config->init_pos_unc[i] = 10;
-  /* Initial accelerometer bias uncertainty per instrument (micro-g, converted
-/* to m/s^2) */
-  LC_KF_config->init_b_a_unc = 1000 * micro_g_to_meters_per_second_squared;
-  /* Initial gyro bias uncertainty per instrument (deg/hour, converted to rad/sec)*/
-  LC_KF_config->init_b_g_unc = 10 * deg_to_rad / 3600;
-
-  /* Gyro noise PSD (deg^2 per hour, converted to rad^2/s) */
-  LC_KF_config->gyro_noise_PSD = pow((0.02 * deg_to_rad / 60), 2);
-  /* Accelerometer noise PSD (micro-g^2 per Hz, converted to m^2 s^-3) */
-  LC_KF_config->accel_noise_PSD = pow((200 * micro_g_to_meters_per_second_squared), 2);
-  /* Accelerometer bias random walk PSD (m^2 s^-5) */
-  LC_KF_config->accel_bias_PSD = 1.0E-7;
-  /* Gyro bias random walk PSD (rad^2 s^-3) */
-  LC_KF_config->gyro_bias_PSD = 2.0E-12;
-
-  /* Position measurement noise SD per axis (m)  */
-  LC_KF_config->pos_meas_SD = 2.5;
-  /* Velocity measurement noise SD per axis (m/s)  */
-  LC_KF_config->vel_meas_SD = 0.1;
-}
-
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-void Initialize_INS_GNSS_TCKF_tactical_grade_IMU(initialization_errors *initialization_errors,
-                                                 IMU_errors *IMU_errors, GNSS_config *GNSS_config, TC_KF_config *TC_KF_config)
-{
-  int i;
-  /*%INS_GNSS_Demo_9
-%SCRIPT Tightly coupled INS/GNSS demo:
-%   Profile_2 (175s car)
-%   Tactical-grade IMU
-%
-% Software for use with "Principles of GNSS, Inertial, and Multisensor
-% Integrated Navigation Systems," Second Edition.
-%
-% Created 27/5/12 by Paul Groves
-
-% Copyright 2012, Paul Groves
-% License: BSD; see license.txt for details   */
-
-  /* Constants  */
-  double deg_to_rad = 0.01745329252;
-  double rad_to_deg = 1 / deg_to_rad;
-  double micro_g_to_meters_per_second_squared = 9.80665E-6;
-
-  /* CONFIGURATION */
-  /* Input truth motion profile filename
-input_profile_name = 'Profile_2.csv'; */
-  /* Output motion profile and error filenames
-output_profile_name = 'INS_GNSS_Demo_9_Profile.csv';
-output_errors_name = 'INS_GNSS_Demo_9_Errors.csv';  */
-
-  /* Attitude initialization error (deg, converted to rad; @N,E,D) */
-  initialization_errors->delta_eul_nb_n[0] = -0.05 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[1] = 0.04 * deg_to_rad;
-  initialization_errors->delta_eul_nb_n[2] = 1 * deg_to_rad; /* rad */
-
-  /* Accelerometer biases (micro-g, converted to m/s^2; body axes) */
-  IMU_errors->b_a[0] = 900 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[1] = -1300 * micro_g_to_meters_per_second_squared;
-  IMU_errors->b_a[2] = 800 * micro_g_to_meters_per_second_squared;
-  /* Gyro biases (deg/hour, converted to rad/sec; body axes) */
-  IMU_errors->b_g[0] = -9 * deg_to_rad / 3600;
-  IMU_errors->b_g[0] = 13 * deg_to_rad / 3600;
-  IMU_errors->b_g[0] = -8 * deg_to_rad / 3600;
-  /* Accelerometer scale factor and cross coupling errors (ppm, converted to
- unitless; body axes) */
-  IMU_errors->M_a[0] = 500 * 1E-6;
-  IMU_errors->M_a[1] = -300 * 1E-6;
-  IMU_errors->M_a[2] = 200 * 1E-6;
-  IMU_errors->M_a[3] = -150 * 1E-6;
-  IMU_errors->M_a[4] = -600 * 1E-6;
-  IMU_errors->M_a[5] = 250 * 1E-6;
-  IMU_errors->M_a[6] = -250 * 1E-6;
-  IMU_errors->M_a[7] = 100 * 1E-6;
-  IMU_errors->M_a[8] = 450 * 1E-6;
-  /* Gyro scale factor and cross coupling errors (ppm, converted to unitless;
-/* body axes) */
-  IMU_errors->M_g[0] = 400 * 1E-6;
-  IMU_errors->M_a[1] = -300 * 1E-6;
-  IMU_errors->M_g[2] = 250 * 1E-6;
-  IMU_errors->M_g[3] = 0 * 1E-6;
-  IMU_errors->M_a[4] = -300 * 1E-6;
-  IMU_errors->M_g[5] = -150 * 1E-6;
-  IMU_errors->M_g[6] = 0 * 1E-6;
-  IMU_errors->M_a[7] = 0 * 1E-6;
-  IMU_errors->M_g[8] = -350 * 1E-6;
-
-  /* Gyro g-dependent biases (deg/hour/g, converted to rad-sec/m; body axes) */
-  IMU_errors->G_g[0] = 0.9 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[1] = -1.1 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[2] = -0.6 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[3] = -0.5 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[4] = 1.9 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[5] = -1.6 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[6] = 0.3 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[7] = 1.1 * deg_to_rad / (3600 * 9.80665);
-  IMU_errors->G_g[8] = -1.3 * deg_to_rad / (3600 * 9.80665);
-
-  /* Accelerometer noise root PSD (micro-g per root Hz, converted to m s^-1.5) */
-  IMU_errors->accel_noise_root_PSD = 100 * micro_g_to_meters_per_second_squared;
-  /* Gyro noise root PSD (deg per root hour, converted to rad s^-0.5) */
-  IMU_errors->gyro_noise_root_PSD = 0.01 * deg_to_rad / 60.0;
-  /* Accelerometer quantization level (m/s^2) */
-  IMU_errors->accel_quant_level = 1E-2;
-  /* Gyro quantization level (rad/s) */
-  IMU_errors->gyro_quant_level = 2E-4;
-
-  /* Interval between GNSS epochs (s) */
-  GNSS_config->epoch_interval = 0.5;
-
-  /* Initial estimated position (m; ECEF) */
-  GNSS_config->init_est_r_ea_e[0] = 0;
-  GNSS_config->init_est_r_ea_e[1] = 0;
-  GNSS_config->init_est_r_ea_e[2] = 0;
-
-  /* Number of satellites in constellation */
-  GNSS_config->no_sat = 30;
-  /* Orbital radius of satellites (m) */
-  GNSS_config->r_os = 2.656175E7;
-  /* Inclination angle of satellites (deg) */
-  GNSS_config->inclination = 55;
-  /* Longitude offset of constellation (deg) */
-  GNSS_config->const_delta_lambda = 0;
-  /* Timing offset of constellation (s) */
-  GNSS_config->const_delta_t = 0;
-
-  /* Mask angle (deg) */
-  GNSS_config->mask_angle = 10;
-  /* Signal in space error SD (m) *Give residual where corrections are applied */
-  GNSS_config->SIS_err_SD = 1;
-  /* Zenith ionosphere error SD (m) *Give residual where corrections are applied */
-  GNSS_config->zenith_iono_err_SD = 2;
-  /* Zenith troposphere error SD (m) *Give residual where corrections are applied*/
-  GNSS_config->zenith_trop_err_SD = 0.2;
-  /* Code tracking error SD (m) *Can extend to account for multipath */
-  GNSS_config->code_track_err_SD = 1;
-  /* Range rate tracking error SD (m/s) *Can extend to account for multipath */
-  GNSS_config->rate_track_err_SD = 0.02;
-  /* Receiver clock offset at time=0 (m); */
-  GNSS_config->rx_clock_offset = 10000;
-  /* Receiver clock drift at time=0 (m/s); */
-  GNSS_config->rx_clock_drift = 100;
-
-  /* Initial attitude uncertainty per axis (deg, converted to rad) */
-  for (i = 0; i < 3; i++)
-    TC_KF_config->init_att_unc[i] = D2R * 1;
-  /* Initial velocity uncertainty per axis (m/s) */
-  for (i = 0; i < 3; i++)
-    TC_KF_config->init_vel_unc[i] = 0.1;
-  /* Initial position uncertainty per axis (m) */
-  for (i = 0; i < 3; i++)
-    TC_KF_config->init_pos_unc[i] = 10;
-  /* Initial accelerometer bias uncertainty per instrument (micro-g, converted
-/* to m/s^2) */
-  TC_KF_config->init_b_a_unc = 1000 * micro_g_to_meters_per_second_squared;
-  /* Initial gyro bias uncertainty per instrument (deg/hour, converted to rad/sec)*/
-  TC_KF_config->init_b_g_unc = 10 * deg_to_rad / 3600;
-  /* Initial clock offset uncertainty per axis (m) */
-  TC_KF_config->init_clock_offset_unc = 10;
-  /* Initial clock drift uncertainty per axis (m/s) */
-  TC_KF_config->init_clock_drift_unc = 0.1;
-
-  /* Gyro noise PSD (deg^2 per hour, converted to rad^2/s) */
-  TC_KF_config->gyro_noise_PSD = pow((0.02 * deg_to_rad / 60), 2);
-  /* Accelerometer noise PSD (micro-g^2 per Hz, converted to m^2 s^-3) */
-  TC_KF_config->accel_noise_PSD = pow((200 * micro_g_to_meters_per_second_squared), 2);
-  /* Accelerometer bias random walk PSD (m^2 s^-5) */
-  TC_KF_config->accel_bias_PSD = 1.0E-7;
-  /* Gyro bias random walk PSD (rad^2 s^-3) */
-  TC_KF_config->gyro_bias_PSD = 2.0E-12;
-  /* Receiver clock frequency-drift PSD (m^2/s^3) */
-  TC_KF_config->clock_freq_PSD = 1;
-  /* Receiver clock phase-drift PSD (m^2/s) */
-  TC_KF_config->clock_phase_PSD = 1;
-
-  /* Pseudo-range measurement noise SD (m) */
-  TC_KF_config->pseudo_range_SD = 2.5;
-  /* Pseudo-range rate measurement noise SD (m/s) */
-  TC_KF_config->range_rate_SD = 0.1;
-}
-
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-extern void Skew_symmetric(double *vec, double *W)
-{
-  W[0] = 0.0;
-  W[1] = -vec[2];
-  W[2] = vec[1];
-  W[3] = vec[2];
-  W[4] = 0.0;
-  W[5] = -vec[0];
-  W[6] = -vec[1];
-  W[7] = vec[0];
-  W[8] = 0.0;
-}
-/* Name of function ------------------------------------------------------------
-
-%Gravitation_ECI - Calculates  acceleration due to gravity resolved about
-%ECEF-frame
-%
-% Software for use with "Principles of GNSS, Inertial, and Multisensor
-% Integrated Navigation Systems," Second Edition.
-%
-% This function created 1/4/2012 by Paul Groves
-%
-% Inputs:
-%   r_eb_e  Cartesian position of body frame w.r.t. ECEF frame, resolved
-%           about ECEF-frame axes (m)
-% Outputs:
-%   g       Acceleration due to gravity (m/s^2)
-
-% Copyright 2012, Paul Groves
-% License: BSD; see license.txt for details
-------------------------------------------------------------------------------*/
-void Gravity_ECEF(double *r_eb_e, double *g)
-{
-  double mag_r, z_scale, gamma[3];
-
-  /* Parameters  */
-  double R_0 = RE_GRS80;  /* WGS84 Equatorial radius in meters */
-  double omega_ie = OMGE; /* Earth rotation rate (rad/s)  */
-
-  /* Begins  */
-
-  /* Calculate distance from center of the Earth  */
-  mag_r = norm(r_eb_e, 3);
-
-  /* If the input position is 0,0,0, produce a dummy output */
-  if (mag_r == 0)
-  {
-    g[0] = 0;
-    g[1] = 0;
-    g[2] = 0;
-
-    /* Calculate gravitational acceleration using (2.142)  */
-  }
-  else
-  {
-    z_scale = 5 * pow((r_eb_e[2] / mag_r), 2);
-    gamma[0] = -(mu / pow(mag_r, 3)) * (r_eb_e[0] + (1.5 * J_2 * pow((R_0 / mag_r), 2)) *
-                                                        ((1 - z_scale) * r_eb_e[0]));
-    gamma[1] = -(mu / pow(mag_r, 3)) * (r_eb_e[1] + (1.5 * J_2 * pow((R_0 / mag_r), 2)) *
-                                                        ((1 - z_scale) * r_eb_e[1]));
-    gamma[2] = -(mu / pow(mag_r, 3)) * (r_eb_e[2] + (1.5 * J_2 * pow((R_0 / mag_r), 2)) *
-                                                        ((3 - z_scale) * r_eb_e[2]));
-
-    /* Add centripetal acceleration using (2.133)  */
-    g[0] = gamma[0] + omega_ie * omega_ie * r_eb_e[0];
-    g[1] = gamma[1] + omega_ie * omega_ie * r_eb_e[1];
-    g[2] = gamma[2];
-
-  } //end % if
-}
-
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-void Euler_to_CTM(double *delta_eul_nb_n, double *C)
-{
-  double sin_phi, cos_phi, sin_theta, cos_theta, sin_psi, cos_psi;
-
-  /* Precalculate sines and cosines of the Euler angles */
-  sin_phi = sin(delta_eul_nb_n[0]);
-  cos_phi = cos(delta_eul_nb_n[0]);
-  sin_theta = sin(delta_eul_nb_n[1]);
-  cos_theta = cos(delta_eul_nb_n[1]);
-  sin_psi = sin(delta_eul_nb_n[2]);
-  cos_psi = cos(delta_eul_nb_n[2]);
-
-  /* Calculate coordinate transformation matrix using (2.22) */
-  C[0] = cos_theta * cos_psi;
-  C[1] = cos_theta * sin_psi;
-  C[2] = -sin_theta;
-  C[3] = (-cos_phi * sin_psi) + (sin_phi * sin_theta * cos_psi);
-  C[4] = (cos_phi * cos_psi) + (sin_phi * sin_theta * sin_psi);
-  C[5] = sin_phi * cos_theta;
-  C[6] = (sin_phi * sin_psi) + (cos_phi * sin_theta * cos_psi);
-  C[7] = (-sin_phi * cos_psi) + (cos_phi * sin_theta * sin_psi);
-  C[8] = cos_phi * cos_theta;
-}
-
-/* Compute Euler from Cbn ------------------------------------------------------
-* description: Compute euler angles from the DCM Cbn
-* args   : double *euler  vector with {roll, pitch, yaw} angles    IO
-* ref.: (Shin, 2001, page 12) and Groves(prev version of 2013, page 28)
-*-----------------------------------------------------------------------------*/
-void CTM_to_Euler(double *euler, double *Cbn)
-{
-  /* Roll (x rotation) - phi
-  euler[0]=atan2(Cbn[7],Cbn[8]);
-  /* Pitch (y rotation) - theta
-//  imu->aea[1]=-1/(tan(Cbn[6]/sqrt(1-Cbn[6]*Cbn[6])));
-  euler[1]=-asin(Cbn[6]);
-  /* Yaw (z rotation) - psi
-  euler[2]=atan2(Cbn[3],Cbn[0]);*/
-  /*
-  printf("Euler 0: %lf\n", atan2(Cbn[7],Cbn[8]));
-  printf("Euler 1: %lf or %lf\n", -asin(Cbn[6]), -1/(tan(Cbn[6]/sqrt(1-Cbn[6]*Cbn[6]))) );
-  printf("Euler 2: %lf\n",  atan2(Cbn[3],Cbn[0]));*/
-
-  /* Grove for attitude -> Cbn 2.24
-
- euler[0] = atan2(Cbn[7],Cbn[8]); /* Roll (x rotation) - phi */
-  //imu->aea[1]=-1/(tan(Cbn[6]/sqrt(1-Cbn[6]*Cbn[6])));
-  /*euler[1]= -asin(Cbn[6]);   Pitch (y rotation) - theta */
-
-  /* euler[2]= atan2(Cbn[3],Cbn[0]);   Yaw (z rotation) - psi */
-  /*
- printf("Euler 0: %lf\n", euler[0]);
- printf("Euler 1: %lf\n", euler[1]);
- printf("Euler 2: %lf\n",  euler[2]);  */
-
-  /* From Groves Matlab code */
-
-  /* Calculate Euler angles using 2.23 */
-
-  euler[0] = atan2(Cbn[5], Cbn[8]); /* Roll (x rotation) - phi */
-                                    //imu->aea[1]=-1/(tan(Cbn[6]/sqrt(1-Cbn[6]*Cbn[6])));
-  euler[1] = -asin(Cbn[2]);         /* Pitch (y rotation) - theta */
-
-  euler[2] = atan2(Cbn[1], Cbn[0]); /* Yaw (z rotation) - psi */
-}
-
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-void ECEF_to_NED(double *r_eb_e, double *v_eb_e, double *C_b_e,
-                 double *L_b, double *lambda_b, double *h_b, double *v_eb_n,
-                 double *C_b_n)
-{
-  /*%ECEF_to_NED - Converts Cartesian  to curvilinear position, velocity
-%resolving axes from ECEF to NED and attitude from ECEF- to NED-referenced
-%
-% Software for use with "Principles of GNSS, Inertial, and Multisensor
-% Integrated Navigation Systems," Second Edition.
-%
-% This function created 2/4/2012 by Paul Groves
-%
-% Inputs:
-%   r_eb_e        Cartesian position of body frame w.r.t. ECEF frame, resolved
-%                 along ECEF-frame axes (m)
-%   v_eb_e        velocity of body frame w.r.t. ECEF frame, resolved along
-%                 ECEF-frame axes (m/s)
-%   C_b_e         body-to-ECEF-frame coordinate transformation matrix
-%
-% Outputs:
-%   L_b           latitude (rad)
-%   lambda_b      longitude (rad)
-%   h_b           height (m)
-%   v_eb_n        velocity of body frame w.r.t. ECEF frame, resolved along
-%                 north, east, and down (m/s)
-%   C_b_n         body-to-NED coordinate transformation matrix   */
-
-  /* Parameters
-   R_0 = 6378137; %WGS84 Equatorial radius in meters
-   e = 0.0818191908425; %WGS84 eccentricity   */
-
-  /* Begins  */
-  double k1, k2, beta, E, F, P, Q, D, V, G, T;
-  double cos_lat, sin_lat, cos_long, sin_long, C_e_n[9];
-  double pos[3];
-
-  /* Convert position using Borkowski closed-form exact solution  */
-  /* From (2.113)  */
-
-  *lambda_b = atan2(r_eb_e[1], r_eb_e[0]);
-
-  /* From (C.29) and (C.30)  */
-  k1 = sqrt(1 - e_2) * fabs(r_eb_e[2]);
-
-  k2 = e_2 * RE_GRS80;
-  beta = sqrt((r_eb_e[0] * r_eb_e[0]) + (r_eb_e[1] * r_eb_e[1]));
-  E = (k1 - k2) / beta;
-  F = (k1 + k2) / beta;
-
-  /* From (C.31)  */
-  P = 4 / 3 * ((E * F) + 1);
-
-  /* From (C.32)  */
-  Q = 2 * ((E * E) - (F * F));
-
-  /* From (C.33)  */
-  D = (P * P * P) + (Q * Q);
-
-  /* From (C.34)  */
-  V = pow((sqrt(D) - Q), (1 / 3)) - pow((sqrt(D) + Q), (1 / 3));
-
-  /* From (C.35) */
-  G = 0.5 * (sqrt((E * E) + V) + E);
-
-  /* From (C.36) */
-  T = sqrt((G * G) + (F - (V * G)) / ((2 * G) - E)) - G;
-
-  /* From (C.37)  */
-  *L_b = sign(r_eb_e[2]) * atan((1 - (T * T)) / (2 * T * sqrt(1 - e_2)));
-
-  /* From (C.38) */
-  *h_b = (beta - (RE_GRS80 * T)) * cos(*L_b) +
-         (r_eb_e[2] - (sign(r_eb_e[2]) * RE_GRS80 * sqrt(1 - e_2))) * sin(*L_b);
-
-  /* using RTKLIB because above computations are not consistent */
-  ecef2pos(r_eb_e, pos);
-  *L_b = pos[0];
-  *lambda_b = pos[1];
-  *h_b = pos[2];
-
-  /* Calculate ECEF to NED coordinate transformation matrix using (2.150) */
-  cos_lat = cos(*L_b);
-  sin_lat = sin(*L_b);
-  cos_long = cos(*lambda_b);
-  sin_long = sin(*lambda_b);
-
-  C_e_n[0] = -sin_lat * cos_long;
-  C_e_n[1] = -sin_lat * sin_long;
-  C_e_n[2] = cos_lat;
-  C_e_n[3] = -sin_long;
-  C_e_n[4] = cos_long;
-  C_e_n[5] = 0;
-  C_e_n[6] = -cos_lat * cos_long;
-  C_e_n[7] = -cos_lat * sin_long;
-  C_e_n[8] = -sin_lat;
-
-  /* Transform velocity using (2.73) */
-  matmul_row("NN", 3, 1, 3, 1.0, C_e_n, v_eb_e, 0.0, v_eb_n);
-
-  /* Transform attitude using (2.15) */
-  matmul_row("NN", 3, 3, 3, 1.0, C_e_n, C_b_e, 0.0, C_b_n);
-}
-
-void NED_to_ECEF(double *L_b, double *lambda_b, double *h_b, double *v_eb_n,
-                 double *C_b_n, double *r_eb_e, double *v_eb_e, double *C_b_e)
-{
-  /*NED_to_ECEF - Converts curvilinear to Cartesian position, velocity
-%resolving axes from NED to ECEF ECEF_to_NEDand attitude from NED- to ECEF-referenced
-%
-% Software for use with "Principles of GNSS, Inertial, and Multisensor
-% Integrated Navigation Systems," Second Edition.
-%
-% This function created 2/4/2012 by Paul Groves
-%
-% Inputs:
-%   L_b           latitude (rad)
-%   lambda_b      longitude (rad)
-%   h_b           height (m)
-%   v_eb_n        velocity of body frame w.r.t. ECEF frame, resolved along
-%                 north, east, and down (m/s)
-%   C_b_n         body-to-NED coordinate transformation matrix
-%
-% Outputs:
-%   r_eb_e        Cartesian position of body frame w.r.t. ECEF frame, resolved
-%                 along ECEF-frame axes (m)
-%   v_eb_e        velocity of body frame w.r.t. ECEF frame, resolved along
-%                 ECEF-frame axes (m/s)
-%   C_b_e         body-to-ECEF-frame coordinate transformation matrix
-
-% Copyright 2012, Paul Groves
-% License: BSD; see license.txt for details
-
-% Parameters
-R_0 = 6378137; %WGS84 Equatorial radius in meters
-e = 0.0818191908425; %WGS84 eccentricity  */
-
-  /* Begins  */
-  double cos_lat, sin_lat, cos_long, sin_long, C_e_n[9], C_n_e[9], R_E;
-
-  /* Calculate transverse radius of curvature using (2.105)  */
-  R_E = RN(*L_b);
-
-  /* Convert position using (2.112)  */
-  cos_lat = cos(*L_b);
-  sin_lat = sin(*L_b);
-  cos_long = cos(*lambda_b);
-  sin_long = sin(*lambda_b);
-  r_eb_e[0] = (R_E + *h_b) * cos_lat * cos_long;
-  r_eb_e[1] = (R_E + *h_b) * cos_lat * sin_long;
-  r_eb_e[2] = ((1 - e_2) * R_E + *h_b) * sin_lat;
-
-  /* Calculate ECEF to NED coordinate transformation matrix using (2.150) */
-  C_e_n[0] = -sin_lat * cos_long;
-  C_e_n[1] = -sin_lat * sin_long;
-  C_e_n[2] = cos_lat;
-  C_e_n[3] = -sin_long;
-  C_e_n[4] = cos_long;
-  C_e_n[5] = 0;
-  C_e_n[6] = -cos_lat * cos_long;
-  C_e_n[7] = -cos_lat * sin_long;
-  C_e_n[8] = -sin_lat;
-
-  /*  Calculate ECEF to NED coordinate transformation matrix using (2.150)  */
-  C_n_e[0] = -sin_lat * cos_long;
-  C_n_e[1] = -sin_long;
-  C_n_e[2] = -cos_lat * cos_long;
-  C_n_e[3] = -sin_lat * sin_long;
-  C_n_e[4] = cos_long;
-  C_n_e[5] = -cos_lat * sin_long;
-  C_n_e[6] = cos_lat;
-  C_n_e[7] = 0.0;
-  C_n_e[8] = -sin_lat;
-
-  /* Transform velocity using (2.73)  */
-  matmul_row("NN", 3, 1, 3, 1.0, C_n_e, v_eb_n, 0.0, v_eb_e);
-
-  /* Transform attitude using (2.15) */
-  matmul_row("NN", 3, 3, 3, 1.0, C_n_e, C_b_n, 0.0, C_b_e);
-}
-
-/* function declaration ------------------------------------------------------*/
-
-void pv_ECEF_to_NED(double *r_eb_e, double *v_eb_e, double *L_b,
-                    double *lambda_b, double *h_b, double *v_eb_n)
-{
-  /*pv_ECEF_to_NED - Converts Cartesian  to curvilinear position and velocity
-   %resolving axes from ECEF to NED
-   %
-   % Software for use with "Principles of GNSS, Inertial, and Multisensor
-   % Integrated Navigation Systems," Second Edition.
-   %
-   % This function created 11/4/2012 by Paul Groves
-   %
-   % Inputs:
-   %   r_eb_e        Cartesian position of body frame w.r.t. ECEF frame, resolved
-   %                 along ECEF-frame axes (m)
-   %   v_eb_e        velocity of body frame w.r.t. ECEF frame, resolved along
-   %                 ECEF-frame axes (m/s)
-   %
-   % Outputs:
-   %   L_b           latitude (rad)
-   %   lambda_b      longitude (rad)
-   %   h_b           height (m)
-   %   v_eb_n        velocity of body frame w.r.t. ECEF frame, resolved along
-   %                 north, east, and down (m/s)
-
-   % Copyright 2012, Paul Groves
-   % License: BSD; see license.txt for details
-
-   % Parameters
-   R_0 = 6378137; %WGS84 Equatorial radius in meters
-   e = 0.0818191908425; %WGS84 eccentricity   */
-
-  /* Begins  */
-  double k1, k2, beta, E, F, P, Q, D, V, G, T;
-  double cos_lat, sin_lat, cos_long, sin_long, C_e_n[9];
-  double pos[3];
-
-  /* Convert position using Borkowski closed-form exact solution  */
-  /* From (2.113)  */
-  *lambda_b = atan2(r_eb_e[1], r_eb_e[0]);
-
-  /* From (C.29) and (C.30)  */
-  k1 = sqrt(1 - e_2) * fabs(r_eb_e[2]);
-  k2 = e_2 * RE_GRS80;
-  beta = sqrt((r_eb_e[0] * r_eb_e[0]) + (r_eb_e[1] * r_eb_e[1]));
-  E = (k1 - k2) / beta;
-  F = (k1 + k2) / beta;
-
-  /* From (C.31)  */
-  P = 4 / 3 * (E * F + 1);
-
-  /* From (C.32)  */
-  Q = 2 * (E * E - F * F);
-
-  /* From (C.33)  */
-  D = P * P * P + Q * Q;
-
-  /* From (C.34)  */
-  V = pow((sqrt(D) - Q), (1 / 3)) - pow((sqrt(D) + Q), (1 / 3));
-
-  /* From (C.35) */
-  G = 0.5 * (sqrt(E * E + V) + E);
-
-  /* From (C.36) */
-  T = sqrt(G * G + (F - V * G) / (2 * G - E)) - G;
-
-  /* From (C.37)  */
-  *L_b = sign(r_eb_e[2]) * atan((1 - T * T) / (2 * T * sqrt(1 - e_2)));
-
-  /* From (C.38) */
-  *h_b = (beta - RE_GRS80 * T) * cos(*L_b) +
-         (r_eb_e[2] - sign(r_eb_e[2]) * RE_GRS80 * sqrt(1 - e_2)) * sin(*L_b);
-
-  /* Using RTKLIB because computations are not consistent  */
-  ecef2pos(r_eb_e, pos);
-  *L_b = pos[0];
-  *lambda_b = pos[1];
-  *h_b = pos[2];
-
-  /* Calculate ECEF to NED coordinate transformation matrix using (2.150) */
-  cos_lat = cos(*L_b);
-  sin_lat = sin(*L_b);
-  cos_long = cos(*lambda_b);
-  sin_long = sin(*lambda_b);
-  C_e_n[0] = -sin_lat * cos_long;
-  C_e_n[1] = -sin_lat * sin_long;
-  C_e_n[2] = cos_lat;
-  C_e_n[3] = -sin_long;
-  C_e_n[4] = cos_long;
-  C_e_n[5] = 0;
-  C_e_n[6] = -cos_lat * cos_long;
-  C_e_n[7] = -cos_lat * sin_long;
-  C_e_n[8] = -sin_lat;
-
-  /* Transform velocity using (2.73) */
-  matmul_row("NN", 3, 1, 3, 1.0, C_e_n, v_eb_e, 0.0, v_eb_n);
-  //matmul("NN",1,3,3,1.0, v_eb_e, C_e_n, 0.0, v_eb_n);
-
-  /* Ends */
-}
-
-void pv_NED_to_ECEF(double *L_b, double *lambda_b, double *h_b, double *v_eb_n,
-                    double *r_eb_e, double *v_eb_e)
-{
-  /*%pv_NED_to_ECEF - Converts curvilinear to Cartesian position and velocity
-%resolving axes from NED to ECEF
-%
-% Software for use with "Principles of GNSS, Inertial, and Multisensor
-% Integrated Navigation Systems," Second Edition.
-%
-% This function created 11/4/2012 by Paul Groves
-%
-% Inputs:
-%   L_b           latitude (rad)
-%   lambda_b      longitude (rad)
-%   h_b           height (m)
-%   v_eb_n        velocity of body frame w.r.t. ECEF frame, resolved along
-%                 north, east, and down (m/s)
-%
-% Outputs:
-%   r_eb_e        Cartesian position of body frame w.r.t. ECEF frame, resolved
-%                 along ECEF-frame axes (m)
-%   v_eb_e        velocity of body frame w.r.t. ECEF frame, resolved along
-%                 ECEF-frame axes (m/s)
-
-% Copyright 2012, Paul Groves
-% License: BSD; see license.txt for details
-
-% Parameters
-R_0 = 6378137; %WGS84 Equatorial radius in meters
-e = 0.0818191908425; %WGS84 eccentricity  */
-
-  /* Begins  */
-  double cos_lat, sin_lat, cos_long, sin_long, C_e_n[9], R_E;
-
-  /* Calculate transverse radius of curvature using (2.105)  */
-  R_E = RN(*L_b);
-
-  /* Convert position using (2.112)  */
-  cos_lat = cos(*L_b);
-  sin_lat = sin(*L_b);
-  cos_long = cos(*lambda_b);
-  sin_long = sin(*lambda_b);
-  r_eb_e[0] = (R_E + *h_b) * cos_lat * cos_long;
-  r_eb_e[1] = (R_E + *h_b) * cos_lat * sin_long;
-  r_eb_e[2] = ((1 - e_2) * R_E + *h_b) * sin_lat;
-
-  /* Calculate ECEF to NED coordinate transformation matrix using (2.150) */
-  C_e_n[0] = -sin_lat * cos_long;
-  C_e_n[1] = -sin_lat * sin_long;
-  C_e_n[2] = cos_lat;
-  C_e_n[3] = -sin_long;
-  C_e_n[4] = cos_long;
-  C_e_n[5] = 0;
-  C_e_n[6] = -cos_lat * cos_long;
-  C_e_n[7] = -cos_lat * sin_long;
-  C_e_n[8] = -sin_lat;
-
-  /* Transform velocity using (2.73)  */
-  matmul("TN", 3, 1, 3, 1.0, C_e_n, v_eb_n, 0.0, v_eb_e);
-
-  /* Ends */
-}
-
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-void Calculate_errors_NED(double *est_L_b, double *est_lambda_b,
-                          double *est_h_b, double *est_v_eb_n, double *est_C_b_n, double *true_L_b,
-                          double *true_lambda_b, double *true_h_b, double *true_v_eb_n,
-                          double *true_C_b_n, double *delta_r_eb_n, double *delta_v_eb_n,
-                          double *delta_eul_nb_n)
-{
-}
-
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-void Initialize_NED_attitude(double *C_b_n,
-                             initialization_errors *initialization_errors, double *est_C_b_n)
-{
-  double delta_C_b_n[9];
-  int i;
-
-  /* Attitude initialization, using (5.109) and (5.111) */
-  for (i = 0; i < 3; i++)
-    initialization_errors->delta_eul_nb_n[i] =
-        -initialization_errors->delta_eul_nb_n[i];
-
-  Euler_to_CTM(initialization_errors->delta_eul_nb_n, delta_C_b_n);
-
-  /* est_C_b_n = delta_C_b_n * C_b_n; */
-  matmul("NN", 3, 3, 3, 1.0, delta_C_b_n, C_b_n, 0.0, est_C_b_n);
-}
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-void Initialize_TC_P_matrix(TC_KF_config *TC_KF_config, double *P_matrix)
-{
-  int i, j, npar = 17;
-  double att_var[3], vel_var[3], pos_var[3], ba_var, bg_var, dt_off_var, dt_drift_var;
-
-  /* Initialize error covariance matrix */
-  // IT ASSUMES THE SAME VALUE FOR EACH AXES, HOWEVER IT MAY DIFFER!!!!!!!!!
-  for (i = 0; i < 3; i++)
-  {
-    att_var[i] = TC_KF_config->init_att_unc[i] * TC_KF_config->init_att_unc[i];
-    vel_var[i] = TC_KF_config->init_vel_unc[i] * TC_KF_config->init_vel_unc[i];
-    pos_var[i] = TC_KF_config->init_pos_unc[i] * TC_KF_config->init_pos_unc[i];
-  }
-
-  ba_var = TC_KF_config->init_b_a_unc * TC_KF_config->init_b_a_unc;
-  bg_var = TC_KF_config->init_b_g_unc * TC_KF_config->init_b_g_unc;
-  dt_off_var = TC_KF_config->init_clock_offset_unc * TC_KF_config->init_clock_offset_unc;
-  dt_drift_var = TC_KF_config->init_clock_drift_unc * TC_KF_config->init_clock_drift_unc;
-
-  /* The 17-states {de,dv,dr,dba,dbg, dt, dtdot} system model order */
-
-  for (i = 0; i < 3; i++)
-  {
-    printf("att: %lf, vel: %lf, pos: %lf\n", att_var[i], vel_var[i], pos_var[i]);
-  }
-
-  /* Attitude  */
-  for (i = 0; i < 3; i++)
-  {
-    for (j = 0; j < 3; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = att_var[i] : 0.0);
-    }
-  }
-
-  /* Velocity */
-  for (i = 3; i < 6; i++)
-  {
-    for (j = 3; j < 6; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = vel_var[j - 3] : 0.0);
-    }
-  }
-
-  /* Position */
-  for (i = 6; i < 9; i++)
-  {
-    for (j = 6; j < 9; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = pos_var[j - 6] : 0.0);
-    }
-  }
-
-  /* Acc. bias  */
-  for (i = 9; i < 12; i++)
-  {
-    for (j = 9; j < 12; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = ba_var : 0.0);
-    }
-  }
-
-  /* Gyro. bias  */
-  for (i = 12; i < 15; i++)
-  {
-    for (j = 12; j < 15; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = bg_var : 0.0);
-    }
-  }
-
-  /* Clock offset and drift variances */
-  P_matrix[15 * npar + 15] = dt_off_var;
-  P_matrix[16 * npar + 16] = dt_drift_var;
-}
-
-/* Name of function ------------------------------------------------------------
-* Brief description
-* arguments  :
-* datatype  name  I/O   description
-* int        a     I   describe a (a unit)
-* double    *b     O   describe b (b unit) {b components x,y,z}
-*
-* return : what does it return?
-* notes  :
-*-----------------------------------------------------------------------------*/
-void Initialize_LC_P_matrix(LC_KF_config *LC_KF_config, double *P_matrix)
-{
-  int i, j, npar = 15;
-  double att_var[3], vel_var[3], pos_var[3], ba_var, bg_var;
-
-  /* Initialize error covariance matrix */
-  // IT ASSUMES THE SAME VALUE FOR EACH AXES, HOWEVER IT MAY DIFFER!!!!!!!!!
-  for (i = 0; i < 3; i++)
-  {
-    att_var[i] = LC_KF_config->init_att_unc[i] * LC_KF_config->init_att_unc[i];
-    vel_var[i] = LC_KF_config->init_vel_unc[i] * LC_KF_config->init_vel_unc[i];
-    pos_var[i] = LC_KF_config->init_pos_unc[i] * LC_KF_config->init_pos_unc[i];
-  }
-
-  ba_var = LC_KF_config->init_b_a_unc * LC_KF_config->init_b_a_unc;
-  bg_var = LC_KF_config->init_b_g_unc * LC_KF_config->init_b_g_unc;
-
-  /* The 15-states {de,dv,dr,dba,dbg} system model order */
-
-  /* Attitude  */
-  for (i = 0; i < 3; i++)
-  {
-    for (j = 0; j < 3; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = att_var[j] : 0.0);
-    }
-  }
-
-  /* Velocity */
-  for (i = 3; i < 6; i++)
-  {
-    for (j = 3; j < 6; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = vel_var[j - 3] : 0.0);
-    }
-  }
-
-  /* Position */
-  for (i = 6; i < 9; i++)
-  {
-    for (j = 6; j < 9; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = pos_var[j - 6] : 0.0);
-    }
-  }
-
-  /* Acc. bias  */
-  for (i = 9; i < 12; i++)
-  {
-    for (j = 9; j < 12; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = ba_var : 0.0);
-    }
-  }
-
-  /* Gyro. bias  */
-  for (i = 12; i < 15; i++)
-  {
-    for (j = 12; j < 15; j++)
-    {
-      (i == j ? P_matrix[i * npar + j] = bg_var : 0.0);
-    }
-  }
-}
-
-/* Quaternion multiplication ---------------------------------------------------
-* description: Multiplies p . q  quaternions
-* args   : double *p      I    first quaternion {4x1}
-*	         double *q		  I    second quaternion {4x1}
-*	         double *pq     IO   resulting quaternion {4x1}
-* Groves (2103) from Appendix E - at E.6.3 section, apge E-10
-*-----------------------------------------------------------------------------*/
-quaternion_mult(double *p, double *q, double *pq)
-{
-  pq[0] = p[0] * q[0] - p[1] * q[1] - p[2] * q[2] - p[3] * q[3];
-  pq[1] = p[0] * q[1] + p[1] * q[0] + p[2] * q[3] - p[3] * q[2];
-  pq[2] = p[0] * q[2] - p[1] * q[3] + p[2] * q[0] + p[3] * q[1];
-  pq[3] = p[0] * q[3] + p[1] * q[2] - p[2] * q[1] + p[3] * q[0];
-}
-
-/* Attitude update -------------------------------------------------------
-* description: Update the quaternion from gyro corrected measurements
-* args   : um7pack_t* imu       IO    current (tk) imu structure
-*	   double dt		I     time difference from previous measu. (tk-1)
-*	   double* wien[3], wenn[3]	I	rotation vectors
-*	   double* C[9]		IO    receives an initial Cbn and outputs the updated one
-Reference: Initialy from Shin (2001, pag.22) adapting to Grove (2103) from
- Appendix E - at E.6.3 section
-*-----------------------------------------------------------------------------*/
-void attitude_update(double *alpha_ib_b, double *omega_ie, float t, double *old_C_b_e, double *new_q_b_e)
-{
-  double old_q_b_e[4], q_less_plus[4], q_omega[4], q_aux[4], q_aux1[4];
-  double mag_alpha, ac = 0.0, as = 0.0;
-  int i;
-
-  /* Form quaternions */
-
-  /* Old Cbe quaternion */
-  DCM_to_quaternion(old_C_b_e, old_q_b_e);
-
-  /* Reverse quaternion to become old_q_e_b */
-  old_q_b_e[0] = -old_q_b_e[0];
-
-  /* Coeficients of q_less_plus quaternion */
-  mag_alpha = norm(alpha_ib_b, 3);
-  ac = 1 - 0.5 * (mag_alpha * mag_alpha / 4) + ((1 / 24) * (pow(mag_alpha / 2, 4)));
-  as = 0.5 - ((1 / 12) * (pow(mag_alpha / 2, 2)));
-
-  /* q_less_plus quaternion */
-  q_less_plus[0] = ac;
-  for (i = 1; i < 4; i++)
-    q_less_plus[i] = as * alpha_ib_b[i - 1];
-
-  /*q_omega quaternion */
-  q_omega[0] = 0.0;
-  for (i = 1; i < 4; i++)
-    q_omega[i] = 0.5 * omega_ie[i - 1] * t;
-
-  quaternion_mult(q_omega, old_q_b_e, q_aux);
-
-  quaternion_mult(old_q_b_e, q_less_plus, q_aux1);
-
-  /* The updated quternion */
-  for (i = 0; i < 4; i++)
-    new_q_b_e[i] = q_aux1[i] - q_aux[i];
-
-  /* Reverse quaternion */
-  new_q_b_e[0] = -new_q_b_e[0];
-}
-
-/* Convert rotation matrix to quaternion ----------------- ---------------------
-* description: Cbe or Cbeta_alpha to quaternion transformation
-* args   : um7pack_t* imu       IO    imu structure
-*
-Reference: Groves (2013, pag.41)
-*-----------------------------------------------------------------------------*/
-void DCM_to_quaternion(double *C, double *q)
-{
-  /* Transformation between DCM Cbn and the quaternion is accomplished by: */
-  q[0] = 0.5 * sqrt(1 + C[0] + C[4] + C[8]);
-
-  if (q[0] < 0.001)
-  {
-    q[1] = 0.5 * sqrt(1 + C[0] + C[4] + C[8]);
-    q[0] = 0.25 * (C[5] - C[7]) / (q[1]);
-    q[2] = 0.25 * (C[3] - C[1]) / (q[1]);
-    q[3] = 0.25 * (C[6] - C[2]) / (q[1]);
-  }
-  else
-  {
-    q[1] = 0.25 * (C[5] - C[7]) / (q[0]);
-    q[2] = 0.25 * (C[6] - C[2]) / (q[0]);
-    q[3] = 0.25 * (C[1] - C[3]) / (q[0]);
-  }
-}
-
-/* Quaternion to DCM ------------------------------------- ---------------------
-* description: transform a quaternion to DCM Cbn amtrix
-* args   : double* C[9]       IO    DCM Cbe matrix
-* 	       double* q[4]	      I   quaternion
-Reference: Groves (2013, pag.41)
-*-----------------------------------------------------------------------------*/
-void Quaternion_to_DCM(double *q, double *C)
-{
-  /* The transformation between the quaternion and the DCM Cbn is accomplished by */
-  C[0] = q[0] * q[0] + q[1] * q[1] - q[2] * q[2] - q[3] * q[3];
-  C[1] = 2 * (q[1] * q[2] + q[3] * q[0]);
-  C[2] = 2 * (q[1] * q[3] - q[2] * q[0]);
-  C[3] = 2 * (q[1] * q[2] - q[3] * q[0]);
-  C[4] = q[0] * q[0] - q[1] * q[1] + q[2] * q[2] - q[3] * q[3];
-  C[5] = 2 * (q[2] * q[3] + q[1] * q[0]);
-  C[6] = 2 * (q[1] * q[3] + q[2] * q[0]);
-  C[7] = 2 * (q[2] * q[3] - q[1] * q[0]);
-  C[8] = q[0] * q[0] - q[1] * q[1] - q[2] * q[2] + q[3] * q[3];
-}
-
-/* Euler to quaternion ----------------------------------- ---------------------
-* description: transform an euler vector to quaternion
-* args   : double *eul_nb       I    Euler angles vector {3x1}
-* 	       double* q_nb[4]	      IO   quaternion {4x1}
-Reference: Groves (2013, pag.42)
-*-----------------------------------------------------------------------------*/
-Euler_to_quaternion(double *eul_nb, double *q_nb)
-{
-  double phi_half = eul_nb[0] / 2, theta_half = eul_nb[1] / 2,
-         yaw_half = eul_nb[2] / 2;
-
-  q_nb[0] = cos(phi_half) * cos(theta_half) * cos(yaw_half) + sin(phi_half) * sin(theta_half) * sin(yaw_half);
-  q_nb[1] = sin(phi_half) * cos(theta_half) * cos(yaw_half) - cos(phi_half) * sin(theta_half) * sin(yaw_half);
-  q_nb[2] = cos(phi_half) * sin(theta_half) * cos(yaw_half) + sin(phi_half) * cos(theta_half) * sin(yaw_half);
-  q_nb[3] = cos(phi_half) * cos(theta_half) * sin(yaw_half) - sin(phi_half) * sin(theta_half) * cos(yaw_half);
-}
-
-/* Quaternion to Euler ---------------------------------- ---------------------
-* description: transform an quaternion to euler vector
-* args   : double *q_nb      I    quaternion {4x1}
-* 	       double  *eul_nb      IO   Euler angles vector {3x1}
-Reference: Groves (2013, pag.42)
-*-----------------------------------------------------------------------------*/
-Quaternion_to_euler(double *q, double *eul)
-{
-
-  eul[0] = atan2(2 * (q[0] * q[1] + q[2] * q[3]), (1 - 2 * q[1] - 2 * q[2]));
-  eul[1] = asin(2 * (q[0] * q[2] - q[1] * q[3]));
-  eul[2] = atan2(2 * (q[0] * q[3] + q[1] * q[2]), (1 - 2 * q[2] - 2 * q[3]));
-
-  printf("Quat.euler: %lf\n", 2 * (q[0] * q[2] - q[1] * q[3]));
-}
-
-/* Attitude update with quaternion --------------------- ---------------------
-* description: quaternion approach for updating the attitude matrix Cbn
-* args   : um7pack_t* imu       IO    imu structure
-*
-Reference: Shin (2001, pag.18)
-*-----------------------------------------------------------------------------*/
-void Cbn_from_rotations(um7pack_t *imu, double *C)
-{
-  double q[4], u, qdoti[16], qdot[4];
-
-  /* Building quaternion from a rotation angle vector u{ux,uy,uz} */
-
-  /* QUEST: Is it from the attitude Euler angles or  the rotation rate from gyroscopes measurements */
-  u = sqrt(imu->aea[0] * imu->aea[0] + imu->aea[1] * imu->aea[1] + imu->aea[2] * imu->aea[2]);
-
-  q[0] = (imu->g[0] / u) * sin(u / 2);
-  q[1] = (imu->g[1] / u) * sin(u / 2);
-  q[2] = (imu->g[2] / u) * sin(u / 2);
-  q[3] = cos(u / 2);
-
-  /* Normality condition
- if( q[0]*q[0]+q[1]*q[1]+q[2]*q[2]+q[3]*q[3] > 1.000001 || q[0]*q[0]+q[1]*q[1]+q[2]*q[2]+q[3]*q[3] < 0.999999 )
- q[]=q[]/sqrt(qTq); //for each component
-*/
-
-  qdoti[0] = qdoti[5] = qdoti[10] = qdoti[15] = 0;
-  qdoti[1] = qdoti[11] = imu->g[2];  /*wz*/
-  qdoti[4] = qdoti[14] = -imu->g[2]; /*-wz*/
-  qdoti[7] = qdoti[8] = imu->g[1];   /*wy*/
-  qdoti[13] = qdoti[2] = -imu->g[1]; /*-wy*/
-  qdoti[3] = qdoti[6] = imu->g[0];   /*wx*/
-  qdoti[9] = qdoti[12] = -imu->g[0]; /*-wx*/
-
-  matmul("NN", 4, 1, 4, 0.5, qdoti, q, 0.0, qdot);
-
-  /* The transformation between the quaternion and the DCM Cbn is accomplished by */
-  C[0] = q[0] * q[0] - q[1] * q[1] - q[2] * q[2] - q[3] * q[3];
-  C[1] = 2 * (q[0] * q[1] - q[2] * q[3]);
-  C[2] = 2 * (q[0] * q[2] - q[1] * q[3]);
-  C[3] = 2 * (q[0] * q[1] - q[2] * q[3]);
-  C[4] = q[1] * q[1] - q[0] * q[0] - q[2] * q[2] + q[3] * q[3];
-  C[5] = 2 * (q[1] * q[2] - q[0] * q[3]);
-  C[6] = 2 * (q[0] * q[2] - q[1] * q[3]);
-  C[7] = 2 * (q[1] * q[2] - q[0] * q[3]);
-  C[8] = q[2] * q[2] - q[0] * q[0] - q[1] * q[1] + q[3] * q[3];
-}
-
-/* Cbn update from attitude error estimate --------------- ---------------------
-* description: Corrects previous Cbe by the estimated attitude error to a new Cbe
-* args   : double *est_delta_Psi     I    vector with attitude errors {3x1}
-           double *est_C_b_e_old     I    old Cbe transformation matrix {3x3}
-           double *est_C_b_e_new     O    new Cbe transformation matrix {3x3}
-*
-Reference: Grove (2013) Appendix E, section E.6.3 page E-14
-*-----------------------------------------------------------------------------*/
-void Quaternion_attitude_errror_correction(double *est_delta_Psi,
-                                           double *est_C_b_e_old, double *est_C_b_e_new)
-{
-  double q_new[4], q_old[4], M_delta_Psi[16];
-
-  /* Obtain Cbe old quaternion */
-  DCM_to_quaternion(est_C_b_e_old, q_old);
-
-  printf("OLD_QUAT NORM %lf\n", norm(q_old, 4));
-
-  M_delta_Psi[0] = M_delta_Psi[5] = M_delta_Psi[10] = M_delta_Psi[15] = 1.0;
-  M_delta_Psi[1] = M_delta_Psi[11] = -est_delta_Psi[0]; /*-wx*/
-  M_delta_Psi[4] = M_delta_Psi[14] = est_delta_Psi[0];  /*wx*/
-  M_delta_Psi[2] = M_delta_Psi[13] = -est_delta_Psi[1]; /*wy*/
-  M_delta_Psi[7] = M_delta_Psi[8] = est_delta_Psi[1];   /*-wy*/
-  M_delta_Psi[3] = M_delta_Psi[6] = -est_delta_Psi[2];  /*wz*/
-  M_delta_Psi[9] = M_delta_Psi[12] = est_delta_Psi[2];  /*-wz*/
-
-  matmul_row("NN", 4, 1, 4, -0.5, M_delta_Psi, q_old, 0.0, q_new);
-  //matmul("NN", 1, 4, 4, -0.5, q_old, M_delta_Psi, 0.0, q_new);
-
-  printf("NEW_QUAT NORM %lf\n", norm(q_new, 4));
-
-  /* Obtain Cbe new from quaternion */
-  Quaternion_to_DCM(q_new, est_C_b_e_new);
-}
 
 /* Name of function ------------------------------------------------------------
 * Brief description
@@ -2831,7 +1127,7 @@ void LC_KF_Epoch(double time, double *GNSS_r_eb_e, double *GNSS_v_eb_e, int no_m
       printf(";\n");
     }
     printf("]\n");
-*/
+ */
   for (i = 0; i < no_meas; i++)
     ones[i] = 1.0;
   for (i = 0; i < 3; i++)
@@ -2919,7 +1215,7 @@ void LC_KF_Epoch(double time, double *GNSS_r_eb_e, double *GNSS_v_eb_e, int no_m
       printf("\n");
     }
     printf("\n");
-*/
+  */
 
   /* 2. Determine approximate system noise covariance matrix using (14.82) */
   //Q_prime_matrix(1:3,1:3) = eye(3) * LC_KF_config.gyro_noise_PSD * tor_s;
@@ -2971,7 +1267,7 @@ void LC_KF_Epoch(double time, double *GNSS_r_eb_e, double *GNSS_v_eb_e, int no_m
       printf("\n");
     }
     printf("\n");
-*/
+  */
   /* 3. Propagate state estimates using (3.14) noting that all states are zero
        due to closed-loop correction.  */
   for (i = 0; i < 15; i++)
@@ -3024,7 +1320,7 @@ void LC_KF_Epoch(double time, double *GNSS_r_eb_e, double *GNSS_v_eb_e, int no_m
       printf("\n");
     }
     printf("\n");
-*/
+  */
   /* MEASUREMENT UPDATE PHASE */
 
   /* 5. Set-up measurement matrix using (14.115)  */
@@ -3055,7 +1351,7 @@ void LC_KF_Epoch(double time, double *GNSS_r_eb_e, double *GNSS_v_eb_e, int no_m
      printf("\n");
    }
    printf("\n");
-*/
+  */
   /* 6. Set-up measurement noise covariance matrix assuming all components of
     GNSS position and velocity are independent and have equal variance. */
 
@@ -3105,7 +1401,7 @@ void LC_KF_Epoch(double time, double *GNSS_r_eb_e, double *GNSS_v_eb_e, int no_m
       printf("\n");
     }
     printf("\n");
-*/
+  */
   for (i = 0; i < no_meas; i++)
   {
     for (j = 0; j < 15; j++)
@@ -3148,15 +1444,15 @@ void LC_KF_Epoch(double time, double *GNSS_r_eb_e, double *GNSS_v_eb_e, int no_m
       printf("\n");
     }
     printf("\n");
-*/
+  */
   /* 8. Formulate measurement innovations using (14.102), noting that zero
     % lever arm is assumed here
   printf("GNSS pos and vel: %lf, %lf, %lf, %lf, %lf, %lf\n",GNSS_r_eb_e[0],GNSS_r_eb_e[1],GNSS_r_eb_e[2],GNSS_v_eb_e[0], \
   GNSS_v_eb_e[1],GNSS_v_eb_e[2]  );
 
   printf("INS pos and vel: %lf, %lf, %lf, %lf, %lf, %lf\n",est_r_eb_e_old[0],est_r_eb_e_old[1],est_r_eb_e_old[2],est_v_eb_e_old[0], \
-est_v_eb_e_old[1],est_v_eb_e_old[2]  );
-*/
+  est_v_eb_e_old[1],est_v_eb_e_old[2]  );
+  */
   for (i = 0; i < 3; i++)
   {
     delta_z[i] = GNSS_r_eb_e[i] - est_r_eb_e_old[i];
@@ -3171,7 +1467,7 @@ est_v_eb_e_old[1],est_v_eb_e_old[2]  );
       fprintf(out_KF_residuals,"%lf %2d %lf %lf\n", time,\
       GNSS_measurements[i].sat, delta_z[i], delta_z[i+no_meas] );
     }
-*/
+  */
 
   /* 9. Update state estimates using (3.24) */
   matmul_row("NN", 15, 1, 6, 1.0, K_matrix, delta_z, 0.0, K_x_delta_z);
@@ -3207,7 +1503,7 @@ est_v_eb_e_old[1],est_v_eb_e_old[2]  );
     printf("\n");
 
    for (i=0;i<15;i++) printf("x_est_new.[%d]:%lf\n",i, x_est_new[i]);
-*/
+  */
 
   /* Correct attitude, velocity, and position using (14.7-9) */
 
@@ -4252,23 +2548,23 @@ void Loosely_coupled_INS_GNSS(INS_measurements *INS_measurements, int no_meas,
                      P_matrix_new);
     printf("\n *******************  LC_KF_EPOCH ENDS **************************\n");
     /*
-printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP BEGINS **************\n");
+  printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP BEGINS **************\n");
 
-/* Correct IMU errors
-for (i=0;i<3;i++) meas_f_ib_b[i]=INS_measurements->f_ib_b[i];
-for (i=0;i<3;i++) meas_omega_ib_b[i]=INS_measurements->omega_ib_b[i];
-for (i=0;i<3;i++) meas_f_ib_b[i] = meas_f_ib_b[i] - est_IMU_bias_new[i];
-for (i=0;i<3;i++) meas_omega_ib_b[i] = meas_omega_ib_b[i] - est_IMU_bias_new[i+3];
+  /* Correct IMU errors
+  for (i=0;i<3;i++) meas_f_ib_b[i]=INS_measurements->f_ib_b[i];
+  for (i=0;i<3;i++) meas_omega_ib_b[i]=INS_measurements->omega_ib_b[i];
+  for (i=0;i<3;i++) meas_f_ib_b[i] = meas_f_ib_b[i] - est_IMU_bias_new[i];
+  for (i=0;i<3;i++) meas_omega_ib_b[i] = meas_omega_ib_b[i] - est_IMU_bias_new[i+3];
 
-for (i=0;i<3;i++) old_est_r_eb_e[i]=est_r_eb_e_new[i];
-for (i=0;i<3;i++) old_est_v_eb_e[i]=est_v_eb_e_new[i];
-for (i=0;i<9;i++) old_true_C_b_e[i]=est_C_b_e_new[i];
+  for (i=0;i<3;i++) old_est_r_eb_e[i]=est_r_eb_e_new[i];
+  for (i=0;i<3;i++) old_est_v_eb_e[i]=est_v_eb_e_new[i];
+  for (i=0;i<9;i++) old_true_C_b_e[i]=est_C_b_e_new[i];
 
-    Nav_equations_ECEF(tor_i,\
-        old_est_r_eb_e, old_est_v_eb_e,old_true_C_b_e, meas_f_ib_b,\
-        meas_omega_ib_b, est_r_eb_e_new, est_v_eb_e_new, est_C_b_e_new);
-printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n");
-*/
+      Nav_equations_ECEF(tor_i,\
+          old_est_r_eb_e, old_est_v_eb_e,old_true_C_b_e, meas_f_ib_b,\
+          meas_omega_ib_b, est_r_eb_e_new, est_v_eb_e_new, est_C_b_e_new);
+  printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n");
+  */
     time_last_GNSS = time;
 
     for (i = 0; i < 6; i++)
@@ -4657,15 +2953,15 @@ void Tightly_coupled_INS_GNSS(INS_measurements *INS_measurements,
 
     printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP BEGINS **************\n");
     /* Correct IMU errors
-for (i=0;i<3;i++) meas_f_ib_b[i]=INS_measurements->f_ib_b[i];
-for (i=0;i<3;i++) meas_omega_ib_b[i]=INS_measurements->omega_ib_b[i];
-for (i=0;i<3;i++) meas_f_ib_b[i] = meas_f_ib_b[i] - est_IMU_bias_new[i];
-for (i=0;i<3;i++) meas_omega_ib_b[i] = meas_omega_ib_b[i] - est_IMU_bias_new[i+3];
+  for (i=0;i<3;i++) meas_f_ib_b[i]=INS_measurements->f_ib_b[i];
+  for (i=0;i<3;i++) meas_omega_ib_b[i]=INS_measurements->omega_ib_b[i];
+  for (i=0;i<3;i++) meas_f_ib_b[i] = meas_f_ib_b[i] - est_IMU_bias_new[i];
+  for (i=0;i<3;i++) meas_omega_ib_b[i] = meas_omega_ib_b[i] - est_IMU_bias_new[i+3];
 
-    Nav_equations_ECEF(tor_i,\
-        old_est_r_eb_e, old_est_v_eb_e,old_true_C_b_e, meas_f_ib_b,\
-        meas_omega_ib_b, est_r_eb_e_new, est_v_eb_e_new, est_C_b_e_new);
-*/
+      Nav_equations_ECEF(tor_i,\
+          old_est_r_eb_e, old_est_v_eb_e,old_true_C_b_e, meas_f_ib_b,\
+          meas_omega_ib_b, est_r_eb_e_new, est_v_eb_e_new, est_C_b_e_new);
+  */
     printf("\n *****************  NAV_EQUATIONS CLOSED-LOOP ENDS ****************\n");
 
     time_last_GNSS = GNSS_measurements->sec;
@@ -5032,11 +3328,11 @@ extern void LC_INS_GNSS_core(double *GNSS_r_eb_e, double *gnss_xyz_ini_cov, doub
   //PVA_old->t_s=curr_GNSS_time;
 
   /*
-printf("Pllhnew: %lf, %lf, %lf\n",pvat_new.latitude*R2D,pvat_new.longitude*R2D,pvat_new.height );
-printf("Vnew: %lf, %lf, %lf\n",pvat_new.ned_velocity[0],pvat_new.ned_velocity[1],pvat_new.ned_velocity[2] );
-printf("Anew: %lf, %lf, %lf\n",pvat_new.euler_angles[0],pvat_new.euler_angles[1],pvat_new.euler_angles[2] );
-printf("dtr, dtrs: %lf, %lf\n", PVA_old->clock_offset_drift[0],PVA_old->clock_offset_drift[1]);
-*/
+  printf("Pllhnew: %lf, %lf, %lf\n",pvat_new.latitude*R2D,pvat_new.longitude*R2D,pvat_new.height );
+  printf("Vnew: %lf, %lf, %lf\n",pvat_new.ned_velocity[0],pvat_new.ned_velocity[1],pvat_new.ned_velocity[2] );
+  printf("Anew: %lf, %lf, %lf\n",pvat_new.euler_angles[0],pvat_new.euler_angles[1],pvat_new.euler_angles[2] );
+  printf("dtr, dtrs: %lf, %lf\n", PVA_old->clock_offset_drift[0],PVA_old->clock_offset_drift[1]);
+  */
   /* Plots -------------------------------------------------------------------*/
 
   /* Write output profile and errors file ------------------------------------*/
@@ -5600,7 +3896,7 @@ extern void imu_tactical_navigation(FILE *imu_file)
    old_C_b_e[3],old_C_b_e[4],old_C_b_e[5],\
    old_C_b_e[6],old_C_b_e[7],old_C_b_e[8]);
 
-*/
+  */
   fgets(str, 100, imu_file);
   sscanf(str, "%f %lf %lf %lf %lf %lf %lf", &t_prev, &f_ib_b[2],
          &f_ib_b[1], &f_ib_b[0], &omega_ib_b[2], &omega_ib_b[1], &omega_ib_b[0]);
@@ -5635,7 +3931,7 @@ extern void imu_tactical_navigation(FILE *imu_file)
   printf("f_ib_b %lf, %lf, %lf\n",f_ib_b[0],f_ib_b[1],f_ib_b[2] );
   printf("omega_ib_b: %lf, %lf, %lf\n",omega_ib_b[0],omega_ib_b[1],omega_ib_b[2] );
   printf("tor_i: %f\n", tor_i);
-*/
+  */
 
     printf("\n *****************  NAV_EQUATIONS BEGINS ************************\n");
     Nav_equations_ECEF(tor_i,
@@ -5861,7 +4157,7 @@ void Nav_equations_ECEF1(ins_states_t *ins)
    % From (5.38), */
   for (i = 0; i < 3; i++)
     ins->re[i] = ins->pre[i] + (ins->ve[i] + ins->pve[i]) * 0.5 * tor_i;
-/**/
+  /**/
   update_ins_state_n(ins);
 
   printf("OUTPUT NAV: \n");
@@ -5885,19 +4181,7 @@ void Nav_equations_ECEF1(ins_states_t *ins)
   printf(" ********************* NAVIGATION EQUATIONS END ******************\n");
 }
 
-/* functions for initial error covariance matrix ----------------------------*/
-extern void initP(int is, int ni, int nx, double unc, double unc0, double *P0)
-{
-  int i, j;
-  for (i = is; i < is + ni; i++)
-    for (j = 0; j < nx; j++)
-    {
-      if (j == i)
-        P0[j + i * nx] = SQR(unc == 0.0 ? unc0 : unc);
-      else
-        P0[j + i * nx] = P0[i + j * nx] = 0.0;
-    }
-}
+
 
 /* system noise covariance matrix--------------------------------------------*/
 static void sysQ(int is, int n, int nx, double v, double dt, double *Q)
@@ -6145,20 +4429,20 @@ static void precPhi(const insgnss_opt_t *opt, double dt, const double *Cbe,
   /* third-order approx */
   for (i = 0; i < nx * nx; i++)
     F[i] *= dt;
-#if 0
-    matmul("NN",nx,nx,nx,1.0,F,F,0.0,FF);
-    matmul33("NNN",F,F,F,nx,nx,nx,nx,FFF);
+  #if 0
+      matmul("NN",nx,nx,nx,1.0,F,F,0.0,FF);
+      matmul33("NNN",F,F,F,nx,nx,nx,nx,FFF);
 
-    for (i=0;i<nx*nx;i++) {
-        Phi[i]=I[i]+F[i]+0.5*FF[i]+1.0/6.0*FFF[i];
-    }
-#else
-  expmat(F, nx, Phi);
-#endif
-  free(F);
-  free(FF);
-  free(FFF);
-  free(I);
+      for (i=0;i<nx*nx;i++) {
+          Phi[i]=I[i]+F[i]+0.5*FF[i]+1.0/6.0*FFF[i];
+      }
+  #else
+    expmat(F, nx, Phi);
+  #endif
+    free(F);
+    free(FF);
+    free(FFF);
+    free(I);
 }
 /* determine transition matrix(first-order approx: Phi=I+F*dt)---------------*/
 static void getPhi1(const insgnss_opt_t *opt, double dt, const double *Cbe,
@@ -6284,29 +4568,29 @@ static void corr_meas(const obsd_t *obs, const nav_t *nav, const double *azel,
         else if (obs->code[i]==CODE_L2C||obs->code[i]==CODE_L2X||
                  obs->code[i]==CODE_L2L||obs->code[i]==CODE_L2S) {
             P[i]+=nav->cbias[obs->sat-1][2];
-#if 0
-            L[i]-=0.25*lam[i]; /* 1/4 cycle-shift */
-#endif
-        }
-    }
-    /* iono-free LC */
-    *Lc=*Pc=0.0;
-    sys=satsys(obs->sat,NULL);
-    i=(sys&(SYS_GAL|SYS_SBS))?2:1; /* L1/L2 or L1/L5 */
-    if (lam[0]==0.0||lam[i]==0.0) return;
-    
-    C1= SQR(lam[i])/(SQR(lam[i])-SQR(lam[0]));
-    C2=-SQR(lam[0])/(SQR(lam[i])-SQR(lam[0]));
-    
-#if 0
-    /* P1-P2 dcb correction (P1->Pc,P2->Pc) */
-    if (sys&(SYS_GPS|SYS_GLO|SYS_QZS)) {
-        if (P[0]!=0.0) P[0]-=C2*nav->cbias[obs->sat-1][0];
-        if (P[1]!=0.0) P[1]+=C1*nav->cbias[obs->sat-1][0];
-    }
-#endif
-    if (L[0]!=0.0&&L[i]!=0.0) *Lc=C1*L[0]+C2*L[i];
-    if (P[0]!=0.0&&P[i]!=0.0) *Pc=C1*P[0]+C2*P[i];
+  #if 0
+              L[i]-=0.25*lam[i]; /* 1/4 cycle-shift */
+  #endif
+          }
+      }
+      /* iono-free LC */
+      *Lc=*Pc=0.0;
+      sys=satsys(obs->sat,NULL);
+      i=(sys&(SYS_GAL|SYS_SBS))?2:1; /* L1/L2 or L1/L5 */
+      if (lam[0]==0.0||lam[i]==0.0) return;
+      
+      C1= SQR(lam[i])/(SQR(lam[i])-SQR(lam[0]));
+      C2=-SQR(lam[0])/(SQR(lam[i])-SQR(lam[0]));
+      
+  #if 0
+      /* P1-P2 dcb correction (P1->Pc,P2->Pc) */
+      if (sys&(SYS_GPS|SYS_GLO|SYS_QZS)) {
+          if (P[0]!=0.0) P[0]-=C2*nav->cbias[obs->sat-1][0];
+          if (P[1]!=0.0) P[1]+=C1*nav->cbias[obs->sat-1][0];
+      }
+  #endif
+      if (L[0]!=0.0&&L[i]!=0.0) *Lc=C1*L[0]+C2*L[i];
+      if (P[0]!=0.0&&P[i]!=0.0) *Pc=C1*P[0]+C2*P[i];
 }
 
 /* propagate state estimates noting that all states are zero due to closed-loop
@@ -6324,46 +4608,39 @@ static void updstat(const insgnss_opt_t *opt, ins_states_t *ins, const double dt
 {
   int nx = ins->nx;
 
-  struct timeval stop, start; 
+ 
   //printf("updstat\n");
 
   /* determine approximate system noise covariance matrix */
-  //gettimeofday(&start, NULL); //do stuff
   opt->scalePN ? getprn(ins, opt, dt, Q, nx) : getQ(opt, dt, Q, nx);
-  //gettimeofday(&stop, NULL); 
-  //printf("took Q %lf\n", (stop.tv_usec - start.tv_usec)/1000.0);
 
 
   /* determine transition matrix
   * using last epoch ins states (first-order approx) */
-  //gettimeofday(&start, NULL); //do stuff
   opt->exphi ? precPhi(opt, dt, ins->Cbe, ins->re, ins->data.wibb, ins->data.fb, phi, nx) : getPhi1(opt, dt, ins->Cbe, ins->re, ins->data.wibb, ins->data.fb, phi, nx);
-  //gettimeofday(&stop, NULL); 
-  //printf("took Phi %lf\n", (stop.tv_usec - start.tv_usec)/1000.0);
 
-#if UPD_IN_EULER
-  getphi_euler(opt, dt, ins->Cbe, ins->re, ins->omgb, ins->fb, phi);
-#endif
-  //gettimeofday(&start, NULL); //do stuff
-  /* propagate state estimation error covariance */
-  if (fabs(dt) >= MAXUPDTIMEINT){
-    getP0(opt, P, nx);
-  }
-  else{
-    propP(opt, Q, phi, P0, P, nx);
-  }
- //gettimeofday(&stop, NULL); 
-  //printf("took P %lf\n", (stop.tv_usec - start.tv_usec)/1000.0);
-  /* propagate state estimates noting that
-     * all states are zero due to close-loop correction */
-  if (x)
-    propx(opt, x0, x);
 
-  /* predict info. */
-  if (ins->P0)
-    matcpy(ins->P0, P, nx, nx);
-  if (ins->F)
-    matcpy(ins->F, phi, nx, nx);
+  #if UPD_IN_EULER
+    getphi_euler(opt, dt, ins->Cbe, ins->re, ins->omgb, ins->fb, phi);
+  #endif
+    //gettimeofday(&start, NULL); //do stuff
+    /* propagate state estimation error covariance */
+    if (fabs(dt) >= MAXUPDTIMEINT){
+      getP0(opt, P, nx);
+    }
+    else{
+      propP(opt, Q, phi, P0, P, nx);
+    }
+    /* propagate state estimates noting that
+      * all states are zero due to close-loop correction */
+    if (x)
+      propx(opt, x0, x);
+
+    /* predict info. */
+    if (ins->P0)
+      matcpy(ins->P0, P, nx, nx);
+    if (ins->F)
+      matcpy(ins->F, phi, nx, nx);
 }
 
 /* propagate ins states and its covariance matrix----------------------------
@@ -6529,15 +4806,7 @@ extern void insp2antp(const ins_states_t *ins, insgnss_opt_t *insopt, double *rr
     matmul3v("N",ins->Cbe,insopt->lever,T);
     for (i=0;i<3;i++) rr[i]=ins->re[i]+T[i];
 }
-/* initialize state and covariance -------------------------------------------*/
-static void tcinitx(ins_states_t *ins,double xi, double var, int i)
-{
-    int j;
-    ins->x[i]=xi;
-    for (j=0;j<ins->nx;j++) {
-        ins->P[i+j*ins->nx]=ins->P[j+i*ins->nx]=i==j?var:0.0;
-    }
-} 
+
 /* temporal update of position -----------------------------------------------*/
 static void udpos_ppp(rtk_t *rtk, int nx, ins_states_t *ins)
 {
@@ -6875,7 +5144,6 @@ static double varerr(int sat, int sys, double el, int type, const prcopt_t *opt)
     return a*a+b*b/sinel/sinel;
 }
 
-
 /* phase and code residuals --------------------------------------------------*/
 static int ppp_res(int post, const obsd_t *obs, int n, const double *rs,
                    const double *dts, const double *vare, const int *svh,
@@ -7013,11 +5281,11 @@ static int ppp_res(int post, const obsd_t *obs, int n, const double *rs,
          printf("Meas: %lf Modeled: %lf RES.: %lf\n", meas[j], r, v[nv]);
 
          /* test innovation */
-#if 0
-         if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno) {
-#else
-         if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno&&sys!=SYS_GLO) {
-#endif
+  #if 0
+          if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno) {
+  #else
+          if (opt->maxinno>0.0&&fabs(v[nv])>opt->maxinno&&sys!=SYS_GLO) {
+  #endif
              trace(2,"ppp outlier rejected %s sat=%2d type=%d v=%.3f\n",
                    time_str(obs[i].time,0),sat,j,v[nv]);
              rtk->ssat[sat-1].rejc[0]++;
@@ -7180,12 +5448,12 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
     /* if the std of the seed position exists then use the seed */
     if (rtk->opt.seed[3]>0) {
     //for (i=0;i<3;i++) insp->x[xiP()+i]=rtk->opt.seed[i]; /* position */
-    for (i=0;i<3;i++) insp->re[i]=rtk->opt.seed[i]; /* position */
-    for (i=0;i<3;i++) rtk->sol.rr[i]=rtk->opt.seed[i]; /* position */
-    for (i=0;i<3;i++) rtk->sol.rr[i+3]=insp->x[xiV()+i]=0.0; /* velocity - start as static*/
-    for (i=0;i<3;i++) insp->P[(xiP()+i)+(xiP()+i)*insp->nx]=rtk->opt.seed[3]; 
-    for (i=0;i<3;i++) insp->P[(xiV()+i)+(xiV()+i)*insp->nx]=0.0; 
-    rtk->opt.seed[3]=-1;
+      for (i=0;i<3;i++) insp->re[i]=rtk->opt.seed[i]; /* position */
+      for (i=0;i<3;i++) rtk->sol.rr[i]=rtk->opt.seed[i]; /* position */
+      for (i=0;i<3;i++) rtk->sol.rr[i+3]=insp->x[xiV()+i]=0.0; /* velocity - start as static*/
+      for (i=0;i<3;i++) insp->P[(xiP()+i)+(xiP()+i)*insp->nx]=rtk->opt.seed[3]; 
+      for (i=0;i<3;i++) insp->P[(xiV()+i)+(xiV()+i)*insp->nx]=0.0; 
+      rtk->opt.seed[3]=-1;
     }
     matcpy(xp,insp->x,nx,1);
 
@@ -7372,43 +5640,43 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
   //   }
   //   printf("\n");
   // }
-/*
-    printf("R\n");
-  for (i = 0; i < nv; i++)
-  {
-    for (j = 0; j < nv; j++)
+  /*
+      printf("R\n");
+    for (i = 0; i < nv; i++)
     {
-      //printf("%lf ", R[j * insp->nx + i]);
-      (i==j?printf("%lf ", R[j*nv + i]):0);
+      for (j = 0; j < nv; j++)
+      {
+        //printf("%lf ", R[j * insp->nx + i]);
+        (i==j?printf("%lf ", R[j*nv + i]):0);
+      }
+      printf("\n");
+    }*/
+  /*
+    printf("v\n");
+    for (i = 0; i < nv; i++) printf("%lf ", v[i]);
+    printf("\n");
+  */
+    printf("x vector:\n");
+    for (j = 0; j < nx; j++) printf("%.15lf ", xp[j]); 
+  /*
+    printf("\nPp\n");
+    for (i = 0; i < nx; i++)
+    {
+      for (j = 0; j < nx; j++)
+      {
+        (i==j?printf("%.15lf ", Pp[i*nx + j]):0); 
+      }
+    }*/
+    printf("\n");
+    printf("\nP\n");
+    for (i = 0; i < nx; i++)
+    {
+      for (j = 0; j < nx; j++)
+      {
+        (i==j?printf("%.15lf ", insp->P[i*nx + j]):0); 
+      }
     }
     printf("\n");
-  }*/
-/*
-  printf("v\n");
-  for (i = 0; i < nv; i++) printf("%lf ", v[i]);
-  printf("\n");
-*/
-  printf("x vector:\n");
-  for (j = 0; j < nx; j++) printf("%.15lf ", xp[j]); 
-/*
-  printf("\nPp\n");
-  for (i = 0; i < nx; i++)
-  {
-    for (j = 0; j < nx; j++)
-    {
-      (i==j?printf("%.15lf ", Pp[i*nx + j]):0); 
-    }
-  }*/
-  printf("\n");
-  printf("\nP\n");
-  for (i = 0; i < nx; i++)
-  {
-    for (j = 0; j < nx; j++)
-    {
-      (i==j?printf("%.15lf ", insp->P[i*nx + j]):0); 
-    }
-  }
-  printf("\n");
   
     if (i>=MAX_ITER) {
         trace(2,"%s ppp (%d) iteration overflows\n",str,i);
@@ -7579,11 +5847,11 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
             getatt(ins,rpy);
 
             if (fabs(yaw-NORMANG(rpy[2]*R2D))<MAXANG) return 0;
-#if 0
-            rpy[2]=yaw*D2R; /* reset yaw */
-#else
-            rpy[2]=(NORMANG(rpy[2]*R2D)+yaw)/2.0*D2R;
-#endif
+  #if 0
+              rpy[2]=yaw*D2R; /* reset yaw */
+  #else
+              rpy[2]=(NORMANG(rpy[2]*R2D)+yaw)/2.0*D2R;
+  #endif
             rpy2dcm(rpy,C);
             matt(C,3,3,ins->Cbn);
 
