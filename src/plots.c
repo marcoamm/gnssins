@@ -36,8 +36,8 @@ extern void imuaccplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(min)' \n"
               "set ylabel 'ACCELERATIONS (m/s/s)' \n"
 	      //"set xrange [0:40] \n"
- 	      //"set term postscript eps enhanced color\n"
-	      //"set output '%s accelerations.ps'\n"
+ 	      "set term postscript eps enhanced color\n"
+	      "set output '%s accelerations.ps'\n"
 	      "set autoscale \n"
         "set yrange [-2.5:2.5] \n"
 	      "set grid \n", outpath[0]);
@@ -124,7 +124,7 @@ extern void imuposplot(char* filename){
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
  	      "set term postscript eps enhanced color\n"
-	      "set output '%s positions_obst.ps'\n"
+	      "set output '%s positions_obs.ps'\n"
         /* General view  */
         //"set yrange [45.942:45.9432] \n"  //BMO field general view
         //"set xrange [-66.6418:-66.6402] \n"

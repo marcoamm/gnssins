@@ -322,7 +322,7 @@ extern FILE *imu_tactical;
 extern int zvu_counter;
 extern int gnss_meas_w;
 extern int gnss_w_counter;
-extern int ins_w_ounter;
+extern int ins_w_counter;
 extern sol_t *solw;
 extern obsb_t obsw;
 extern ins_states_t *insw;

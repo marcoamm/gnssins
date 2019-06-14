@@ -1829,7 +1829,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     //     }
     //   }
      
-    //   core1(rtk, obs, n, nav);
+      core1(rtk, obs, n, nav);
 
     //   printf("Clock check after core1: dt: %lf s! \n", rtk->sol.dtr[0]);
    
@@ -1852,7 +1852,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     /* precise point positioning */
     if (opt->mode>=PMODE_PPP_KINEMA) {
    
-        pppos(rtk,obs,nu,nav);
+        //pppos(rtk,obs,nu,nav);
    
       //pppos1(rtk,obs,nu,nav); /* PPP-modified*/
 
@@ -1864,33 +1864,33 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
          rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
        }*/
 
-       if(!rtk->tt){
-        rtk->sol.prevclk=rtk->sol.dtr[0];
-        rtk->sol.prevdrf=rtk->sol.dtrr;
-       }
+    //    if(!rtk->tt){
+    //     rtk->sol.prevclk=rtk->sol.dtr[0];
+    //     rtk->sol.prevdrf=rtk->sol.dtrr;
+    //    }
 
-      double cdiff=(double)fabs((rtk->sol.prevclk + rtk->sol.prevdrf*rtk->tt)-(rtk->sol.dtr[0]));
+    //   double cdiff=(double)fabs((rtk->sol.prevclk + rtk->sol.prevdrf*rtk->tt)-(rtk->sol.dtr[0]));
 
-      printf("Clock check: dt: %lf ,cdiff: %lf, tt: %lf\n", rtk->sol.dtr[0], cdiff, rtk->tt);
+    //   printf("Clock check: dt: %lf ,cdiff: %lf, tt: %lf\n", rtk->sol.dtr[0], cdiff, rtk->tt);
 
-      if (cdiff < 300000 && rtk->tt >= 0.0 ) {
-         rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
-      }else{
-        if (fabs(rtk->sol.dtr[0]) > 10000 ) {
-          rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
-        }
-      }
+    //   if (cdiff < 300000 && rtk->tt >= 0.0 ) {
+    //      rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+    //   }else{
+    //     if (fabs(rtk->sol.dtr[0]) > 10000 ) {
+    //       rtk->sol.dtr[0]=rtk->sol.dtr[0]/CLIGHT;
+    //     }
+    //   }
       
-      core1(rtk, obs, n, nav); 
+    //   core1(rtk, obs, n, nav); 
 
-      if (cdiff < 300000 && rtk->tt >= 0.0 ) {
-         rtk->sol.dtr[0]=rtk->sol.dtr[0]*CLIGHT;
-      }
+    //   if (cdiff < 300000 && rtk->tt >= 0.0 ) {
+    //      rtk->sol.dtr[0]=rtk->sol.dtr[0]*CLIGHT;
+    //   }
 
-      printf("Clock check OUTPUT: dt: %lf s!!\n", rtk->sol.dtr[0]);
+    //   printf("Clock check OUTPUT: dt: %lf s!!\n", rtk->sol.dtr[0]);
 
-      rtk->sol.prevclk=rtk->sol.dtr[0];
-      rtk->sol.prevdrf=rtk->sol.dtrr;
+    //   rtk->sol.prevclk=rtk->sol.dtr[0];
+    //   rtk->sol.prevdrf=rtk->sol.dtrr;
 
        /* loosley coupled inertial gnss integration  */
       // printf("GNSS TIME BEFORE: %lf\n", time2gpst(rtk->sol.time,NULL));
@@ -1898,7 +1898,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
       //insgnssLC(rtk->sol.rr, rtk->sol.qr, vel, time2gpst(rtk->sol.time,NULL));
 
         //undiffppp(rtk,obs,nu, nav);
-        pppoutsolstat(rtk,statlevel,fp_stat);
+        //pppoutsolstat(rtk,statlevel,fp_stat);
         //fclose(f1);
         printf("Leaving rtkpos ppp if\n");
         return 1;

@@ -4785,6 +4785,22 @@ static int chkpcov(int nx, const insgnss_opt_t *opt, double *P)
 {
   int i;
   double var = 0.0;
+
+  //   /* If negative values */
+  //     for (i = 0; i < nx; i++){
+  //       if (P[i * nx + i] < 0.0 ){
+  //         printf("checkpcov: negative values, getting P0\n");
+  //         if (ins_w_counter<insgnssopt.insw){
+  //           //matcpy(P,insw[ins_w_counter].P,nx,nx);
+  //           getP0(opt, P, nx);
+  //           return;
+  //         }          
+  //         //matcpy(P,insw[insgnssopt.insw-1].P,nx,nx);
+  //         getP0(opt, P, nx);
+  //         return;
+  //   }
+  // }
+
   for (i = xiP(); i < xiP() + 3; i++){
     var += SQRT(P[i + i * nx]);
   }
@@ -4797,6 +4813,8 @@ static int chkpcov(int nx, const insgnss_opt_t *opt, double *P)
       getP0(opt, P, nx);
     }
   }
+
+
 }
 
 /* imu body position transform to gps antenna---------------------------------*/
@@ -5935,6 +5953,11 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
   /* Ins navigation */
   Nav_equations_ECEF1(insc);
 
+  /* propagate ins states */
+  printf("Prop ins\n");
+  propinss(insc, ig_opt, insc->dt, insc->x, insc->P);
+  printf("Prop ins end\n");
+
        printf("ins->P before checkpcov\n");
   for (i = 0; i < insc->nx; i++)
   {
@@ -5945,12 +5968,10 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
   }
   printf("\n GNSS time: %lf", gnss_time);
 
-  /* propagate ins states */
-  printf("Prop ins\n");
-  propinss(insc, ig_opt, insc->dt, insc->x, insc->P);
-  printf("Prop ins end\n");
+  /* Checking input values  */
+  chkpcov(nx, ig_opt, insc->P);
 
-  for (i = 0; i < insc->nx; i++)
+    for (i = 0; i < insc->nx; i++)
   {
     if (insc->P[i * insc->nx + i] < 0.0 ){
       printf("NEGATIVE VALUE AT P[%d]",i * insc->nx + i);
@@ -5958,15 +5979,12 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
     }
   }
 
-  /* Checking input values  */
-  chkpcov(nx, ig_opt, insc->P);
-
   if (nav_or_int)
   {
     /* Integration */
     if (obs && insc && n){
       /* code */
-      dt = fabs(gnss_time - insc->time);
+      dt = fabs(gnss_time - insc->ptctime);
 
       /* check synchronization */
       if (fabs(dt) > 3.0)
@@ -5975,6 +5993,11 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
         ig_opt->Nav_or_KF = 0;
         return (0);
       }
+
+      /* propagate ins states */
+      // printf("Prop ins\n");
+      // propinss(insc, ig_opt, dt, insc->x, insc->P);
+      // printf("Prop ins end\n");
 
       /* tightly coupled */
      if(ig_opt->Nav_or_KF=pppos1(rtk, obs, insc, ig_opt, n, nav)){

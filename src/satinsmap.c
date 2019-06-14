@@ -33,12 +33,12 @@ obsb_t obsw={0};          /* observation data buffer */
 ins_states_t *insw;   /* ins states buffer */
 int zvu_counter = 0;
 int gnss_w_counter = 0;
-int ins_w_counter = 0;
+int ins_w_counter = 0; 
 int dz_counter = 0;
 res_t resid={0};
 const double Omge[9]={0,OMGE,0,-OMGE,0,0,0,0,0}; /* (5.18) */
 
-char *outpath1[] = {"../out/"};  
+char *outpath1[] = {"../out/"};   
 FILE *out_PVA;
 FILE *out_clock_file;
 FILE *out_IMU_bias_file;
@@ -3209,7 +3209,7 @@ int statImumeas(ins_states_t *ins){
   appgrav(ins->rn, gan, wiee);
 
   printf("Position: %lf, %lf, %lf \n", ins->rn[0]*R2D, ins->rn[1]*R2D, ins->rn[2]);
-  printf("GNSS pos: %lf, %lf, %lf \n", llh[0]*R2D, llh[1]*R2D, llh[2]); 
+  printf("GNSS pos: %lf, %lf, %lf \n", llh[0]*R2D, llh[1]*R2D, llh[2]);  
   //printf("Gravidade: %lf test quantity: %lf < \n", gn(ins->rn[0], ins->rn[2]), norm(ins->data.fb0,3) - gn(ins->rn[0], ins->rn[2]) );
 
   /* Velocity threshold: as low as 0.0075 m/s per axis (norm=0.0129) for aviagtion-grade 
@@ -3328,7 +3328,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     if(insc.pdata.sec > 0.0 ){
       outputrawimu(&insc);
     }
-
+    /* Ins time propagation */
     if (ins_w_counter >= 1){
       insc.dt = insc.time - insc.ptime;
     }
@@ -3372,7 +3372,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
         }  
       }      
    
-      /* Check if ins and gps observations match for integration */
+      /* Check if ins and gps observations match for integration */ 
       flag=interp_ins2gpst(gnss_time, &insc); 
 
       /* GNSS solution quality check */
@@ -3380,7 +3380,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
       //if (flag)  
 
-      /* Integration */
+      /* Integration */ 
       if (insgnssopt.mode){ // Add condition: if less than four satellites mode=0;
          /* Tightly-coupled ins/gnss */
          TC_INS_GNSS_core1(rtk, obs, n, nav, &insc, &insgnssopt, flag);
@@ -3430,9 +3430,10 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     }
  
     /* Zeroing closed-loop states */
-     for (i=0;i<xnCl();i++) insc.x[i]=0.0;  
+     for (i=0;i<xnCl();i++) insc.x[i]=0.0;   
 
-     /* Update ins states and measurements */  
+     /* Update ins states and measurements */
+     insc.ptctime=gnss_time;    
      insupdt(&insc);
 
      /* Add current ins measurement to buffer */
@@ -3504,13 +3505,13 @@ insgnssopt.mode = 1; /* Tightly=1, or Loosley=0 coupled solution */
 insgnssopt.Tact_or_Low = 1;       /* Type of inertial, tact=1, low=0 */
 insgnssopt.scalePN = 0;             /* use extended Process noise model */ 
 insgnssopt.gnssw = 3; 
-insgnssopt.insw = 10; 
+insgnssopt.insw = 10;  
 insgnssopt.exphi = 0;            /* use precise system propagate matrix for ekf */
 /* ins sthocastic process noises: */
-insgnssopt.baproopt=INS_RANDOM_WALK;
-insgnssopt.bgproopt=INS_RANDOM_WALK; 
-insgnssopt.saproopt=INS_RANDOM_WALK;
-insgnssopt.sgproopt=INS_RANDOM_WALK;
+insgnssopt.baproopt=INS_GAUSS_MARKOV;
+insgnssopt.bgproopt=INS_GAUSS_MARKOV; 
+insgnssopt.saproopt=INS_GAUSS_MARKOV;
+insgnssopt.sgproopt=INS_GAUSS_MARKOV;
 solw=(sol_t*)malloc(sizeof(sol_t)*insgnssopt.gnssw);  /* gnss solution structure window size allocation */
 insw=(ins_states_t*)malloc(sizeof(ins_states_t)*insgnssopt.insw);   /* ins states window size allocation */
 
@@ -3521,21 +3522,21 @@ resid.data=(res_epoch_t*)malloc(sizeof(res_epoch_t)*resid.nv_w);  /* residuals s
 
 strcpy(filopt.trace,tracefname); 
    
-/* Global TC_KF_INS_GNSS output files          */
-out_PVA=fopen("../out/out_PVA.txt","w");
-out_clock_file=fopen("../out/out_clock_file.txt","w"); 
-out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
-out_tropo_file=fopen("../out/out_tropo_bias.txt","w");
-out_amb_file=fopen("../out/out_amb_bias.txt","w");
-out_KF_state_error=fopen("../out/out_KF_state_error.txt","w");
-out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
-out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
-out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
-//imu_tactical=fopen("../data/imu_ascii_new_1.txt", "r");
-imu_tactical=fopen("../data/imu_ascii_new_timesync2.txt", "r");
-fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");   
+// /* Global TC_KF_INS_GNSS output files          */
+// out_PVA=fopen("../out/out_PVA.txt","w");
+// out_clock_file=fopen("../out/out_clock_file.txt","w");  
+// out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
+// out_tropo_file=fopen("../out/out_tropo_bias.txt","w");
+// out_amb_file=fopen("../out/out_amb_bias.txt","w");
+// out_KF_state_error=fopen("../out/out_KF_state_error.txt","w");
+// out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
+// out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
+// out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
+// //imu_tactical=fopen("../data/imu_ascii_new_1.txt", "r");
+// imu_tactical=fopen("../data/imu_ascii_new_timesync2.txt", "r");
+// fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");   
  
-rewind(imu_tactical);                                                 
+// rewind(imu_tactical);                                                 
 
 
 
@@ -3687,8 +3688,8 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
 /* Start rnx2rtkp processing  ----------------------------------- --*/ 
 /* Processing ------------------------------------------------------*/
-  ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
-  if (!ret) fprintf(stderr,"%40s\r","");
+  //ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
+ // if (!ret) fprintf(stderr,"%40s\r","");
  
   for (i=0;i<insgnssopt.insw;i++) insfree(insw+i); 
   free(resid.data);
@@ -3699,17 +3700,17 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
 
  /* Closing global files          */
   //fclose(fp_lane);
-  fclose(out_PVA);
-  fclose(out_clock_file);
-  fclose(out_IMU_bias_file);  
-  fclose(out_tropo_file);
-  fclose(out_amb_file);
-  fclose(out_KF_SD_file);
-  fclose(out_raw_fimu);
-  fclose(imu_tactical);
-  fclose(out_KF_state_error); 
-  fclose(out_KF_residuals);  
-  fclose(fimu);                      
+  // fclose(out_PVA);
+  // fclose(out_clock_file);
+  // fclose(out_IMU_bias_file);  
+  // fclose(out_tropo_file);
+  // fclose(out_amb_file);
+  // fclose(out_KF_SD_file);
+  // fclose(out_raw_fimu);
+  // fclose(imu_tactical);
+  // fclose(out_KF_state_error); 
+  // fclose(out_KF_residuals);  
+  // fclose(fimu);                      
 
 /*
   char posfile[]="../out/out_PVA.txt";
