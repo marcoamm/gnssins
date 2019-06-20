@@ -202,6 +202,7 @@ typedef struct {        /* Position, velocity and attitude structure (PVA) */
 typedef struct {      /* Position velocity and attitude solution structure */
   double time;             /* time (sec) */
   double ptctime;         /* Previous integration time*/
+  double proptime;         /* Previous integration time*/
   double dt;              /* time difference of previous ins update and current time */
   double vn[3],rn[3],an[3]; /*states in navigation frame */
   double ve[3],re[3],ae[3]; /*states in ecef frame */
@@ -277,6 +278,7 @@ typedef struct {  /* GNSS/INS processing options */
   int dtproopt;           /* ins-gnss time synchronization error stochastic process setting (INS_RANDOM_WALK) */
   int rgproopt;           /* non-orthogonal between sensor axes for gyro stochastic process setting */
   int raproopt;           /* non-orthogonal between sensor axes for accl stochastic process setting */
+  int ins_EOF;     /* End of IMU file stream flag: 1:there is data or 0: EOF*/
 } insgnss_opt_t;
 
 typedef struct {        /* observation data buffer */
@@ -299,6 +301,16 @@ typedef struct {        /* Residuals data buffer */
     double Q[(18+MAXSAT)*(18+MAXSAT)];  /* Q (nx,nx) matrix from averaged C */
     double R[MAXSAT*MAXSAT*4];          /* R (n,n) matrix from averaged C */
 } res_t;
+
+typedef struct {        /* Static structure */
+    int static_counter;
+    int gyro_counter;
+    double gnss_time[10],ins_time[10]; /* Latest solution time */
+    int gyros[10];          /* Rotation vector index from gyro rate: 0=rotating,1=straight (at imu rate) */
+    int acc[10];          /* Static vector index from acceleremeters: 0=moving,1=static (at imu rate) */
+    int vel_nav_sol[10];          /* Static vector index from integrated/navigated sol: 0=moving,1=static (at imu rate) */
+    int vel_gnss[10];          /* Static vector index from gnss velocities: 0=moving,1=static (at gnss sol. rate)*/
+} static_info_t;
 
 
 
@@ -329,6 +341,7 @@ extern ins_states_t *insw;
 extern insgnss_opt_t insgnssopt;
 extern res_t resid;
 extern int dz_counter;
+extern static_info_t staticInfo;
 extern const double Omge[9]; /* earth rotation matrix in i/e-frame (5.18) */
 
 /* global states index -------------------------------------------------------*/

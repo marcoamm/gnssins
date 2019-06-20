@@ -4932,8 +4932,8 @@ static void udclk_ppp(rtk_t *rtk, ins_states_t *ins)
         }
         printf("udclk here again?: dtr:%lf\n", CLIGHT*dtr);
         /* Only parameter update */
-        //ins->x[xiRc()]=CLIGHT*dtr;
-        tcinitx(ins,CLIGHT*dtr,VAR_CLK,xiRc());
+        ins->x[xiRc()]=CLIGHT*dtr;
+       // tcinitx(ins,CLIGHT*dtr,VAR_CLK,xiRc());
     }
 
     /* initialize GLONASS */
@@ -5458,7 +5458,7 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
     printf("ppp observations: nv=%d, parameters=%d\n",nv, insp->nx);
     printf("Before PPP integration:\n");
     printf("x vector:\n");
-  for (j = 0; j < nx; j++) printf("%lf ", insp->x[j]); 
+    for (j = 0; j < nx; j++) printf("%lf ", insp->x[j]); 
 
     //x=insp->x;
     //P=insp->P;.
@@ -5783,18 +5783,23 @@ extern void getatt(const ins_states_t *ins,double *rpy)
 extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
 {
     int NPOS=3;//insgnssopt.gnssw;
-    int i,j;
+    int i,j, index;
     double dt,*vel,llh[3];
     double C[9],yaw,vn[3],rpy[3]={0};
     double vb[3],pvb[3],Cbe[9];
+
+    if(gnss_w_counter >= insgnssopt.gnssw ) index=insgnssopt.gnssw-1;
+    else index=gnss_w_counter;
 
     vel=zeros(3,NPOS);
 
     trace(3,"rechkatt:\n");
     printf("rechkatt:\n");
 
+    if(index<NPOS-1) return 0; /* Not sufficient gnss solution */
+
     /* check gps solution status */
-    for (i=0;i<NPOS;i++) {
+    for (i=index-(NPOS-1);i<index;i++) {
         if (solw[i].stat==0)  {
           free(vel);
           trace(3,"no recheck attitude\n");
@@ -5803,15 +5808,15 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
     }
 
     /* recheck ins attitude if need */
-    if (gnss_w_counter>=insgnssopt.gnssw) {
+    if (gnss_w_counter>=NPOS) {
 
-        /* velocity for trajectory*/
+        /* velocity for trajectory */
         if (norm(solw[i-1].rr+3, 3)){
           /* Velocity from solution */
           printf("Velocity from solution\n");
           for (i=NPOS;i>0;i--) {
               for (j=0;j<3;j++) {
-                vel[3*(NPOS-i)+j]=solw[insgnssopt.gnssw-i].rr[j+3];
+                vel[3*(NPOS-i)+j]=solw[index-(NPOS-i)].rr[j+3];
                }
            }
          }else{
@@ -5829,11 +5834,9 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
            }
 
         /* velocity convert to attitude */
-            ecef2pos(solw[NPOS-1].rr,llh);
-            ned2xyz(llh,C);
-
         ecef2pos(solw[NPOS-1].rr,llh);
         ned2xyz(llh,C);
+
         /* yaw */
          matmul("TN",3,1,3,1.0,C,vel,0.0,vn);
 
@@ -5844,19 +5847,23 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
         /* check velocity whether is straight driving  */
         if (!chksdri(vel,NPOS-1)) {
             trace(2,"no straight driving\n");
-            printf("no straight driving: \n");
+            printf("no straight driving: by gnss\n");
             return 0;
         }
-        printf("straight driving %lf\n");
+        printf("straight driving by gnss\n");
+        if (!(staticInfo.static_counter>10?staticInfo.gyros[9]:staticInfo.gyros[staticInfo.static_counter])) {
+            printf("no straight driving: by accelerometers\n");
+            return 0;
+        }
+        printf("straight driving by accel too\n");
         /* check velocity */
-        if (norm(vel,3)>MAXVEL
-            &&norm(imu->wibb,3)<MAXGYRO) {
+        if (!(staticInfo.static_counter>10?staticInfo.vel_gnss[9]:staticInfo.vel_gnss[staticInfo.static_counter])
+            && (staticInfo.static_counter>10?staticInfo.gyros[9]:staticInfo.gyros[staticInfo.static_counter]) ) {
+        // if (norm(vel,3)>MAXVEL
+        //     &&norm(imu->wibb0,3)<MAXGYRO) {
               printf("Velocity and gyro turn check ok\n");
 
             /* velocity convert to attitude */
-            ecef2pos(solw[NPOS-1].rr,llh);
-            ned2xyz(llh,C);
-
             /* yaw */
             matmul("TN",3,1,3,1.0,C,vel,0.0,vn);
             yaw=NORMANG(vel2head(vn)*R2D);
@@ -5876,7 +5883,9 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
             ned2xyz(llh,C);
             matmul("NN",3,3,3,1.0,C,ins->Cbn,0.0,Cbe);
             matmul("TN",3,1,3,1.0,Cbe,ins->ve,0.0,vb);
-            matmul("TN",3,1,3,1.0,ins->Cbe,ins->ve,0.0,pvb);
+            matmul("TN",3,1,3,1.0,ins->pCbe,ins->pve,0.0,pvb);
+
+            printf("check again\n");
 
             /* check again */
             if (fabs(norm(vb,3)-norm(pvb,3))<MINVEL
@@ -5884,6 +5893,7 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
                 &&(fabs(vb[2])<fabs(pvb[2]))) {
                 matcpy(ins->Cbe,Cbe,3,3);
                 trace(3,"recheck attitude ok\n");
+                printf("recheck attitude ok\n");
                 return 1;
             }
         }
@@ -5941,7 +5951,9 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
 
   gnss_time = time2gpst(rtk->sol.time, NULL);
 
-  /* Initialize KF parameters uncertainty */
+  printf("Diff.time.prop: %lf, proptime: %lf, instime: %lf, gnss+0.5: %lf\n", fabs(insc->time - insc->proptime), insc->proptime, insc->time,gnss_time +0.5 );
+
+  /* Initialize KF parameters uncertainty */ 
   kf_par_unc_init(ig_opt);
 
   /* Initialize KF noise information */
@@ -5954,11 +5966,18 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
   Nav_equations_ECEF1(insc);
 
   /* propagate ins states */
-  printf("Prop ins\n");
-  propinss(insc, ig_opt, insc->dt, insc->x, insc->P);
-  printf("Prop ins end\n");
+  
+   if ( fabs(insc->time - insc->proptime) < 0.002 ){
+    printf("Prop ins: %lf\n", insc->time);
+    propinss(insc, ig_opt, fabs(insc->time - insc->ptctime), insc->x, insc->P);
+    printf("Prop ins end\n");
+    insc->ptctime=insc->time; 
+   }
+    // printf("Prop ins: %lf\n", insc->time);
+    // propinss(insc, ig_opt, insc->dt, insc->x, insc->P);
+    // printf("Prop ins end\n");
 
-       printf("ins->P before checkpcov\n");
+  printf("ins->P before checkpcov\n");
   for (i = 0; i < insc->nx; i++)
   {
     for (j = 0; j < insc->nx; j++)
@@ -5995,9 +6014,9 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
       }
 
       /* propagate ins states */
-      // printf("Prop ins\n");
-      // propinss(insc, ig_opt, dt, insc->x, insc->P);
-      // printf("Prop ins end\n");
+      printf("Prop ins: %lf\n", insc->time);
+      propinss(insc, ig_opt, dt, insc->x, insc->P);
+      printf("Prop ins end\n"); 
 
       /* tightly coupled */
      if(ig_opt->Nav_or_KF=pppos1(rtk, obs, insc, ig_opt, n, nav)){
@@ -6060,7 +6079,7 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
 
   /* Free memory -------------------------------------------------------------*/
 
-
+  insc->ptctime=gnss_time;
   return 1;
 
   printf("\n *****************  TC INSGNSS CORE ENDS *************************\n");
