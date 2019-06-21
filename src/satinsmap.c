@@ -2326,7 +2326,7 @@ if ( norm(ned_ini_vel,3) <= 0.000001 && norm(PVA_prev_sol.v,3) <= 0.000001) {
 }
 
 /* input imu measurement data-------------------------------------------------*/
-static int inputimu(ins_states_t *ins, int week){
+static int inputimu(prcopt_t *opt, ins_states_t *ins, int week){
   char check, str[150];
   um7pack_t imu_curr_meas={0};
   int i, j;
@@ -2338,6 +2338,11 @@ static int inputimu(ins_states_t *ins, int week){
     sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &ins->time, &ins->data.fb0[2],\
     &ins->data.fb0[1],&ins->data.fb0[0], &ins->data.wibb0[2],&ins->data.wibb0[1],\
     &ins->data.wibb0[0]);
+
+    //Filter acceleration data low pass t = t-1*a + t*b
+    ins->data.fb0[0] = ins->pdata.fb0[0]*opt->acfilt[0] + ins->data.fb0[0]*opt->acfilt[1];
+    ins->data.fb0[1] = ins->pdata.fb0[1]*opt->acfilt[0] + ins->data.fb0[1]*opt->acfilt[1];
+    ins->data.fb0[2] = ins->pdata.fb0[2]*opt->acfilt[0] + ins->data.fb0[2]*opt->acfilt[1];
 
     printf("IMU.raw.read: %lf %lf %lf %lf %lf %lf %lf - check: %d\n", ins->time, ins->data.fb0[2],\
     ins->data.fb0[1],ins->data.fb0[0], ins->data.wibb0[2],ins->data.wibb0[1],\
@@ -3350,7 +3355,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
        }  
 
     /* input ins */ 
-    if(!inputimu(&insc, week)) {insgnssopt.ins_EOF=0;printf(" ** End of imu file **\n"); return;}
+    if(!inputimu(&opt, &insc, week)) {insgnssopt.ins_EOF=0;printf(" ** End of imu file **\n"); return;}
 
     /* Propagation time */
     insc.proptime = gnss_time-0.5;

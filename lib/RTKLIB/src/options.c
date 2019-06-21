@@ -93,10 +93,13 @@ opt_t sysopts[]={
     {"pos2-niter",      0,  (void *)&prcopt_.niter,      ""     },
     {"pos2-baselen",    1,  (void *)&prcopt_.baseline[0],"m"    },
     {"pos2-basesig",    1,  (void *)&prcopt_.baseline[1],"m"    },
-    {"pos2-seedx",    1,  (void *)&prcopt_.seed[0],"m"    },
-    {"pos2-seedy",    1,  (void *)&prcopt_.seed[1],"m"    },
-    {"pos2-seedz",    1,  (void *)&prcopt_.seed[2],"m"    },
-    {"pos2-seedstd",    1,  (void *)&prcopt_.seed[3],"m"    },
+    {"pos2-seedx",      1,  (void *)&prcopt_.seed[0],    "m"    },
+    {"pos2-seedy",      1,  (void *)&prcopt_.seed[1],    "m"    },
+    {"pos2-seedz",      1,  (void *)&prcopt_.seed[2],    "m"    },
+    {"pos2-seedstd",    1,  (void *)&prcopt_.seed[3],    "m"    },
+    {"pos2-accelfilt1", 1,  (void *)&prcopt_.acfilt[0],   ""    },
+    {"pos2-accelfilt2", 1,  (void *)&prcopt_.acfilt[1],   ""    },
+
 
     {"out-solformat",   3,  (void *)&solopt_.posf,       SOLOPT },
     {"out-outhead",     3,  (void *)&solopt_.outhead,    SWTOPT },
