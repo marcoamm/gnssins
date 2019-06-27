@@ -5470,7 +5470,7 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
       for (i=0;i<3;i++) rtk->sol.rr[i]=rtk->opt.seed[i]; /* position */
       for (i=0;i<3;i++) rtk->sol.rr[i+3]=insp->x[xiV()+i]=0.0; /* velocity - start as static*/
       for (i=0;i<3;i++) insp->P[(xiP()+i)+(xiP()+i)*insp->nx]=rtk->opt.seed[3]; 
-      for (i=0;i<3;i++) insp->P[(xiV()+i)+(xiV()+i)*insp->nx]=0.0; 
+      for (i=0;i<3;i++) insp->P[(xiV()+i)+(xiV()+i)*insp->nx]=0.00125; //0.00125 *It bridged perfeclty the obstruction 
       rtk->opt.seed[3]=-1;
     }
     matcpy(xp,insp->x,nx,1);

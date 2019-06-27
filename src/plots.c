@@ -36,10 +36,12 @@ extern void imuaccplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(min)' \n"
               "set ylabel 'ACCELERATIONS (m/s/s)' \n"
 	      //"set xrange [0:40] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s accelerations.ps'\n"
+ 	      // "set term postscript eps\n"
+	      // "set output '%s accelerations1.ps'\n"
+        "set term png size 1280,960\n"
+	      "set output '%s accelerations.png'\n"
 	      "set autoscale \n"
-        "set yrange [-2.5:2.5] \n"
+        // "set yrange [-10:2.5] \n"
 	      "set grid \n", outpath[0]);
 
  fprintf(gp,"plot '%s' u ($1):($4) w l title \"acc. z\" ,\
@@ -58,8 +60,10 @@ extern void imugyroplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(min)' \n"
               "set ylabel 'RATE GYROSCOPES (deg/s)' \n"
 	      "set xrange [0:40] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s gyroscopes.ps'\n"
+ 	      // "set term postscript eps enhanced color\n"
+	      // "set output '%s gyroscopes.ps'\n"
+        "set term png size 1280,960\n"
+	      "set output '%s gyroscopes.png'\n"
 	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
@@ -100,15 +104,16 @@ extern void imueulerplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(min)' \n"
               "set ylabel 'ATTITUDE ANGLE (deg)' \n"
 	      "set yrange [-200:200] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s euler_angles_march.ps'\n"
+ 	      // "set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+	      "set output '%s euler_angles_march.png'\n"
 	      "set autoscale \n"
         //"set xrange [242141.328125:244778.140625] \n"  // city collection
         //"set xrange [394477.000:397062.000] \n"  //bmo collection
 	      "set grid \n", outpath[0]);
 
-  /* printing Euler angles */
-  fprintf(gp,"plot '%s' u ($1):($10<0.0?$10+360:$10) w l title \"yaw(z)\" ,\
+  /* printing Euler angles */  //($10<0.0?$10+360:$10)
+  fprintf(gp,"plot '%s' u ($1):($10) w l title \"yaw(z)\" ,\
          '%s' u ($1):($8) w l title \"roll(x)\" ,\
          '%s' u ($1):($9) w l title \"pitch(y)\" \n", filename, filename, filename);
 
@@ -123,8 +128,9 @@ extern void imuposplot(char* filename){
   /* Gnuplot plot commands   - PLotting INS data  */
   fprintf(gp, "set xlabel 'y(lat)(m)' \n"
 	      "set ylabel 'x(long)(m)' \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s positions_beg.ps'\n"
+ 	      // "set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+	      "set output '%s positions_unb.png'\n"
         /* General view  */
         //"set yrange [45.942:45.9432] \n"  //BMO field general view
         //"set xrange [-66.6418:-66.6402] \n"
@@ -134,22 +140,22 @@ extern void imuposplot(char* filename){
         //"set autoscale \n"
         "set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
         "set xrange [-66.675:-66.63] \n"
-        //"set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
-        //"set xrange [-66.6455:-66.6355] \n" 
+        // "set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
+        // "set xrange [-66.6455:-66.6355] \n" 
         //"set yrange [45.93:45.94] \n"  // Highway
         //"set xrange [-66.66:-66.650] \n"
-        //"set yrange [45.95:45.955] \n"  // UNB parking lot
-        //"set xrange [-66.645:-66.640] \n"
+        "set yrange [45.95:45.955] \n"  // UNB parking lot
+        "set xrange [-66.645:-66.640] \n"
         //"set yrange [45.945:45.955] \n"  // UNB parking lot 2
         //"set xrange [-66.65:-66.64] \n"
         //"set yrange [45.97:45.98] \n"  // Northside
         //"set xrange [-66.645:-66.635] \n"
-        "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
-        "set xrange [-66.6454:-66.618] \n"
-        "set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
-        "set xrange [-66.635:-66.63] \n"
-        "set yrange [45.95:45.955] \n"  // March 21 - Beggining
-        "set xrange [-66.645:-66.64] \n"
+        // "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
+        // "set xrange [-66.6454:-66.618] \n"
+        // "set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
+        // "set xrange [-66.635:-66.63] \n"
+        // "set yrange [45.95:45.955] \n"  // March 21 - Beggining
+        // "set xrange [-66.645:-66.64] \n"
 	      "set grid \n", outpath[0]);
 
         // Obstructions: 396546.04 < $1 < , Off-road: 396838.72 - end
@@ -204,8 +210,9 @@ extern void imuvelplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'VELOCITIES (m/s)' \n"
 	      "set yrange [-40:40] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s velocities_march.ps'\n"
+ 	      // "set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+	      "set output '%s velocities_march.png'\n"
         //"set xrange [242141.328125:244778.140625] \n"  // city collection
         //"set xrange [394477.000:397062.000] \n"  //bmo collection
 	      //"set autoscale \n"
@@ -228,8 +235,9 @@ extern void imuaccbiasplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'IMU ACC. BIAS' \n"
 	      "set yrange [-0.05:0.05] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s IMU_acc_bias.ps'\n"
+ 	      // "set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+	      "set output '%s IMU_acc_bias.png'\n"
 	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
@@ -249,8 +257,9 @@ extern void imugyrobiasplot(char* filename){
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'IMU GYROS. BIAS' \n"
 	      "set yrange [-0.05:0.05] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s IMU_gyro_bias.ps'\n"
+ 	      // "set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+	      "set output '%s IMU_gyro_bias.png'\n"
 	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
@@ -270,8 +279,9 @@ extern void KF_att_stds_plot(char* filename){
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'ATTITUDE STDs' \n"
 	      "set yrange [0:1] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s KF_att_std.ps'\n"
+ 	      //"set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+	      "set output '%s KF_att_std.png'\n"
 	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
@@ -291,8 +301,9 @@ extern void KF_vel_stds_plot(char* filename){
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'VELOCITY STDs' \n"
 	      "set yrange [0:0.5] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s KF_vel_std.ps.ps'\n"
+ 	      //"set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+	      "set output '%s KF_vel_std.png'\n"
 	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
@@ -312,8 +323,9 @@ extern void KF_pos_stds_plot(char* filename){
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'POSITION STDs' \n"
 	      "set yrange [0:20] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s KF_pos_std.ps'\n"
+ 	      // "set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+	      "set output '%s KF_pos_std.png'\n"
 	      //"set autoscale \n"
 	      "set grid \n", outpath[0]);
 
@@ -333,8 +345,9 @@ extern void KF_clock_plot(char* filename){
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'CLOCK' \n"
 	      "set yrange [0:2] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s KF_clk.ps'\n"
+ 	      // "set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+        "set output '%s KF_clk.png'\n"
 	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
@@ -518,8 +531,9 @@ extern void KF_residuals_plot(char* filename){
                "set key horiz \n"
                "set yrange [-10:10]\n"
               "set key top center \n"
-              "set term postscript eps enhanced color\n"
-             "set output '%s KF_pseudorange_residuals.ps'\n"
+              // "set term postscript eps enhanced color\n"
+              "set term png size 1280,960\n"
+             "set output '%s KF_pseudorange_residuals.png'\n"
   "set grid \n",outpath[0]);
 
       /* Gnuplot plot commands   - Carrier phase */
@@ -529,8 +543,9 @@ extern void KF_residuals_plot(char* filename){
                  "set yrange [-10:10]\n"
                   "set key horiz \n"
                  "set key top center \n"
-                 "set term postscript eps enhanced color\n"
-                 "set output '%s KF_doppler_residuals.ps'\n"
+                //  "set term postscript eps enhanced color\n"
+                  "set term png size 1280,960\n"
+                 "set output '%s KF_doppler_residuals.png'\n"
                  "set grid \n",outpath[0]);
 
 
@@ -566,8 +581,9 @@ extern void tropo_plot(char* filename){
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'TROPOSPHERIC DELAY (m)' \n"
 	      "set yrange [1.5:4] \n"
- 	      "set term postscript eps enhanced color\n"
-	      "set output '%s tropo_bias.ps'\n"
+ 	      // "set term postscript eps enhanced color\n"
+        "set term png size 1280,960\n"
+	      "set output '%s tropo_bias.png'\n"
 	      "set autoscale \n"
 	      "set grid \n", outpath[0]);
 
@@ -625,8 +641,9 @@ extern void amb_plot(char* filename){
                "set yrange [-20:20]\n"
                //"set autoscale \n"
                "set key top center \n"
-               "set term postscript eps enhanced color\n"
-               "set output '%s ambiguities.ps'\n"
+              //  "set term postscript eps enhanced color\n"
+              "set term png size 1280,960\n"
+               "set output '%s ambiguities.png'\n"
                "set grid \n",outpath[0]);
 
 
