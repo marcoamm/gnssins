@@ -4537,7 +4537,7 @@ static void propP(const insgnss_opt_t *opt, const double *Q, const double *phi,
       P[i + j * nx] = Phi2[i + j * nx] + 0.5 * Q[i + j * nx];
   }
   /* initialize every epoch for clock (white noise) */
-  initP(irc, nrc, nx, opt->unc.rc, UNC_CLK, P);
+  initP(irc, nrc, nx, opt->unc.rc, UNC_CLK, P); 
   
   free(PQ);
   free(Phi2);
@@ -4709,8 +4709,8 @@ void kf_par_unc_init(insgnss_opt_t *opt)
   {
     /* Tactical */
     opt->unc.att = D2R * 1;          /* Initial attitude uncertainty per axis (deg, converted to rad) */
-    opt->unc.vel = 0.1;              /* Initial velocity uncertainty per axis (m/s) */
-    opt->unc.pos = 10;               /* Initial position uncertainty per axis (m) */
+    opt->unc.vel = 0.05;              /* Initial velocity uncertainty per axis (m/s) */
+    opt->unc.pos = 0.1;               /* Initial position uncertainty per axis (m) */
     opt->unc.ba = 1000 * Mg2M;       /* Initial accelerometer bias uncertainty per instrument 
       (micro-g, converted /* to m/s^2) */
     opt->unc.bg = 10 * D2R / 3600.0; /* Initial gyro bias uncertainty per instrument (deg/hour, 
@@ -4719,7 +4719,7 @@ void kf_par_unc_init(insgnss_opt_t *opt)
     {
       /* Tightly */
       opt->unc.rc = 10.0;
-      opt->unc.rr = 0.1;
+      opt->unc.rr = 0.1; 
     }
   }
   else
@@ -4942,7 +4942,8 @@ static void udclk_ppp(rtk_t *rtk, ins_states_t *ins)
       tcinitx(ins,CLIGHT*dtr,VAR_CLK,xiRc()+1);
     }
 
-      // dtr=rtk->sol.dtr[0]+rtk->sol.dtr[1];
+       dtr=rtk->sol.dtr[0]+rtk->sol.dtr[1];
+       ins->x[xiRc()+1]=CLIGHT*dtr;
       // tcinitx(ins,CLIGHT*dtr,VAR_CLK,xiRc()+1);
     
 }
@@ -5465,13 +5466,14 @@ extern int pppos1(rtk_t *rtk, const obsd_t *obs, ins_states_t *insp,
 
     /* if the std of the seed position exists then use the seed */
     if (rtk->opt.seed[3]>0) {
+      printf("SEED APPLIED: t=%lf\n", insp->time);
     //for (i=0;i<3;i++) insp->x[xiP()+i]=rtk->opt.seed[i]; /* position */
       for (i=0;i<3;i++) insp->re[i]=rtk->opt.seed[i]; /* position */
       for (i=0;i<3;i++) rtk->sol.rr[i]=rtk->opt.seed[i]; /* position */
       for (i=0;i<3;i++) rtk->sol.rr[i+3]=insp->x[xiV()+i]=0.0; /* velocity - start as static*/
       for (i=0;i<3;i++) insp->P[(xiP()+i)+(xiP()+i)*insp->nx]=rtk->opt.seed[3]; 
-      for (i=0;i<3;i++) insp->P[(xiV()+i)+(xiV()+i)*insp->nx]=0.00125; //0.00125 *It bridged perfeclty the obstruction 
-      rtk->opt.seed[3]=-1;
+      for (i=0;i<3;i++) insp->P[(xiV()+i)+(xiV()+i)*insp->nx]=0.00125; //0.00125 *It bridged perfeclty the obstruction
+      rtk->opt.seed[3]=-1;  
     }
     matcpy(xp,insp->x,nx,1);
 
@@ -6044,6 +6046,10 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
     /* ins state in n-frame */
       update_ins_state_n(insc);
   }
+
+  matmul("TN",3,1,3,1.0,insc->Cbe,insc->ve,0.0,insc->vb);
+
+  printf("vel.vb: %lf, %lf, %lf\n", insc->vb[0], insc->vb[1], insc->vb[2]);
 
   printf("OUTPUT OF INTEGRATED OR NAVIGATED SOLUTION: %lf\n", insc->time);
   printf("P: %lf, %lf, %lf\n", insc->re[0], insc->re[1], insc->re[2]);

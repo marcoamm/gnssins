@@ -206,6 +206,7 @@ typedef struct {      /* Position velocity and attitude solution structure */
   double dt;              /* time difference of previous ins update and current time */
   double vn[3],rn[3],an[3]; /*states in navigation frame */
   double ve[3],re[3],ae[3]; /*states in ecef frame */
+  double vb[3];           /* velocity in body-frame */
   double Cbe[9];        /* Tranformation matrix from body-to-ECEF frame  */
   double Cbn[9];        /* Tranformation matrix from body-to-navigation frame  */
   double dtr[6];          /* receiver clock bias to time systems (s) */

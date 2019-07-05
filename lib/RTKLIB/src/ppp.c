@@ -1759,7 +1759,7 @@ extern void pppos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
         /* update solution status */
 
         // /* Call ins/gnss integration */
-        // core1(rtk, obs, n, nav); 
+         core1(rtk, obs, n, nav); 
 
         rtk->sol.ns=0;
         for (i=0;i<n&&i<MAXOBS;i++) {

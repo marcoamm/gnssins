@@ -1023,7 +1023,7 @@ typedef struct {        /* processing options type */
     double odisp[2][6*11]; /* ocean tide loading parameters {rov,base} */
     exterr_t exterr;    /* extended receiver error model */
     double seed[4];   /* initial position x,y,z and stds */
-    double acfilt[2]  /*Accelerometer filtering parameters t = t-1*a + t*b*/
+    double acfilt[2];  /*Accelerometer filtering parameters t = t-1*a + t*b*/
 } prcopt_t;
 
 typedef struct {        /* solution options type */

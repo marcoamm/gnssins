@@ -130,7 +130,7 @@ extern void imuposplot(char* filename){
 	      "set ylabel 'x(long)(m)' \n"
  	      // "set term postscript eps enhanced color\n"
         "set term png size 1280,960\n"
-	      "set output '%s positions_unb.png'\n"
+	      "set output '%s positions_beg.png'\n"
         /* General view  */
         //"set yrange [45.942:45.9432] \n"  //BMO field general view
         //"set xrange [-66.6418:-66.6402] \n"
@@ -140,18 +140,18 @@ extern void imuposplot(char* filename){
         //"set autoscale \n"
         "set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
         "set xrange [-66.675:-66.63] \n"
-        // "set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
-        // "set xrange [-66.6455:-66.6355] \n" 
+         "set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
+         "set xrange [-66.6455:-66.6355] \n" 
         //"set yrange [45.93:45.94] \n"  // Highway
         //"set xrange [-66.66:-66.650] \n"
-        "set yrange [45.95:45.955] \n"  // UNB parking lot
-        "set xrange [-66.645:-66.640] \n"
-        //"set yrange [45.945:45.955] \n"  // UNB parking lot 2
-        //"set xrange [-66.65:-66.64] \n"
+        // "set yrange [45.95:45.955] \n"  // UNB parking lot
+        // "set xrange [-66.645:-66.640] \n"
+        // "set yrange [45.945:45.955] \n"  // UNB parking lot 2
+        // "set xrange [-66.65:-66.64] \n"
         //"set yrange [45.97:45.98] \n"  // Northside
         //"set xrange [-66.645:-66.635] \n"
-        // "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
-        // "set xrange [-66.6454:-66.618] \n"
+        "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
+        "set xrange [-66.6454:-66.618] \n"
         // "set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
         // "set xrange [-66.635:-66.63] \n"
         // "set yrange [45.95:45.955] \n"  // March 21 - Beggining
@@ -545,7 +545,7 @@ extern void KF_residuals_plot(char* filename){
                  "set key top center \n"
                 //  "set term postscript eps enhanced color\n"
                   "set term png size 1280,960\n"
-                 "set output '%s KF_doppler_residuals.png'\n"
+                 "set output '%s KF_phase_residuals.png'\n"
                  "set grid \n",outpath[0]);
 
 
@@ -556,6 +556,8 @@ extern void KF_residuals_plot(char* filename){
   filename,prn[i],prn[i]);
 
   //lt rgb 'red'
+   fprintf(gp," \" stats \" '%s' u 4 name 'A' nooutput \n", filename);
+  // fprintf(gp, "stats '%s' u 3 name 'B' nooutput \n", filename);
 
    for (i = 1; i < count; i++) { //PRN loop
      fprintf(gp,"'%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
@@ -565,6 +567,10 @@ extern void KF_residuals_plot(char* filename){
      filename,prn[i],prn[i]);
   }
   //pointtype %d
+  
+   fprintf(gp, "A_mean t sprintf('mean:%.2f',A_mean),\ A_stddev t sprintf('std:%.2f',A_stddev) \n", filename);
+  // fprintf(gp1, "B_mean t sprintf('mean:%.2f',B_mean),\ B_stddev t sprintf('std:%.2f',B_stddev) \n", filename);
+
 
   fflush(gp);
   fclose(gp);
@@ -580,11 +586,11 @@ extern void tropo_plot(char* filename){
   /* Gnuplot plot commands   - PLotting INS data  */
   fprintf(gp, "set xlabel 'TIME(s)' \n"
 	      "set ylabel 'TROPOSPHERIC DELAY (m)' \n"
-	      "set yrange [1.5:4] \n"
+	      "set yrange [2.0:3.0] \n"
  	      // "set term postscript eps enhanced color\n"
         "set term png size 1280,960\n"
 	      "set output '%s tropo_bias.png'\n"
-	      "set autoscale \n"
+	      //"set autoscale \n"
 	      "set grid \n", outpath[0]);
 
   fprintf(gp,"plot '%s' u ($1):($2) w lp ps 0.7 title \"tropo. delay\" \n", filename);

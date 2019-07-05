@@ -2333,20 +2333,11 @@ static int inputimu(prcopt_t *opt, ins_states_t *ins, int week){
 
   if(insgnssopt.Tact_or_Low){
     /* Tactical KVH input */
-    // For March experiments: 2,1,0 - For previous: 2, 0, 1
+    // For Oct/March experiments: 2,1,0
     check=fgets(str, 150, imu_tactical);
     sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &ins->time, &ins->data.fb0[2],\
     &ins->data.fb0[1],&ins->data.fb0[0], &ins->data.wibb0[2],&ins->data.wibb0[1],\
     &ins->data.wibb0[0]);
-
-    //Filter acceleration data low pass t = t-1*a + t*b
-    ins->data.fb0[0] = ins->pdata.fb0[0]*opt->acfilt[0] + ins->data.fb0[0]*opt->acfilt[1];
-    ins->data.fb0[1] = ins->pdata.fb0[1]*opt->acfilt[0] + ins->data.fb0[1]*opt->acfilt[1];
-    ins->data.fb0[2] = ins->pdata.fb0[2]*opt->acfilt[0] + ins->data.fb0[2]*opt->acfilt[1];
-
-    printf("IMU.raw.read: %lf %lf %lf %lf %lf %lf %lf - check: %d\n", ins->time, ins->data.fb0[2],\
-    ins->data.fb0[1],ins->data.fb0[0], ins->data.wibb0[2],ins->data.wibb0[1],\
-    ins->data.wibb0[0], check);
     
     ins->time=ins->time+16; /* Accounting for leap seconds */
     ins->data.sec=ins->time;
@@ -2355,7 +2346,19 @@ static int inputimu(prcopt_t *opt, ins_states_t *ins, int week){
 
     /* raw acc. to m/s*s and rate ve locity from degrees to radians  */
     for (j= 0;j<3;j++) ins->data.fb0[j]=ins->data.fb0[j]*Gcte;
-    for (j=0;j<3;j++) ins->data.wibb0[j]=ins->data.wibb0[j]*D2R; 
+    for (j=0;j<3;j++) ins->data.wibb0[j]=ins->data.wibb0[j]*D2R;
+
+    printf("Acfilt: %lf %lf %lf - %lf %lf %lf\n", ins->pdata.fb0[0],ins->pdata.fb0[1],\
+    ins->pdata.fb0[2], ins->data.fb0[0],ins->data.fb0[1],ins->data.fb0[2]);
+
+    //Filter acceleration data low pass t = t-1*a + t*b
+    ins->data.fb0[0] = ins->pdata.fb0[0] * opt->acfilt[0] + ins->data.fb0[0] * opt->acfilt[1];
+    ins->data.fb0[1] = ins->pdata.fb0[1] * opt->acfilt[0] + ins->data.fb0[1] * opt->acfilt[1];
+    ins->data.fb0[2] = ins->pdata.fb0[2] * opt->acfilt[0] + ins->data.fb0[2] * opt->acfilt[1];
+
+    printf("IMU.raw.read: %lf %lf %lf %lf %lf %lf %lf - check: %d\n", ins->time, ins->data.fb0[2],\
+    ins->data.fb0[1],ins->data.fb0[0], ins->data.wibb0[2],ins->data.wibb0[1],\
+    ins->data.wibb0[0], check);
 
     /* Turn-on bias on x and y axis */
     //  ins->data.fb0[0]=ins->data.fb0[0]-0.869565;//-0.850372;
@@ -2765,7 +2768,12 @@ void insupdt(ins_states_t *ins){
  
    /* Measurements update*/
    ins->pdata=ins->data;
-   
+   for(i=0;i<3;i++){
+    ins->pdata.fb0[i]=ins->data.fb0[i];
+    ins->pdata.fb[i]=ins->data.fb[i];
+    ins->pdata.wibb0[i]=ins->data.wibb0[i];
+    ins->pdata.wibb[i]=ins->data.wibb[i];
+   }
 }
 
 /* Interpolate INS measurement to match GNSS time  -------------------------
@@ -2948,6 +2956,7 @@ static int bldnhc(const insgnss_opt_t *opt,const imuraw_t *imu,const double *Cbe
         v[nv  ]=vb[i];
         r[nv++]=VARVEL;
     }
+    
     for (i=0;i<nv;i++) R[i+i*nv]=r[i];
     return nv;
 }
@@ -2960,7 +2969,7 @@ static int bldnhc(const insgnss_opt_t *opt,const imuraw_t *imu,const double *Cbe
 extern int nhc(ins_states_t *ins,const insgnss_opt_t *opt)
 {
     const imuraw_t *imu=&ins->data;
-    int nx=ins->nx,info=0,nv, i;
+    int nx=ins->nx,info=0,nv, i, j;
     double *H,*v,*R,*x;  
 
     trace(3,"nhc:\n");
@@ -2971,8 +2980,13 @@ extern int nhc(ins_states_t *ins,const insgnss_opt_t *opt)
     for (i = 0; i < nx; i++) x[i]=1E-17;
 
     nv=bldnhc(opt,imu,ins->Cbe,ins->ve,nx,v,H,R);
-    if (nv>0) {
 
+    // i = xiV()+1;
+    // for (i = xiV()+1; i < xiV() + 3; i++){
+    //   R[i-(xiV()+1)+(i-(xiV()+1))*nv] = SQRT(ins->P[i + i * nx]);
+    // }
+
+    if (nv>0) {
         /* kalman filter */
         info=filter(x,ins->P,H,v,R,nx,nv);
         printf("nhc.x:\n");
@@ -3009,12 +3023,75 @@ extern int nhc(ins_states_t *ins,const insgnss_opt_t *opt)
 extern int zvu(ins_states_t *ins,const insgnss_opt_t *opt,int flag)
 {
     imuraw_t *imu=&ins->data;
-    int nx=ins->nx,info=0, i;
+    int nx=ins->nx,info=0, i, j;
     static int nz=0;
     double *x,*H,*R,*v,I[9]={-1,0,0,0,-1,0,0,0,-1};
 
     trace(3,"zvu:\n");
     printf("zvu:\n");
+
+   // flag&=nz++>MINZC?nz=0,true:false;
+
+    if (!flag) return info;
+
+    x=zeros(1,nx); H=zeros(3,nx);
+    R=zeros(3,3); v=zeros(3,1);
+    for (i = 0; i < nx; i++) x[i]=1E-17;
+
+    /* sensitive matrix */
+    asi_blk_mat(H,3,nx,I,3,3,0,3);
+
+    /* variance matrix */
+    R[0]=R[4]=R[8]=VARVEL;
+    // i = xiV();
+    // for (i = xiV(); i < xiV() + 3; i++){
+    //   R[(i-xiV())+(i-xiV())*3] = SQRT(ins->P[i + i * nx]);
+    // }        
+
+    v[0]=ins->ve[0];
+    v[1]=ins->ve[1];
+    v[2]=ins->ve[2]; /* residual vector */
+
+    if (norm(v,3)<MAXVEL&&norm(imu->wibb,3)<MAXGYRO) { 
+
+        /* ekf filter */
+        info=filter(x,ins->P,H,v,R,nx,3);
+
+        printf("zvu.x:\n");
+        for (i=0; i < nx; i++){
+          printf("%lf ", x[i]);
+        }
+
+        /* solution fail */
+        if (info) {
+            trace(2,"zero velocity update filter error\n");
+            printf("zero velocity update filter error\n");
+            info=0;
+        }
+        else {
+            /* solution ok */
+            //ins->stat=INSS_ZVU;
+            info=1;
+            clp(ins,opt,x);
+            trace(3,"zero velocity update ok\n");
+            printf("zero velocity update ok\n");
+        }
+    }
+    free(x); free(H);
+    free(R); free(v);
+    return info;
+}
+
+/* Quasi_stationary IMU calibration  ************************************************/
+extern int finealign(ins_states_t *ins,const insgnss_opt_t *opt,int flag)
+{
+    imuraw_t *imu=&ins->data;
+    int nx=ins->nx,info=0, i;
+    static int nz=0;
+    double *x,*H,*R,*v,I[9]={-1,0,0,0,-1,0,0,0,-1};
+
+    trace(3,"fine alignment:\n");
+    printf("fine alignment:\n");
 
    // flag&=nz++>MINZC?nz=0,true:false;
 
@@ -3063,6 +3140,7 @@ extern int zvu(ins_states_t *ins,const insgnss_opt_t *opt,int flag)
     free(R); free(v);
     return info;
 }
+
 /* ZUPT detection, based on   GREJNER-BRZEZINSKA et al. (2002) 
   If static: ++zvu_counter else zvu=0 if not ---------------------------------------*/
 void detstc(ins_states_t *ins){
@@ -3099,16 +3177,28 @@ void outputinsgnsssol(ins_states_t *insc, insgnss_opt_t *opt, prcopt_t *gnssopt,
     fprintf(out_PVA,"%lf %.12lf %.12lf %lf %lf %lf %lf %lf %lf %lf %d\n",\
     insc->time, insc->rn[0]*R2D, insc->rn[1]*R2D, insc->rn[2],\
     insc->vn[0], insc->vn[1], insc->vn[2],
-    insc->an[0]*R2D,insc->an[1]*R2D,insc->an[2]*R2D, opt->Nav_or_KF);  
-  }
+    insc->an[0]*R2D,insc->an[1]*R2D,insc->an[2]*R2D, opt->Nav_or_KF);
 
-  /* Generate IMU bias output record */
-  fprintf(out_IMU_bias_file, "%lf %lf %lf %lf %.10lf %.10lf %.10lf %d\n", insc->time,
+   /* Generate IMU bias output record */
+   fprintf(out_IMU_bias_file, "%lf %lf %lf %lf %.10lf %.10lf %.10lf %d\n", insc->time,
         insc->data.ba[0], insc->data.ba[1], insc->data.ba[2],
         insc->data.bg[0], insc->data.bg[1], insc->data.bg[2], 
         opt->Nav_or_KF);
-  
-  /* Generate clock output record */
+
+   /* Generate KF uncertainty output record */
+   if (opt->Nav_or_KF ){  
+    fprintf(out_KF_SD_file, "%lf ", insc->time);
+     for (i = 0; i < insc->nx; i++){
+      for (j = 0; j < insc->nx; j++){
+        (i==j?fprintf(out_KF_SD_file, "%lf ", SQRT(fabs(insc->P[i * insc->nx + j])) ):0);
+       }
+     }
+   fprintf(out_KF_SD_file, "%d\n", opt->Nav_or_KF); 
+   }  
+ }
+
+  if (opt->Nav_or_KF){
+     /* Generate clock output record */
   if (xnRc(gnssopt)>1){
     fprintf(out_clock_file, "%lf %lf %lf %lf %d\n", insc->time, insc->dtr[0], 
     insc->dtr[1], insc->dtrr, opt->Nav_or_KF);
@@ -3127,16 +3217,7 @@ void outputinsgnsssol(ins_states_t *insc, insgnss_opt_t *opt, prcopt_t *gnssopt,
     opt->Nav_or_KF);  
   }   
  
-  /* Generate KF uncertainty output record */
-  if (opt->Nav_or_KF ){  
-  fprintf(out_KF_SD_file, "%lf ", insc->time);
-   for (i = 0; i < insc->nx; i++){
-     for (j = 0; j < insc->nx; j++){
-       (i==j?fprintf(out_KF_SD_file, "%lf ", SQRT(fabs(insc->P[i * insc->nx + j])) ):0);
-      }
-    }
-  fprintf(out_KF_SD_file, "%d\n", opt->Nav_or_KF); 
-  }
+ }
 
  } 
 
@@ -3277,13 +3358,6 @@ void statRotat(ins_states_t *ins, double gnss_time, int check){
  
 }
 
-/* Quasi_stationary IMU calibration  ************************************************/
-void biascalib(ins_states_t *ins){
-  int i,j;
-
-
-}
-
 /* Core function -------------------------------------------------------------
 * Description: Receive raw GNSS and INS data and determine a PVA solution
 * args:
@@ -3297,7 +3371,7 @@ void biascalib(ins_states_t *ins){
 extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){ 
   int i, j, week, flag, core_count=0;
   double gnss_time, rr[3], ve[3];
-  ins_states_t insc={0};
+  ins_states_t insc={{{0}}};
   prcopt_t *opt = &rtk->opt; 
  
  
@@ -3310,6 +3384,9 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   /* initialize ins/gnss parameter default uncertainty */ 
   //ig_paruncinit(&insgnssopt); 
   kf_par_unc_init(&insgnssopt);
+  
+    printf("Insc.pdata: %lf %lf %lf - %lf %lf %lf\n", insc.pdata.fb0[0],insc.pdata.fb0[1],\
+    insc.pdata.fb0[2], insc.data.fb0[0],insc.data.fb0[1],insc.data.fb0[2]);
 
   /* initialize ins state */
   insinit(&insc, &insgnssopt, opt, n);
@@ -3323,6 +3400,9 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
   /* Check if imu file is not at the end */
   if(!insgnssopt.ins_EOF) return;
 
+  /* Static check with GNSS */
+  statRotat(&insc, gnss_time, 1);
+
   /* Ins and integration loop
   Processing window - integrates when GNSS and INS mea. are closer by 0.1s
   The do while takes care when INS or GNSS is too ahead from each other         */  
@@ -3334,6 +3414,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
     if(core_count>0){
       memset_ins_pva(&insc);    
     }
+  
 
     /* Initialize ins states with previous state from ins buffer */
       if(ins_w_counter>insgnssopt.insw-1){
@@ -3355,7 +3436,10 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
        }  
 
     /* input ins */ 
-    if(!inputimu(&opt, &insc, week)) {insgnssopt.ins_EOF=0;printf(" ** End of imu file **\n"); return;}
+    if(!inputimu(opt, &insc, week)) {insgnssopt.ins_EOF=0;printf(" ** End of imu file **\n"); return;}
+
+    printf("Insc.pdata1: %lf %lf %lf - %lf %lf %lf\n", insc.pdata.fb0[0],insc.pdata.fb0[1],\
+    insc.pdata.fb0[2], insc.data.fb0[0],insc.data.fb0[1],insc.data.fb0[2]);
 
     /* Propagation time */
     insc.proptime = gnss_time-0.5;
@@ -3434,26 +3518,24 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
 
       /* Static and rotation detection - It modifies staticInfo structure */
       printf("Test: %d %lf\n",insgnssopt.Nav_or_KF, fabs(gnss_time-insc.ptctime));
-      if (insgnssopt.Nav_or_KF==1){
-        statRotat(&insc, gnss_time, 1);
-        statRotat(&insc, gnss_time, 0); 
-      }else{
-        statRotat(&insc, gnss_time, 0);
-      }
+      statRotat(&insc, gnss_time, 0);
+
 
       printf("Static by gnss: %lf %d\n", gnss_time, (staticInfo.static_counter>10?staticInfo.vel_gnss[9]:staticInfo.vel_gnss[staticInfo.static_counter]));
       printf("Straight by Rotat: %lf %d\n", insc.time, (staticInfo.static_counter>10?staticInfo.gyros[9]:staticInfo.gyros[staticInfo.static_counter]));
 
       detstc(&insc);  
-
-      if(insgnssopt.ins_ini){
-        biascalib(&insc);
-      }
       
-      /* Zero velocity update */ 
-      //if (zvu_counter>10) {
+      /* Zero velocity update */  
+      //if (zvu_counter>10) {  
       printf("Stat condition: %d \n", staticInfo.static_counter>10?staticInfo.vel_gnss[9]:staticInfo.vel_gnss[staticInfo.static_counter]);
-      if((staticInfo.static_counter>10?staticInfo.vel_gnss[9]:staticInfo.vel_gnss[staticInfo.static_counter]) ){ 
+      if((staticInfo.static_counter>10?staticInfo.vel_gnss[9]:staticInfo.vel_gnss[staticInfo.static_counter]) ){
+
+        /* If straight and static do a Fine alignment */
+        if ((staticInfo.static_counter>10?staticInfo.gyros[9]:staticInfo.gyros[staticInfo.static_counter])){
+          //finealign(&insc,&insgnssopt,1);
+        }
+        
         /* Bias estimation */
         printf("ZVU UPDATE: 1 %lf\n", insc.time);
         /* Zero-velocity constraints */
@@ -3461,8 +3543,8 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
         zvu_counter=0;  
       }else{printf("ZVU UPDATE: 0 %lf\n", insc.time);}
 
-      /* Output PVA, clock, imu bias solution     */
-      if(insc.ptime>0.0){ 
+      /* Output PVA, clock, imu bias solution     */ 
+      if(insc.ptime>0.0){  
         outputinsgnsssol(&insc, &insgnssopt, &rtk->opt, n, obs);  
       }
 
@@ -3476,7 +3558,7 @@ extern void core1(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
       //insc.dtr[0]=rtk->sol.dtr[0]*CLIGHT;  
       update_ins_state_n(&insc);  
       /* Gnss solution covariance to ins */ 
-      pvclkCovfromgnss(rtk, &insc); 
+      //pvclkCovfromgnss(rtk, &insc);    
     }
  
     /* Zeroing closed-loop states */
@@ -3573,8 +3655,8 @@ resid.data=(res_epoch_t*)malloc(sizeof(res_epoch_t)*resid.nv_w);  /* residuals s
 
 strcpy(filopt.trace,tracefname); 
    
-/* Global TC_KF_INS_GNSS output files          */
-out_PVA=fopen("../out/out_PVA.txt","w");
+/* Global TC_KF_INS_GNSS output files    */     
+out_PVA=fopen("../out/out_PVA.txt","w"); 
 out_clock_file=fopen("../out/out_clock_file.txt","w");  
 out_IMU_bias_file=fopen("../out/out_IMU_bias.txt","w");
 out_tropo_file=fopen("../out/out_tropo_bias.txt","w");
@@ -3585,9 +3667,9 @@ out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
 //imu_tactical=fopen("../data/imu_ascii_new_1.txt", "r");
 imu_tactical=fopen("../data/imu_ascii_new_timesync2.txt", "r");
-fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");   
+fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");    
  
-// rewind(imu_tactical);                                                 
+rewind(imu_tactical);                                                   
 
 
 
@@ -3605,12 +3687,12 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/igs19674.*  ../data/SEPT
   char *argv[] = {"./rnx2rtkp", "../data/LOG__033.18O", "../data/igs20012.sp3", "../data/brdc1350.18n", "-o", "../out/PPP_test2.pos", "-k", "../config/opts3.conf"};
 
   char *comlin = "./rnx2rtkp ../data/LOG__033.18O ../data/igs20012.sp3  ../data/brdc1350.18n -o ../out/PPP_test2.pos -k ../config/opts3.conf";
-     */// Command line
+     */// Command line 
 
 /* PPP-Kinematic  3rd experimet
   char *argv[] = {"./rnx2rtkp", "../data/LOG__038.18O", "../data/LOG__038_gps.nav", "-o", "../out/SPP_test3.pos", "-k", "../config/opts4.conf"};
   char *comlin = "./rnx2rtkp ../data/LOG__038.18O ../data/LOG__038_gps.nav -o ../out/SPP_test3.pos -k ../config/opts4.conf";
-         // Command line */
+         // Command line */ 
 
 /* PPP-Kinematic  4th experimet - GPS AND GLONASS */
  //char *argv[] = {"./rnx2rtkp", "../data/LOG__040.18o", "../data/BRDC00IGS_R_20181930000_01D_MN.rnx", "../data/grm20094.clk", "../data/grm20094.sp3", "-o", "../out/PPP_bmo.pos", "-k", "../config/opts3.conf", "-x", "5"};
@@ -3625,12 +3707,12 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/igs19674.*  ../data/SEPT
   */    // Command line 
 
 /* PPP-Kinematic  Kinematic Positioning dataset  GPS+GLONASS */  
-//char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/BRDC00IGS_R_20182890000_01D_MN.rnx", "../data/grm20232.clk","../data/grm20232.sp3", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf", "-x", "5"};
+//char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/BRDC00IGS_R_20182890000_01D_MN.nav", "../data/grm20232.clk","../data/grm20232.sp3", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
 /* PPP-Kinematic  Kinematic Positioning dataset  March 21, 2019 GPS */
-char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/APS_center.19N", "../data/igs20452.clk","../data/igs20452.sp3", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
+//char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/igs20452.clk","../data/igs20452.sp3", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
-//char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/GRG0MGXFIN_20190780000_01D_30S_CLK.CLK","../data/GRG0MGXFIN_20190780000_01D_15M_ORB.SP3", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
+char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/grg20452.sp3","../data/grg20452.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
  
 /* PPP-AR Kinematic   
 char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};
@@ -3736,13 +3818,12 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
         showmsg("error : no input file");
         return -2;
     }
-
-/* Start rnx2rtkp processing  ----------------------------------- --*/ 
-/* Processing ------------------------------------------------------*/
+  
+   /* Start rnx2rtkp processing  ---------*/ 
   ret=postpos(ts,te,tint,0.0,&prcopt,&solopt,&filopt,infile,n,outfile,"","");
   if (!ret) fprintf(stderr,"%40s\r","");
  
-  for (i=0;i<insgnssopt.insw;i++) insfree(insw+i); 
+  for (i=0;i<insgnssopt.insw;i++) insfree(insw+i);  
   free(resid.data);
   free(solw); free(insw); 
 
@@ -3762,7 +3843,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   fclose(imu_tactical);
   fclose(out_KF_state_error); 
   fclose(out_KF_residuals);  
-  fclose(fimu);                      
+  fclose(fimu);                     
 
 /*
   char posfile[]="../out/out_PVA.txt";
@@ -3774,7 +3855,7 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
  
 
 /* INS/GNSS plots  */ 
- char out_raw_fimu[]="../out/out_raw_imu.txt";     
+ char out_raw_fimu[]="../out/out_raw_imu.txt";      
  imuaccplot(out_raw_fimu);
 imugyroplot(out_raw_fimu);
 char gyrofile[]="../out/out_PVA.txt";   
@@ -3799,7 +3880,7 @@ KF_state_errors_plot_pos(KF_states);
 KF_state_errors_plot_accb(KF_states);
 KF_state_errors_plot_gyrb(KF_states);
 KF_state_errors_plot_clk(KF_states);  */
-char imu_KF_res[]="../out/out_KF_residuals.txt";
+char imu_KF_res[]="../out/out_KF_residuals.txt"; 
 KF_residuals_plot(imu_KF_res);
 char tropo_file[]="../out/out_tropo_bias.txt";
 tropo_plot(tropo_file);
@@ -3807,7 +3888,7 @@ tropo_plot(tropo_file);
  amb_plot(amb_file);                                  
 
 /*call for analysis script*/
-system("./../analysis/analysis.sh");
+//system("./../analysis/analysis.sh");
 
 /* Plot IMU ra measurements
 char imu_raw_meas[]="../out/out_raw_imu.txt";
@@ -3848,8 +3929,7 @@ while ( fgets(str, 100, imu_tactical)!= NULL ){
   i++;
 }
 
-fclose(new);*/
-
+fclose(new);*/     
 
 
 /*Processing imu_tactical only */
@@ -3860,7 +3940,7 @@ fclose(new);*/
 
 /* IMU-MAP test
   while ( 1 ) {
-    if(ferror(fimu)||feof(fimu)) break;
+    if(ferror(fimu)||feof(fimu)) break; 
     insmap ();
 }*/
 
@@ -3963,7 +4043,7 @@ char velfile[]="../out/insmap_test_vel.txt";
 
 
 /* Height comparison file preparation
-FILE *f1,*f2,*f3,*f4,*f1out,*f2out,*f3out;
+FILE *f1,*f2,*f3,*f4,*f1out,*f2out,*f3out; 
 char str[150];
 double t,s,ht,ep[6],posr[3],r[3],posp[3],enup[3],enu[3],dr[3],r0[3],pos0[3];
 pos0[0]=45.94312323*D2R, pos0[1]=-66.64106835*D2R, pos0[2]=52.7309; // BMO corner 1
