@@ -163,7 +163,7 @@ extern void imuposplot(char* filename){
 /**/
   //PPP_car_back(copy).pos  PPP_bmo(copy).pos  PPP_march21.pos
   fprintf(gp,"plot '../out/PPP_car_back.pos' u ($4):($3) w lp pointsize 0.4 lt 3 title \" PPP \", \
-  '../data/reference1903.pos' u ($4):($3) w lp pointsize 0.4 lt 3 notitle, \
+  '../data/19032019/reference1903.pos' u ($4):($3) w lp pointsize 0.4 lt 3 notitle, \
   '%s' u ($3):($2) w lines lt rgb 'grey' notitle , \
    '%s' u ($3):( ($11) == 0 ? ($2):1/0 ) w points pointsize 0.08 pointtype 3 lt rgb 'red' title \" INS solution \" ,\
    '%s' u ($3):( ($11) == 1 ? ($2):1/0 ) w points pointsize 0.2 pointtype 3 lt rgb 'green' title \" INS/GNSS Integrated solution \" \n", filename, filename, filename);
@@ -549,34 +549,29 @@ extern void KF_residuals_plot(char* filename){
                  "set grid \n",outpath[0]);
 
 
-  fprintf(gp,"plot '%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \" Sat %d \",\ ",\
-  filename,prn[i],prn[i]);
+  fprintf(gp,"plot '%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \"Sat %d\",\ ", filename,prn[i],prn[i]);
 
-  fprintf(gp1,"plot '%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
-  filename,prn[i],prn[i]);
+  fprintf(gp1,"plot '%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \"Sat. %d\",\ ", filename,prn[i],prn[i]);
 
-  //lt rgb 'red'
    fprintf(gp," \" stats \" '%s' u 4 name 'A' nooutput \n", filename);
   // fprintf(gp, "stats '%s' u 3 name 'B' nooutput \n", filename);
 
    for (i = 1; i < count; i++) { //PRN loop
-     fprintf(gp,"'%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
-     filename,prn[i],prn[i]);
+     fprintf(gp,"'%s' u ($1):( $2==(%d) ? $4 : 1/0 ) w points ps 0.8 title \"Sat. %d\",\ ", filename,prn[i],prn[i]);
 
-     fprintf(gp1,"'%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \" Sat. %d \",\ ",\
-     filename,prn[i],prn[i]);
+     fprintf(gp1,"'%s' u ($1):( $2==(%d) ? $3 : 1/0 ) w points ps 0.8 title \"Sat. %d\",\ ", filename,prn[i],prn[i]);
   }
+
   //pointtype %d
   
    fprintf(gp, "A_mean t sprintf('mean:%.2f',A_mean),\ A_stddev t sprintf('std:%.2f',A_stddev) \n", filename);
   // fprintf(gp1, "B_mean t sprintf('mean:%.2f',B_mean),\ B_stddev t sprintf('std:%.2f',B_stddev) \n", filename);
 
-
   fflush(gp);
   fclose(gp);
   fflush(gp1);
   fclose(gp1);
-fclose(fp);
+  fclose(fp);
 }
 
 /* Print tropo parameters */

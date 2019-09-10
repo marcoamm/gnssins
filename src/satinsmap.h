@@ -262,7 +262,6 @@ typedef struct {            /* initial uncertainty for ins-gnss coupled */
 } unc_t;
 
 typedef struct {  /* GNSS/INS processing options */
-  int mode;               /* Tightly=1, or Loosley=0 coupled solution */
   int Tact_or_Low;       /* Type of inertial, tact=1, low=0 */
   int Nav_or_KF;          /* Type of solution: Navigation sol:0 KF Integrated sol:1   */
   int ins_ini;           /* Ins intialization: 0: no 1: yes   */
