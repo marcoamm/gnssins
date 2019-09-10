@@ -3652,7 +3652,6 @@ insgnssopt.ins_EOF=1;
 resid.nv_w=10;
 resid.data=(res_epoch_t*)malloc(sizeof(res_epoch_t)*resid.nv_w);  /* residuals structure window size allocation */
 
-
 strcpy(filopt.trace,tracefname); 
    
 /* Global TC_KF_INS_GNSS output files    */     
@@ -3665,46 +3664,11 @@ out_KF_state_error=fopen("../out/out_KF_state_error.txt","w");
 out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
 out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
-//imu_tactical=fopen("../data/imu_ascii_new_1.txt", "r");
-imu_tactical=fopen("../data/imu_ascii_new_timesync2.txt", "r");
+imu_tactical=fopen("../data/19032019/imu_ascii.txt", "r");
 fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");    
  
 rewind(imu_tactical);                                                   
 
-
-
-/* Declarations from rnx2rtkp source code program */
-//clk93stream.rtcm3  CLK930600.rtcm3
-// Base station: /home/emerson/Desktop/rtk_simul/PNW2_140448.16o
-
-/* PPP-Kinematic  1st experimet
-char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/igs19674.*", "../data/SEPT2640.17N", "-o", "../out/PPP_phs2_exp1.pos", "-k", "../config/opts3.conf"};
-
-char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/igs19674.*  ../data/SEPT2640.17N -o ../out/PPP_phs2_exp1.pos -k ../config/opts3.conf";
-  */ // Command line
-
-/* PPP-Kinematic  2nd experimet
-  char *argv[] = {"./rnx2rtkp", "../data/LOG__033.18O", "../data/igs20012.sp3", "../data/brdc1350.18n", "-o", "../out/PPP_test2.pos", "-k", "../config/opts3.conf"};
-
-  char *comlin = "./rnx2rtkp ../data/LOG__033.18O ../data/igs20012.sp3  ../data/brdc1350.18n -o ../out/PPP_test2.pos -k ../config/opts3.conf";
-     */// Command line 
-
-/* PPP-Kinematic  3rd experimet
-  char *argv[] = {"./rnx2rtkp", "../data/LOG__038.18O", "../data/LOG__038_gps.nav", "-o", "../out/SPP_test3.pos", "-k", "../config/opts4.conf"};
-  char *comlin = "./rnx2rtkp ../data/LOG__038.18O ../data/LOG__038_gps.nav -o ../out/SPP_test3.pos -k ../config/opts4.conf";
-         // Command line */ 
-
-/* PPP-Kinematic  4th experimet - GPS AND GLONASS */
- //char *argv[] = {"./rnx2rtkp", "../data/LOG__040.18o", "../data/BRDC00IGS_R_20181930000_01D_MN.rnx", "../data/grm20094.clk", "../data/grm20094.sp3", "-o", "../out/PPP_bmo.pos", "-k", "../config/opts3.conf", "-x", "5"};
- 
- //char *comlin = "./rnx2rtkp ../data/LOG__040.18o ../data/BRDC00IGS_R_20181930000_01D_MN.rnx ../data/igs20094.* -o ../out/PPP_mod_exp4.pos -k ../config/opts3.conf";
-// Command line 
-
-
-/* PPP-Kinematic  Kinematic Positioning dataset
- char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/CAR_2890.18N", "../data/igs20232.*", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf", "-x 5"};
- char *comlin = "./rnx2rtkp ../data/CAR_2890.18O ../data/CAR_2890.18N ../data/igs20232.* -o ../out/PPP_car_back.pos -k ../config/opts3.conf -x 5";
-  */    // Command line 
 
 /* PPP-Kinematic  Kinematic Positioning dataset  GPS+GLONASS */  
 //char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/BRDC00IGS_R_20182890000_01D_MN.nav", "../data/grm20232.clk","../data/grm20232.sp3", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf", "-x", "5"};
@@ -3712,25 +3676,10 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/igs19674.*  ../data/SEPT
 /* PPP-Kinematic  Kinematic Positioning dataset  March 21, 2019 GPS */
 //char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/igs20452.clk","../data/igs20452.sp3", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
-char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/grg20452.sp3","../data/grg20452.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
+char *argv[] = {"./rnx2rtkp", "../data/19032019/APS_center.19O", "../data/19032019/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/19032019/grg20452.sp3","../data/19032019/grg20452.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
  
 /* PPP-AR Kinematic   
-char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};
-
-char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT2640.17N -o ../out/exp1_PPP_amb_mod_constr.pos -k ../config/opts3.conf";
-  */  // Command line
-
-/* PPK - Post Processed Kinematic
-   char *argv[] = {"./rnx2rtkp", "../data/2_APS_2644.17O", "../data/UNB3264.17o", "../data/1_APS_2640.17N", "../data/igs19674.sp3", "-o", "../out/PPK_exp1.pos", "-k", "../config/relative.conf"};
-
-   char *comlin = "./rnx2rtkp ../data/2_APS_2644.17O ../data/UNB3264.17o ../data/1_APS_2640.17N ../data/igs19674.sp3 -o ../out/PPK_exp1.pos -k ../config/relative.conf";
-// Command line*/
-
-/* Static data
- char *argv[] = {"./rnx2rtkp", "/home/emerson/Desktop/rtk_simul/unbj_constrain_test/unbj0600.16o", "/home/emerson/Desktop/rtk_simul/unbj_constrain_test/brdc0600.16n", "/home/emerson/Desktop/rtk_simul/unbj_constrain_test/igs18861.sp3", "-o", "/home/emerson/Desktop/rtk_simul/unbj_constrain_test/sol_unbj1.pos", "-k", "/home/emerson/Desktop/rtk_simul/opts3.conf"};
-
-   char *comlin = "./rnx2rtkp /home/emerson/Desktop/rtk_simul/unbj_constrain_test/unbj0600.16o /home/emerson/Desktop/rtk_simul/unbj_constrain_test/brdc0600.16n /home/emerson/Desktop/rtk_simul/unbj_constrain_test/igs18861.sp3 -o /home/emerson/Desktop/rtk_simul/unbj_constrain_test/sol_unbj1.pos -k /home/emerson/Desktop/rtk_simul/opts3.conf"; // Command line
-*/
+char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};*/
 
  //argc= sizeof(comlin) / sizeof(char);  
     argc=11; 
@@ -3742,24 +3691,8 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
     solopt.timef=0;
     sprintf(solopt.prog ,"%s ver.%s",PROGNAME,VER_RTKLIB);
     sprintf(filopt.trace,"%s.trace",PROGNAME);
+
 /* Declarations from rnx2rtkp */
-
-/* Reference lane size measurement */
-/*for(;;){
-  c =fgetc(fp_lane);
-    if( c == EOF ){break;
-    }else if ( c == '\n') {
-      l++;
-    }
-}
-   fseek(fp_lane, 0L, SEEK_END);
-   lane.size = ftell(fp_lane);
-   lane.sizeline = lane.size/l;
-   rewind(fp_lane);
-*/
-
-/* load options from configuration file */
-//printf("%d\n",argc);
 
     for (i=1;i<argc;i++) {
     printf("input: %s \n", argv[i]);
@@ -3830,9 +3763,6 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
  /* ins navigation only */
  //imu_tactical_navigation(imu_tactical); 
 
- /* Closing global files          */
-  //fclose(fp_lane);
-
   fclose(out_PVA);
   fclose(out_clock_file);
   fclose(out_IMU_bias_file);  
@@ -3844,15 +3774,6 @@ char *comlin = "./rnx2rtkp ../data/SEPT2640.17O ../data/grg19674.*  ../data/SEPT
   fclose(out_KF_state_error); 
   fclose(out_KF_residuals);  
   fclose(fimu);                     
-
-/*
-  char posfile[]="../out/out_PVA.txt";
-  imuposplot(posfile);
-  char gyrofile[]="../out/out_PVA.txt";   
-  imueulerplot(gyrofile);                            */
-
-/* Other function call after processing ------------------------------*/
- 
 
 /* INS/GNSS plots  */ 
  char out_raw_fimu[]="../out/out_raw_imu.txt";      
@@ -3873,363 +3794,12 @@ KF_vel_stds_plot(imu_KF_stds);
 KF_pos_stds_plot(imu_KF_stds);
 char imu_KF_clk[]="../out/out_clock_file.txt"; 
 KF_clock_plot(imu_KF_clk);
-/*char KF_states[]="../out/out_KF_state_error.txt";
-KF_state_errors_plot_att(KF_states);
-KF_state_errors_plot_vel(KF_states);
-KF_state_errors_plot_pos(KF_states);
-KF_state_errors_plot_accb(KF_states);
-KF_state_errors_plot_gyrb(KF_states);
-KF_state_errors_plot_clk(KF_states);  */
 char imu_KF_res[]="../out/out_KF_residuals.txt"; 
 KF_residuals_plot(imu_KF_res);
 char tropo_file[]="../out/out_tropo_bias.txt";
 tropo_plot(tropo_file);
  char amb_file[]="../out/out_amb_bias.txt"; 
  amb_plot(amb_file);                                  
-
-/*call for analysis script*/
-//system("./../analysis/analysis.sh");
-
-/* Plot IMU ra measurements
-char imu_raw_meas[]="../out/out_raw_imu.txt";
-imuaccplot(imu_raw_meas);
-imugyroplot(imu_raw_meas);
-*/
-
-/* Adjusting IMU tactical time
-FILE *new=fopen("../data/imu_ascii_new_1.txt", "w");
-char str[100];
-char timeini[]="2018 10 16 19 5 35.600";
-gtime_t t_ini;
-double gpst;
-int week=2023;
-
-str2time(timeini, 0, 23, &t_ini);
-gpst=time2gpst(t_ini, &week);
-printf("Time of week: %lf\n",gpst );
-
-
-double t_0=gpst+622.0;
-//t_0 = 244535.296;  // Tactical clock corect time experiment
-double t_end, t=0.0, t_beggin=0.0;
-double a[3], g[3];
-i=0;
-while ( fgets(str, 100, imu_tactical)!= NULL ){
-  //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,%lf", &hh, &m,&s, &ht);
-  sscanf(str, "%lf %lf %lf %lf %lf %lf %lf", &t, &a[0], &a[1], &a[2], &g[0], &g[1], &g[2]);
-  if(i==0){
-      t_end = t_0;
-      t_beggin=t;
-  }else{
-    t_end = t_0 + (t-t_beggin);
-  }
-  //printf("%lf %lf %lf\n", posp[0]*R2D, posp[1]*R2D, posp[2]);
-  //t=(double)(hh+(m/60.0)+(s/3600.0));
-  fprintf(new, "%.3lf %lf %lf %lf %lf %lf %lf\n", t_end, a[0], a[1], a[2], g[0], g[1], g[2]);
-  i++;
-}
-
-fclose(new);*/     
-
-
-/*Processing imu_tactical only */
-//imuaccplot("/home/emerson/Desktop/Connected_folders/data/imu_ascii.txt");
-//imugyroplot("/home/emerson/Desktop/Connected_folders/data/imu_ascii.txt");
-//imu_tactical_navigation(imu_tactical);
-
-
-/* IMU-MAP test
-  while ( 1 ) {
-    if(ferror(fimu)||feof(fimu)) break; 
-    insmap ();
-}*/
-
-/* IMU PLOTS
-char accfile[]="../out/ins_acceleration.txt";
-char gyrofile[]="../out/ins_gyro.txt";
-char posfile[]="../out/insmap_test_pos.txt";
-char velfile[]="../out/insmap_test_vel.txt";
-   imuaccplot(accfile);
-   imugyroplot(gyrofile);
-//   imueulerplot();
-   imuUpplot(posfile);
-   imuvelplot(velfile);*/
-/*
-   char raw_imu[]="../out/out_raw_imu.txt";
-   imuaccplot(raw_imu);
-   imugyroplot(raw_imu);
-   char gyrofile[]="../out/out_PVA.txt";
-   imueulerplot(gyrofile);
-   char velfile[]="../out/out_PVA.txt";
-   imuvelplot(velfile);
-   char posfile[]="../out/out_PVA.txt";
-   imuposplot(posfile);
-/**/
-
-   // amb_and_var_plot ();
-
-  /* Printing residuals for the grad seminar */
-  //resprint4();
-  //resinnovbounds();
-  //resinnovqchisq();
-  //resinnovqchisqtger();  
-
-  //sppstdnsat();
-
-  //return ret;
-  /* Calling interpolation function
-  FILE *fp=fopen("../data/Bmo_corners_static_from_rtkplot","r"); // static (Antenna centered) exp5
-  //FILE *fp=fopen("../data/Bmo_corners_xyz_rtklib","r"); // Corner centered
-//  FILE *fp=fopen("../data/Bmo_cartesian_corners_derived_with_height","r"); // Kinematic (antenna centered) exp5
-  lineInterp(fp,0.1,4);
-  fclose(fp);
-*/
-
-
- /* For Map-matching plots
- double r[3], enu[3],r0[3], dr[3], pos0[3];
- double lat0=45.94312323*D2R, lon0=-66.64106835*D2R, h0=52.7309; // BMO corner 1
- double x,y,z;
- char str[150];
-
- //FILE *flaenu=fopen("../data/Lanes_enu_rtklib_corr.txt","w");
- FILE *flaenu=fopen("../data/Lanes_enu_rtklib3.txt","w");
-
- pos0[0]=lat0;pos0[1]=lon0;pos0[2]=h0; // datum
- pos2ecef(pos0, r0);
-
- printf("%lf,%lf,%lf\n",r0[0],r0[1],r0[2]);
-
-  rewind(fp_lane);
-  while ( fgets(str, 150, fp_lane)!= NULL ){
-    //puts(str);
-    sscanf(str, "%lf %lf %lf", &r[0], &r[1], &r[2]);
-
-    for (j = 0; j < 3; j++) dr[j]=r[j]-r0[j];
-    ecef2enu(pos0, dr, enu);
-
-    //sscanf(str, "%*4d%*[/]%*2d%*[/]%*4d %*2d%*[:]%*2d%*[:]%*12lf   %13lf  %14lf\n", &y, &x);
-    fprintf(flaenu, "%lf %lf %lf\n", enu[0], enu[1],enu[2]);
-   }
-   fclose(flaenu);
-*/
-
-//  resprint4();
-
- /* Height and 3D distance comparison plot  */
-//  heightplot();
- //coordcompplot ();
- //coordcompcalcplot ();
-
-//mapmatchplot();
-//mapmatchplot1 ();
-
-/*Print misclosure and residuals values from SPP vs MM  using Rescomp file */
-//resprint2();
-//resprint1();
-//resprint3();
-
- /* IMU functions call	tests
- pos[0]= 1761566.127;
- pos[1]= -4078757.743;
- pos[2]= 4560891.627;
- insnav(fimu, pos);*/
- //fclose(fimu);
-
- /* Residuals plots functions
- res=fopen(residualsfname,"r");
- resprint(res);
- fclose(res);*/
-
-
-/* Height comparison file preparation
-FILE *f1,*f2,*f3,*f4,*f1out,*f2out,*f3out; 
-char str[150];
-double t,s,ht,ep[6],posr[3],r[3],posp[3],enup[3],enu[3],dr[3],r0[3],pos0[3];
-pos0[0]=45.94312323*D2R, pos0[1]=-66.64106835*D2R, pos0[2]=52.7309; // BMO corner 1
-pos0[0]=(45+(56.0/60.0)+(35.241079/3600.0))*D2R;  //BMO corner with lever arm
-pos0[1]=-(66+(38.0/60.0)+(27.85004/3600.0))*D2R;
-pos0[2]=54.360;
-int ww,hh,m;
-gtime_t taux;
-
-//f1=fopen("../out/Relative_ALLOFF_ANTENNASON_AMB_ON_wirthout_height.pos","r");
-//f2=fopen("../out/PPPonly2Ddist.txt","r");
-//f3=fopen("../out/PPP_only_exp1 (copy).pos","r");
-//f3=fopen("../out/PPP_cand_enu.txt","r");
-//f4=fopen("../out/PPK_enu.txt","r");
-//f1out=fopen("../data/Magnet_kin_height.txt","w");
-f2out=fopen("../data/Lanes_5_llh.csv","w");
-//f2out=fopen("../out/PPK2Ddist.txt","w");
-//f3out=fopen("../data/NrCan_kin_height1.txt","w");
-//f3out=fopen("../data/GAPS_kin_height.txt","w");
-//f3out=fopen("../data/exp1_PPP_back_height.pos","w");
-//f3out=fopen("../data/exp1_PPP_back_height.pos","w");
-pos2ecef(pos0, r0);
-//printf("%lf,%lf,%lf\n",r0[0],r0[1],r0[2]);
-double avge=0.0,avgn=0.0,avgup=0.0;
-double avppponly[3],avgpppmod[3],avgrtk[3];
-avppponly[0]=0.395488;avppponly[1]=0.436018;avppponly[2]=1.315044;
-avgpppmod[0]=0.000212;avgpppmod[1]=0.002623;avgpppmod[2]=0.002917;
-avgrtk[0]=0.179752;avgrtk[1]=0.277061;avgrtk[2]=0.271385;
-
-
-/* Opening Reference Lane file and coverting cartesia coordinates to geodetic
-
-while ( fgets(str, 200, fp_lane)!= NULL ){
-  //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,%lf", &hh, &m,&s, &ht);
-  sscanf(str, "%lf %lf %lf", &r[0], &r[1], &r[2]);
-  ecef2pos(r, posp);
-  //printf("%lf %lf %lf\n", posp[0]*R2D, posp[1]*R2D, posp[2]);
-  //t=(double)(hh+(m/60.0)+(s/3600.0));
-  fprintf(f2out, "%11.9lf,  %11.9lf, %11.9lf\n", posp[0]*R2D, posp[1]*R2D, posp[2]);
-}
-*/
-
-/*
-i=0;
-f2=fopen("../out/PPPonly2Ddist.txt","r");
-while ( fgets(str, 200, f2)!= NULL ){
-  //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,%lf", &hh, &m,&s, &ht);
-  sscanf(str, "%*lf %lf %lf %lf", &enup[0], &enup[1], &enup[2]);
-  avge+=(enup[0]-avppponly[0])*(enup[0]-avppponly[0]);
-  avgn+=(enup[1]-avppponly[1])*(enup[1]-avppponly[1]);
-  avgup+=(enup[2]-avppponly[2])*(enup[2]-avppponly[2]);
-  i++;
-  //t=(double)(hh+(m/60.0)+(s/3600.0));
-  //fprintf(f1out, "%lf %lf\n", t,ht);
-}
-
-printf("PPP-only std in E, N, UP: %lf, %lf, %lf\n",sqrt(avge/(i-1)),sqrt(avgn/(i-1)),sqrt(avgup/(i-1)));
-fclose(f2);
-
-i=0;
-avge=0.0,avgn=0.0,avgup=0.0;
-f2=fopen("../out/PPPmod2Ddist.txt","r");
-while ( fgets(str, 200, f2)!= NULL ){
-  //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,%lf", &hh, &m,&s, &ht);
-  sscanf(str, "%*lf %lf %lf %lf", &enup[0], &enup[1], &enup[2]);
-  avge+=(enup[0]-avgpppmod[0])*(enup[0]-avgpppmod[0]);
-  avgn+=(enup[1]-avgpppmod[1])*(enup[1]-avgpppmod[1]);
-  avgup+=(enup[2]-avgpppmod[2])*(enup[2]-avgpppmod[2]);
-  i++;
-  //t=(double)(hh+(m/60.0)+(s/3600.0));
-  //fprintf(f1out, "%lf %lf\n", t,ht);
-}
-
-//printf("PPP-mod averages in E, N, UP: %lf, %lf, %lf\n",avge/i,avgn/i,avgup/i);
-printf("PPP-mod std in E, N, UP: %lf, %lf, %lf\n",sqrt(avge/(i-1)),sqrt(avgn/(i-1)),sqrt(avgup/(i-1)));
-fclose(f2);
-
-i=0;
-avge=0.0,avgn=0.0,avgup=0.0;
-f2=fopen("../out/PPK2Ddist.txt","r");
-while ( fgets(str, 200, f2)!= NULL ){
-  //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,%lf", &hh, &m,&s, &ht);
-  sscanf(str, "%*lf %lf %lf %lf", &enup[0], &enup[1], &enup[2]);
-//  avge+=enup[0];
-//  avgn+=enup[1];
-//  avgup+=enup[2];
-avge+=(enup[0]-avgrtk[0])*(enup[0]-avgrtk[0]);
-avgn+=(enup[1]-avgrtk[1])*(enup[1]-avgrtk[1]);
-avgup+=(enup[2]-avgrtk[2])*(enup[2]-avgrtk[2]);
-
-  i++;
-  //t=(double)(hh+(m/60.0)+(s/3600.0));
-  //fprintf(f1out, "%lf %lf\n", t,ht);
-}
-//printf("RTK averages in E, N, UP: %lf, %lf, %lf\n",avge/i,avgn/i,avgup/i);
-printf("RTK std in E, N, UP: %lf, %lf, %lf\n",sqrt(avge/(i-1)),sqrt(avgn/(i-1)),sqrt(avgup/(i-1)));
-fclose(f2);
-
-
-if(f1 == NULL) {
-     perror("Error opening file");
-     return(-1);
-  }
-
-
-while ( fgets(str1, 150, f1)!= NULL ){
-            //2017/09/21 16:23:36.400   45.943136265  -66.641063914    56.5241
-  //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf   %lf  %lf    %lf", &hh, &m,&s, &posr[0], &posr[1], &posr[2]);
-
-           //2017/09/21 16:23:36.400,  45.943124507, -66.641093833,   52.0725,  6,  9, 23.6700, 14.2659, 34.0400, 11.4957,  3.8339, -5.5948,  0.00,   0.0
-           //2018/07/12 13:40:06.000,  45.943122547, -66.641069572,   54.3898,  1,  9,  0.0065,  0.0063,  0.0137,  0.0022,  0.0025, -0.0051,  0.00,   5.4
-  sscanf(str1, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf,   %lf,  %lf,    %lf,", &hh, &m,&s, &posr[0], &posr[1], &posr[2]);
-  //sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf%*c%*lf%*c%*lf%*c%lf", &hh, &m,&s, &ht);
-
-  t=(double)(hh+(m/60.0)+(s/3600.0));
-
-  posr[0]=posr[0]*D2R; posr[1]=posr[1]*D2R;
-  pos2ecef(posr, r);
- // printf("Read position: %lf %lf %lf\n",r[0],r[1], r[2]);
-  // Fetching data to the first buffer structure (lane.buffer)
-   inibuff();
-  // Closest point computation
-  clstpt(&r);
-  // Closest point positions to local
-	for (j=0;j<3;j++) posp[j]=lane.buffer[lane.currsearch*3+j];
-  //printf("clst: %lf %lf %lf\n", posp[0], posp[1], posp[2]);
-  for (j = 0; j < 3; j++) dr[j]=posp[j]-r0[j];
-  ecef2enu(pos0, dr, enup);
-  ecef2pos(posr, posp);
-  //printf("%lf\n", posp[2]);
-
-  // When xyz directly
-  //sscanf(str, "%lf %lf %lf", &r[0], &r[1], &r[2]);
-
-  for (j = 0; j < 3; j++) dr[j]=r[j]-r0[j];
-  ecef2enu(pos0, dr, enu);
-
-
-  //printf("rtk: %lf %lf %lf,clst: %lf %lf %lf\n", enu[0],enu[1],enu[2],enup[0],enup[1],enup[2]);
-  // en and up differences
-  //fprintf(f2out, "%lf %lf %lf\n", t, sqrt( pow(enup[0]-enu[0],2) + pow(enup[1]-enu[1],2)),enup[2]-enu[2]);
-
-  // e, n, and up differences
-fprintf(f2out, "%lf %lf %lf %lf\n", t, fabs(enup[0]-enu[0]), fabs(enup[1]-enu[1]), fabs(enup[2]-enu[2]));
-
-  // e, n, and up
-  //fprintf(f2out, "%lf %lf %lf\n", enu[0], enu[1], enu[2]);
-
-  //fprintf(f2out, "%lf %lf\n",t,posr[2]);
-
-}
-
-/*
-while ( fgets(str, 200, f3)!= NULL ){
-  // NRCan csv file readings
-  //sscanf(str, "%*lf%*c%*lf%*c%lf%*c%lf", &ht,&t);
-  // GAPS pos file reading
-  //sscanf(str, " %*4d   %*1d  %*2d  %2d  %2d  %lf       %*d       %*d    %*lf      %*d       %*d    %*lf        %lf", &hh, &m,&s, &ht);
-  // Magnet tools
-  //2017/09/21 16:23:36.400,53.559
-  //sscanf(str, " %*4d/%*d/%*d  %2d:%2d:%lf,%lf", &hh, &m,&s, &ht);
-  // RTKLIB - 2017/09/21 16:23:36.400   45.943136265  -66.641063914    56.5241
-sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf   %*lf  %*lf    %lf", &hh, &m,&s, &ht);
-//sscanf(str, "%*4d%*c%*2d%*c%*2d %2d%*c%2d%*c%lf%*c%*lf%*c%*lf%*c%lf", &hh, &m,&s, &ht);
-t=(double)(hh+(m/60.0)+(s/3600.0));
-   //printf("%d,%d,%lf,%lf\n",hh,m,s,ht);
-  //printf("%lf,%lf\n",t, ht);
-//  fprintf(f3out, "%lf %lf\n", t,ht);
-}
-*/
-//fclose(f1);fclose(f3);fclose(f4);
-//fclose(f1out);
-//fclose(f2out);
-//fclose(f3out);    */
-
- //heightplot();
- //resinnovbounds ();
- //mapmatchplot1 ();
- //mapmatchplot ();
- //nsat();
-
- //imuposplot();
- //imuaccplot();
- //imuvelplot();
- //imugyroplot();
-
 
  printf("\n\n SUCCESSFULLY EXECUTED!  \n\n");
  return;
