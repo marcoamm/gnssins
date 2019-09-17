@@ -1,0 +1,22 @@
+% program   : RTKPOST ver.2.4.2
+% inp file  : Z:\home\emerson\Desktop\Connected_folders\Collection_Aug2019\Monday_Aug26\Septentrio\SEPT2380.19O
+% inp file  : Z:\home\emerson\Desktop\Connected_folders\Collection_Aug2019\Monday_Aug26\Septentrio\SEPT2380.19N
+% inp file  : Z:\home\emerson\Desktop\Connected_folders\Data\AUG26\igs20681.*
+% obs start : 2019/08/26 17:06:31.0 GPST (week2068 147991.0s)
+% obs end   : 2019/08/26 18:19:39.0 GPST (week2068 152379.0s)
+% pos mode  : ppp-kinematic
+% solution  : forward
+% elev mask : 15.0 deg
+% dynamics  : on
+% tidecorr  : off
+% tropo opt : est ztd
+% ephemeris : precise
+% antenna1  :                       ( 0.0000  0.0000  0.0000)
+%
+% (lat/lon/height=WGS84/ellipsoidal,Q=1:fix,2:float,3:sbas,4:dgps,5:single,6:ppp,ns=# of satellites)
+%  GPST                  latitude(deg) longitude(deg)  height(m)   Q  ns   sdn(m)   sde(m)   sdu(m)  sdne(m)  sdeu(m)  sdun(m) age(s)  ratio
+2019/08/26 17:19:30.000   46.597650862  -65.754699791 -131505.1795   6   1  85.1711  93.9879  94.4103  42.3030 -33.5526  41.5620   0.00    0.0
+2019/08/26 17:20:39.000   46.582281778  -65.756847754 -132405.4186   6   1  99.0108  99.2553  73.1142  13.0734  28.8282 -30.9386   0.00    0.0
+2019/08/26 17:20:40.000   46.582072720  -65.756899793 -132407.8561   6   1  99.0110  99.2563  73.1111  13.0684  28.8190 -30.9381   0.00    0.0
+2019/08/26 17:20:41.000   46.581864465  -65.756948836 -132410.3734   6   1  99.0112  99.2573  73.1089  13.0632  28.8094 -30.9371   0.00    0.0
+2019/08/26 17:20:42.000   46.581653335  -65.757000651 -132412.4179   6   1  99.0114  99.2584  73.1070  13.0580  28.7997 -30.9360   0.00    0.0
