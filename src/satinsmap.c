@@ -21,7 +21,6 @@
 
 /* global variables ----------------------------------------------------------*/
 FILE *fp_lane;       /* Lane coordinate file pointer */
-FILE *fimu;          /* Imu datafile pointer  */
 FILE *imu_tactical; /* Imu datafile pointer */
 lane_t lane;
 imuraw_t imu_obs_global={{0}}; 
@@ -822,6 +821,43 @@ extern void getaccl(const double *fib,const double *Cbe,const double *re,
     }
 }
 
+/* Local apparent gravity ----------------------------------------------------
+* description: computes the gravity vector in the navigation frame (n-frame)
+* args	:	double *pos[3]	I	{llh} vector [m] in e-frame
+*	 	double *gan[3]	O	apparent gravity vector in n-frame [m/s*s]
+* Reference: Chatfiled (1997, pag. 80)
+*----------------------------------------------------------------------------*/
+void appgrav (double* pos, double* gan, double* wiee){
+ double ge[3], r[3];
+ double auxvec[3], aux1vec[3], gae[3], Ren[9];
+ int i;
+
+ /* llh to xyz	*/
+ pos2ecef(pos, r);
+
+ /* apparent gravity vector in e-frame
+ from normal gravity vector at the location and altitude	*/
+ ge[0]=0;ge[1]=0;ge[2]=gn(pos[0], pos[2]);
+
+ cross3(wiee, r, auxvec);
+ cross3(wiee, auxvec, aux1vec);
+
+ for (i=0; i<3;i++){gae[i]=ge[i]-aux1vec[i];}
+
+ /* Rotation matrix from e to n-frame	*/
+ Ce2n(pos[0],pos[1],Ren);
+
+ /* Local apparent gravity vector in n-frame	*/
+ matmul_row("NN", 3, 1, 3, 1.0, Ren, gae, 0.0, gan);
+
+ for (i=0; i<3;i++) gan[i]=-gan[i];
+
+ /* Forcing gan back to ge, as in Shin (2001) page 24 */
+ for (i=0; i<3;i++) gan[i]=ge[i];
+
+
+}
+
 /* close loop for non-holonomic constraint-----------------------------------*/
 extern void clp(ins_states_t *ins,const insgnss_opt_t *opt,const double *x)
 {
@@ -1035,7 +1071,95 @@ static void jacobian_prot_pang(const double *Cbe,double *S)
     S[1]=-cos(rpy[1])*sin(rpy[2]); S[4]=cos(rpy[2]); S[7]=0.0;
     S[2]= sin(rpy[1]);             S[5]=0.0;         S[8]=1.0;
 }
-/* input imu measurement data-------------------------------------------------*/
+/* input imu measurement data --------------------------------------------------*/
+/* Return imu file pointer one complete set of observation  */
+extern void imufileback(){
+  int j;
+  char c;
+
+  for (j = 0; j <= 3 ; j++) {  // Returns 2 sets of obs
+    while (c != '\n'){
+      fseek(imu_tactical, -1L, SEEK_CUR);
+      c = fgetc(imu_tactical);
+      fseek(imu_tactical, -1L, SEEK_CUR);
+    }
+    c=0;
+  }
+  /* to match the begining of the line after the \n */
+  fseek(imu_tactical, 1, SEEK_CUR);
+}
+/* Parse and organize the MEMs-IMU received packets ----------------------------
+* description: IMU
+* args   : char *strline       I   char with one line containing one sensor IMU readings
+* One epoch message type:
+489629.200,1946,COM3,36,$PCHRS,0,101.633,3.32,0.33,-0.49,*7E
+489629.200,1946,COM3,42,$PCHRS,1,101.633,0.3717,0.1030,-0.7725,*77
+489629.200,1946,COM3,42,$PCHRS,2,101.633,0.4922,0.2708,-1.6283,*7D, where
+secofweek sync, GPS week, port, ?, header filed, count, sensor time, x,y,z,checksum
+    O  imu.status -1: meassage not complete, 0: error reading, 1: ok
+*-----------------------------------------------------------------------------*/
+void parseimudata(char* strline, um7pack_t* imu)
+{
+   char *token;
+   int i=1, sscanstat;
+   float sensor_x,sensor_y,sensor_z;
+   double imucurrtime;
+   double G = 9.80665;
+
+  sscanstat=sscanf(strline, "%lf,%d,%*4s,%*2d,%*6s,%d,%f,%*f,%*f,%*f,%*s",
+  &imu->sec, &imu->gpsw, &imu->count, &imu->internal_time);
+
+  /* Checking if received message is complete and synchronized	*/
+  if (sscanstat < 4) {
+    imu->status=-1;
+    return;
+  }
+
+  sscanstat=sscanf(strline, "%lf,%d,%*4s,%*2d,%*6s,%d,%*f,%f,%f,%f,%3c",
+  &imu->sec, &imu->gpsw, &imu->count, &sensor_x, &sensor_y, &sensor_z, &imu->checksum);
+  /*printf("%6.1f, %d, %d, %f, %f, %f, %c \n",
+  imu->sec, imu->gpsw, imu->count, sensor_x, sensor_y, sensor_z, imu->checksum);*/
+  imu->time=gpst2time(imu->gpsw,imu->sec);
+
+ /* Check if message was read successfully	*/
+ if (sscanstat < 7) {
+   imu->status=0;
+   return;
+ }
+
+ if (imu->count == 0){
+  // printf("Gyro data: %d \n", imu->count);
+   imu->g[0]=sensor_x*D2R; imu->g[1]=sensor_y*D2R;imu->g[2]=sensor_z*D2R; /* rad/s */
+   imu->tgyr=imu->internal_time;
+ }else if (imu->count == 1){
+       	//  printf("Accelerometer data: %d \n", imu->count);
+	  imu->a[0]=sensor_x*G;imu->a[1]=sensor_y*G;imu->a[2]=sensor_z*G; /* in gravities to m/s2 */
+    imu->tacc=imu->internal_time;
+       }else {
+	 // printf("Magnetometer data: %d \n", imu->count);
+	  imu->m[0]=sensor_x;imu->m[1]=sensor_y;imu->m[2]=sensor_z; /* uT unitless */
+    imu->tmag=imu->internal_time;
+       }
+
+   /* Checking if data is complete for processing	*/
+   /* Using time of each data measurement */
+   if (imu->tgyr==0.0 || imu->tacc==0.0 ) {
+     /* Not complete yet */
+     imu->status=0;
+     return;
+   }
+
+   if (imu->tgyr==imu->tacc) {
+     /* Data complete and synchronized */
+     imu->status=1;
+   }else{
+     /* Data not synchronized */
+     imu->status=0;
+   }
+   //if ( imu->count==2 ) imu->status = 1;
+
+}
+/* Imu input data --------------  */
 static int inputimu(prcopt_t *opt, ins_states_t *ins, int week){
   char check, str[150];
   um7pack_t imu_curr_meas={0};
@@ -1049,7 +1173,7 @@ static int inputimu(prcopt_t *opt, ins_states_t *ins, int week){
     &ins->data.fb0[1],&ins->data.fb0[0], &ins->data.wibb0[2],&ins->data.wibb0[1],\
     &ins->data.wibb0[0]);
     
-    ins->time=ins->time+16; /* Accounting for leap seconds */
+    ins->time=ins->time+5; /* Accounting for leap seconds */
     ins->data.sec=ins->time;
 
     ins->data.time=gpst2time(week, ins->time);
@@ -1087,7 +1211,7 @@ static int inputimu(prcopt_t *opt, ins_states_t *ins, int week){
   }else{
     /* Low cost IMU um7 input*/
    while(imu_curr_meas.status!=1){
-     if(!fgets(str, 150, fimu)) {
+     if(!fgets(str, 150, imu_tactical)) {
        printf("END OF FILE?\n");
        check=NULL;
        return 0;
@@ -1294,6 +1418,65 @@ extern void gapv2ipv(const double *pos,const double *vel,const double *Cbe,
         matmul33("NNN",Omge,Cbe,lever,3,3,3,1,TT);
         for (i=0;i<3;i++) veli[i]=vel[i]-T[i]+TT[i];
     }
+}
+
+
+/* Coarse alignment -----------------------------------------------------------
+* description: Coarse alignment of roll, pitch and yaw
+* args   : um7pack_t* imu       IO    imu structure
+*	   double* gn	I	local gravity
+           double acc[3]	I	INS accelerations from previous epoch {xyz}
+*          double v[3]	I	GNSS/or INS/GNSS previous state velocities {NED}
+           gan[3]  I  gravity vector
+           euler_angles[3]  IO  attitude angles in _nb frame {roll, pitch, yaw}
+Reference: Shin (2005, pag.42) and Groves (2013, pages 198 to 199)
+*-----------------------------------------------------------------------------*/
+//void coarseAlign(um7pack_t* imu, double* gan)
+void coarseAlign(double *acc, double *gyr, double *vel, double *gan, double *euler_angles)
+{
+ double r1[9], r2[9], aux[3], sign=1.0;
+ double sineyaw, coseyaw;
+
+ /* Is it a static or kinematic alignment? Use GNSS velocity or any velocity in imu->v */
+ if ( norm(vel,3) < 0.5){
+   printf("LEVELLING.STATIC, %lf, %lf, %lf\n", vel[0], vel[1],vel[2]);
+                                    //static alignment
+  /* Then we can solve for the roll(x(phi)) and pitch(y(theta)) angles using accelerometers */
+  //if(acc[2]<0.0){sign=-1.0;}
+  //accea[0]= sign*(asin((acc[1])/norm(gan,3)));
+  //accea[1]=-sign*(asin((acc[0])/norm(gan,3)));
+
+  /* Levelling from Groves (2013) */
+  /* roll - phi angle */
+  euler_angles[0]= atan2(-acc[1],-acc[2]);
+
+  /* pitch - theta angle */
+  euler_angles[1]= atan (acc[0]/sqrt(acc[1]*acc[1]+acc[2]*acc[2]));
+
+  /* Gyrocompasing by Groves(2013,page 199)  */
+  /* yaw - psi angle */
+  sineyaw=-gyr[1]*cos(euler_angles[0])+gyr[2]*sin(euler_angles[0]);
+  coseyaw= gyr[0]*cos(euler_angles[1])+gyr[1]*sin(euler_angles[0])*sin(euler_angles[1])+\
+  gyr[2]*cos(euler_angles[0])*sin(euler_angles[1]);
+  euler_angles[2]=atan2(sineyaw,coseyaw);
+
+}else{                            //kinematic alignment
+ /* Roll can be initialized to zero with an uncertainty of +-5 degrees,
+ in most cases, on the road */
+ printf("LEVELLING.KINE, %lf, %lf, %lf\n", vel[0], vel[1],vel[2] );
+
+ euler_angles[0]=0.0;
+
+ /* Levelling from Groves (2013) */
+ /* roll - phi angle */
+ //euler_angles[0]= atan2(-acc[1],-acc[2]); /* CORRECT IT LATER*/
+
+ /* The pitch(y(theta)) and heading(z(psi)) angles using velocities */
+ euler_angles[1]= atan(vel[2]/sqrt(vel[0]*vel[0]+vel[1]*vel[1]));
+ euler_angles[2]= atan(vel[2]/vel[1]);
+ /* Can be improved using an EKF with LHU model, see Shin (2005) chapter 3	*/
+ }
+
 }
 
 /* give gps antenna position/velocity to initialize ins states when static ---
@@ -1979,7 +2162,7 @@ int gnssQC(rtk_t *rtk, int nsat){
 
   printf("GNSS quality check: %lf, %lf Nsat: %d\n",norm(gnss_ned_cov,2), rtk->sol.gdop[0], nsat);
 
-  if (norm(gnss_ned_cov,2)<20.0){ //for SPP a reasonable value is 15 m, for others 5 m
+  if (norm(gnss_ned_cov,2)<60.0){ //for SPP a reasonable value is 15 m, for others 5 m
     if (rtk->sol.gdop[0]<4.0) 
     {
       printf("GNSS quality check ok\n"); 
@@ -2001,6 +2184,9 @@ void statRotat(ins_states_t *ins, double gnss_time, int check){
 
   if(gnss_w_counter >= insgnssopt.gnssw ) i=insgnssopt.gnssw-1;
   else i=gnss_w_counter;
+
+  printf("GNSS ACCEL: %lf %lf %lf\n", gnss_time, norm(solw[i].rr+3,2), norm(ins->data.fb0 ,2)); // for debugging
+
 
   if (check){
     /* Static detection by GNSS */
@@ -2360,19 +2546,19 @@ out_KF_state_error=fopen("../out/out_KF_state_error.txt","w");
 out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
 out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
-imu_tactical=fopen("../data/19032019/imu_ascii.txt", "r");
-fimu=fopen("../data/LOG__040.SBF_SBF_ASCIIIn.txt","r");    
+//imu_tactical=fopen("../data/19032019/imu_ascii.txt", "r");
+imu_tactical=fopen("../data/16102018/imu_ascii.txt", "r");
  
 rewind(imu_tactical);                                                   
 
 
 /* PPP-Kinematic  Kinematic Positioning dataset  GPS+GLONASS */  
-//char *argv[] = {"./rnx2rtkp", "../data/CAR_2890.18O", "../data/BRDC00IGS_R_20182890000_01D_MN.nav", "../data/grm20232.clk","../data/grm20232.sp3", "-o", "../out/PPP_car_back.pos", "-k", "../config/opts3.conf", "-x", "5"};
+char *argv[] = {"./rnx2rtkp", "../data/16102018/CAR_2890.18O", "../data/16102018/BRDC00IGS_R_20182890000_01D_MN.nav", "../data/16102018/grm20232.clk","../data/16102018/grm20232.sp3", "-o", "../out/PPP.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
 /* PPP-Kinematic  Kinematic Positioning dataset  March 21, 2019 GPS */
-//char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/igs20452.clk","../data/igs20452.sp3", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
+//char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/igs20452.clk","../data/igs20452.sp3", "-o", "../out/PPP.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
-char *argv[] = {"./rnx2rtkp", "../data/19032019/APS_center.19O", "../data/19032019/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/19032019/grg20452.sp3","../data/19032019/grg20452.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
+// char *argv[] = {"./rnx2rtkp", "../data/19032019/APS_center.19O", "../data/19032019/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/19032019/grg20452.sp3","../data/19032019/grg20452.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
  
 /* PPP-AR Kinematic   
 char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};*/
@@ -2468,34 +2654,36 @@ char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../
   fclose(out_raw_fimu);
   fclose(imu_tactical);
   fclose(out_KF_state_error); 
-  fclose(out_KF_residuals);  
-  fclose(fimu);                     
+  fclose(out_KF_residuals);    
+
+  char posfile[]="../out/out_PVA.txt"; 
+  imuposplot(posfile);                
 
 /* INS/GNSS plots  */ 
- char out_raw_fimu[]="../out/out_raw_imu.txt";      
- imuaccplot(out_raw_fimu);
-imugyroplot(out_raw_fimu);
-char gyrofile[]="../out/out_PVA.txt";   
-imueulerplot(gyrofile);
-char velfile[]="../out/out_PVA.txt"; 
-imuvelplot(velfile);
-char posfile[]="../out/out_PVA.txt"; 
-imuposplot(posfile);
-char imu_bias[]="../out/out_IMU_bias.txt";        
-imuaccbiasplot(imu_bias);  
-imugyrobiasplot(imu_bias);
-char imu_KF_stds[]="../out/out_KF_SD.txt"; 
-KF_att_stds_plot(imu_KF_stds);
-KF_vel_stds_plot(imu_KF_stds);
-KF_pos_stds_plot(imu_KF_stds);
-char imu_KF_clk[]="../out/out_clock_file.txt"; 
-KF_clock_plot(imu_KF_clk);
-char imu_KF_res[]="../out/out_KF_residuals.txt"; 
-KF_residuals_plot(imu_KF_res);
-char tropo_file[]="../out/out_tropo_bias.txt";
-tropo_plot(tropo_file);
- char amb_file[]="../out/out_amb_bias.txt"; 
- amb_plot(amb_file);                                  
+//  char out_raw_fimu[]="../out/out_raw_imu.txt";      
+//  imuaccplot(out_raw_fimu);
+// imugyroplot(out_raw_fimu);
+// char gyrofile[]="../out/out_PVA.txt";   
+// imueulerplot(gyrofile);
+// char velfile[]="../out/out_PVA.txt"; 
+// imuvelplot(velfile);
+// char posfile[]="../out/out_PVA.txt"; 
+// imuposplot(posfile);
+// char imu_bias[]="../out/out_IMU_bias.txt";        
+// imuaccbiasplot(imu_bias);  
+// imugyrobiasplot(imu_bias);
+// char imu_KF_stds[]="../out/out_KF_SD.txt"; 
+// KF_att_stds_plot(imu_KF_stds);
+// KF_vel_stds_plot(imu_KF_stds);
+// KF_pos_stds_plot(imu_KF_stds);
+// char imu_KF_clk[]="../out/out_clock_file.txt"; 
+// KF_clock_plot(imu_KF_clk);
+// char imu_KF_res[]="../out/out_KF_residuals.txt"; 
+// KF_residuals_plot(imu_KF_res);
+// char tropo_file[]="../out/out_tropo_bias.txt";
+// tropo_plot(tropo_file);
+//  char amb_file[]="../out/out_amb_bias.txt"; 
+//  amb_plot(amb_file);                                  
 
  printf("\n\n SUCCESSFULLY EXECUTED!  \n\n");
  return;

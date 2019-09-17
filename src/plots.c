@@ -130,7 +130,7 @@ extern void imuposplot(char* filename){
 	      "set ylabel 'x(long)(m)' \n"
  	      // "set term postscript eps enhanced color\n"
         "set term png size 1280,960\n"
-	      "set output '%s positions_beg.png'\n"
+	      "set output '%s positions_downt.png'\n"
         /* General view  */
         //"set yrange [45.942:45.9432] \n"  //BMO field general view
         //"set xrange [-66.6418:-66.6402] \n"
@@ -150,8 +150,8 @@ extern void imuposplot(char* filename){
         // "set xrange [-66.65:-66.64] \n"
         //"set yrange [45.97:45.98] \n"  // Northside
         //"set xrange [-66.645:-66.635] \n"
-        "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
-        "set xrange [-66.6454:-66.618] \n"
+        // "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
+        // "set xrange [-66.6454:-66.618] \n"
         // "set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
         // "set xrange [-66.635:-66.63] \n"
         // "set yrange [45.95:45.955] \n"  // March 21 - Beggining
@@ -162,7 +162,7 @@ extern void imuposplot(char* filename){
        // With points: w points pointtype 1.4
 /**/
   //PPP_car_back(copy).pos  PPP_bmo(copy).pos  PPP_march21.pos
-  fprintf(gp,"plot '../out/PPP_car_back.pos' u ($4):($3) w lp pointsize 0.4 lt 3 title \" PPP \", \
+  fprintf(gp,"plot '../out/PPP.pos' u ($4):($3) w lp pointsize 0.4 lt 3 title \" PPP \", \
   '../data/19032019/reference1903.pos' u ($4):($3) w lp pointsize 0.4 lt 3 notitle, \
   '%s' u ($3):($2) w lines lt rgb 'grey' notitle , \
    '%s' u ($3):( ($11) == 0 ? ($2):1/0 ) w points pointsize 0.08 pointtype 3 lt rgb 'red' title \" INS solution \" ,\
@@ -564,7 +564,7 @@ extern void KF_residuals_plot(char* filename){
 
   //pointtype %d
   
-   fprintf(gp, "A_mean t sprintf('mean:%.2f',A_mean),\ A_stddev t sprintf('std:%.2f',A_stddev) \n", filename);
+  // fprintf(gp, "A_mean t sprintf('mean:%.2f',A_mean),\ A_stddev t sprintf('std:%.2f',A_stddev) \n", filename);
   // fprintf(gp1, "B_mean t sprintf('mean:%.2f',B_mean),\ B_stddev t sprintf('std:%.2f',B_stddev) \n", filename);
 
   fflush(gp);

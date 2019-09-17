@@ -22,4 +22,4 @@ LIB	= ../lib
 all:	satinsmap
 
 satinsmap:	satinsmap.c
-	gcc -Wall -g -w -o satinsmap satinsmap.c mapmatch.c plots.c ins.c $(SRC1)/*.c $(SRC)/*.c $(SRC)/rcv/*.c -I$(SRC) -DENAGLO -DLAPACK -llapack -lblas -lm -lpthread
+	gcc -Wall -g -w -o satinsmap satinsmap.c plots.c $(SRC1)/*.c $(SRC)/*.c $(SRC)/rcv/*.c -I$(SRC) -DENAGLO -DLAPACK -llapack -lblas -lm -lpthread

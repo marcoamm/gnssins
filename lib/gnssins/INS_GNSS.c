@@ -4661,9 +4661,9 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
     insc->ptctime=insc->time;
 
     /* recheck attitude */
-         if(rechkatt(insc,&insc->data)){
-           printf("rechecked attitude ok\n");
-         } else printf("no rechecked attitude\n");
+        //  if(rechkatt(insc,&insc->data)){
+        //    printf("rechecked attitude ok\n");
+        //  } else printf("no rechecked attitude\n");
 
     /* ins state in n-frame */
       update_ins_state_n(insc);
