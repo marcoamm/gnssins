@@ -163,7 +163,7 @@ extern void imuposplot(char* filename){
 /**/
   //PPP_car_back(copy).pos  PPP_bmo(copy).pos  PPP_march21.pos
   fprintf(gp,"plot '../out/PPP.pos' u ($4):($3) w lp pointsize 0.4 lt 3 title \" PPP \", \
-  '../data/19032019/reference1903.pos' u ($4):($3) w lp pointsize 0.4 lt 3 notitle, \
+  '../data/19032019/reference.pos' u ($4):($3) w lp pointsize 0.4 lt 3 notitle, \
   '%s' u ($3):($2) w lines lt rgb 'grey' notitle , \
    '%s' u ($3):( ($11) == 0 ? ($2):1/0 ) w points pointsize 0.08 pointtype 3 lt rgb 'red' title \" INS solution \" ,\
    '%s' u ($3):( ($11) == 1 ? ($2):1/0 ) w points pointsize 0.2 pointtype 3 lt rgb 'green' title \" INS/GNSS Integrated solution \" \n", filename, filename, filename);

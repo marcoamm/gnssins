@@ -1186,9 +1186,9 @@ static int inputimu(prcopt_t *opt, ins_states_t *ins, int week){
     ins->pdata.fb0[2], ins->data.fb0[0],ins->data.fb0[1],ins->data.fb0[2]);
 
     //Filter acceleration data low pass t = t-1*a + t*b
-    ins->data.fb0[0] = ins->pdata.fb0[0] * opt->acfilt[0] + ins->data.fb0[0] * opt->acfilt[1];
-    ins->data.fb0[1] = ins->pdata.fb0[1] * opt->acfilt[0] + ins->data.fb0[1] * opt->acfilt[1];
-    ins->data.fb0[2] = ins->pdata.fb0[2] * opt->acfilt[0] + ins->data.fb0[2] * opt->acfilt[1];
+    //ins->data.fb0[0] = ins->pdata.fb0[0] * opt->acfilt[0] + ins->data.fb0[0] * opt->acfilt[1];
+    //ins->data.fb0[1] = ins->pdata.fb0[1] * opt->acfilt[0] + ins->data.fb0[1] * opt->acfilt[1];
+    //ins->data.fb0[2] = ins->pdata.fb0[2] * opt->acfilt[0] + ins->data.fb0[2] * opt->acfilt[1];
 
     printf("IMU.raw.read: %lf %lf %lf %lf %lf %lf %lf - check: %d\n", ins->time, ins->data.fb0[2],\
     ins->data.fb0[1],ins->data.fb0[0], ins->data.wibb0[2],ins->data.wibb0[1],\

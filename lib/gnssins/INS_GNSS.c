@@ -3371,12 +3371,10 @@ void kf_noise_init(insgnss_opt_t *opt)
   if (opt->Tact_or_Low)
   {
     /* Tactical */
-    opt->psd.accl = pow((200 * Mg2M), 2);      /* Accelerometer noise PSD (micro-g^2 per Hz, 
-      converted to m^2 s^-3) */
-    opt->psd.gyro = pow((0.02 * D2R / 60), 2); /* Gyro noise PSD (deg^2 per hour, converted 
-      to rad^2/s) */
+    opt->psd.accl = pow((400 * Mg2M), 2);      /* Accelerometer noise PSD (micro-g^2 per Hz, converted to m^2 s^-3) */
+    opt->psd.gyro = pow((0.03 * D2R / 60), 2); /* Gyro noise PSD (deg^2 per hour, converted to rad^2/s) */
     opt->psd.ba = 1.0E-7;                      /* Accelerometer bias random walk PSD (m^2 s^-5) */
-    opt->psd.bg = 2.0E-12;                     /* Gyro bias random walk PSD (rad^2 s^-3) */
+    opt->psd.bg = 5.0E-13;                     /* Gyro bias random walk PSD (rad^2 s^-3) */
     
     /* Tightly */
     opt->psd.clk = 1;  /* Receiver clock frequency-drift PSD (m^2/s^3) */
