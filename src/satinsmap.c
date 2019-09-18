@@ -2498,7 +2498,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
  printf("\n *****************  CORE ENDS ***********************\n");
 }
 
-int main(int argc, char **argu){
+int main(void){
 
 /* Variables declaration =====================================================*/
 prcopt_t prcopt=prcopt_default;
@@ -2545,14 +2545,7 @@ out_KF_state_error=fopen("../out/out_KF_state_error.txt","w");
 out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
 out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
-
-// Data folder from argv
-char experiment[]="../data/";
-strcat(experiment, argu[1]);
-
-char imufilehandle[sizeof(experiment)];
-strcpy(imufilehandle, experiment);
-imu_tactical=fopen(strcat(imufilehandle, "/imu_ascii.txt"), "r");
+imu_tactical=fopen("../data/19032019/imu_ascii.txt", "r");
 
 rewind(imu_tactical);                                                   
 
@@ -2562,37 +2555,13 @@ rewind(imu_tactical);
 /* PPP-Kinematic  Kinematic Positioning dataset  March 21, 2019 GPS */
 //char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/igs20452.clk","../data/igs20452.sp3", "-o", "../out/PPP.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
-char *argv[11]; // = {"./rnx2rtkp", "../data/19032019/APS_center.19O", "../data/19032019/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/19032019/grg20452.sp3","../data/19032019/grg20452.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
-
-argv[0] = "./rnx2rtkp";
-char observhandle[sizeof(experiment)];
-strcpy(observhandle, experiment);
-argv[1] = strcat(observhandle, "/observations.rnx");
-
-char navhandle[sizeof(experiment)];
-strcpy(navhandle, experiment);
-argv[2] = strcat(navhandle, "/navigation.nav");
-
-char orbhandle[sizeof(experiment)];
-strcpy(orbhandle, experiment);
-argv[3] = strcat(orbhandle, "/orbit.sp3");
-
-char clkhandle[sizeof(experiment)];
-strcpy(clkhandle, experiment);
-argv[4] = strcat(clkhandle, "/clock.clk");
-
-argv[5] = "-o";
-argv[6] = "../out/PPP_march21.pos";
-argv[7] = "-k";
-argv[8] = "../config/opts3.conf";
-argv[9] = "-x";
-argv[10] = "5";
+char *argv[11] = {"./rnx2rtkp", "../data/19032019/observations.rnx", "../data/19032019/navigation.nav", "../data/19032019/orbit.sp3","../data/19032019/clock.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
 /* PPP-AR Kinematic   
 char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};*/
 
  //argc= sizeof(comlin) / sizeof(char);  
-    argc=11; 
+   int argc = 11;
 
     prcopt.mode  =PMODE_KINEMA;
   //  prcopt.navsys=SYS_GPS|SYS_GLO;   
