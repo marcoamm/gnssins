@@ -1173,7 +1173,7 @@ static int inputimu(prcopt_t *opt, ins_states_t *ins, int week){
     &ins->data.fb0[1],&ins->data.fb0[0], &ins->data.wibb0[2],&ins->data.wibb0[1],\
     &ins->data.wibb0[0]);
     
-    ins->time=ins->time+5; /* Accounting for leap seconds */
+    ins->time=ins->time+16; /* Accounting for leap seconds */
     ins->data.sec=ins->time;
 
     ins->data.time=gpst2time(week, ins->time);
@@ -2162,7 +2162,7 @@ int gnssQC(rtk_t *rtk, int nsat){
 
   printf("GNSS quality check: %lf, %lf Nsat: %d\n",norm(gnss_ned_cov,2), rtk->sol.gdop[0], nsat);
 
-  if (norm(gnss_ned_cov,2)<60.0){ //for SPP a reasonable value is 15 m, for others 5 m
+  if (norm(gnss_ned_cov,2)<20.0){ //for SPP a reasonable value is 15 m, for others 5 m
     if (rtk->sol.gdop[0]<4.0) 
     {
       printf("GNSS quality check ok\n"); 
@@ -2498,7 +2498,7 @@ extern void core(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav){
  printf("\n *****************  CORE ENDS ***********************\n");
 }
 
-int main(void){
+int main(int argc, char **argu){
 
 /* Variables declaration =====================================================*/
 prcopt_t prcopt=prcopt_default;
@@ -2513,7 +2513,6 @@ FILE *res;
 char residualsfname[]="../out/PPP_car_back.pos.stat"; //Residuals file
 char tracefname[]="../out/trace.txt"; //trace file
 int l=0,c;   
-int argc; // Size of file or options? 
    
 /* Global structures initialization */ 
 insgnssopt.Tact_or_Low = 1;       /* Type of inertial, tact=1, low=0 */
@@ -2546,20 +2545,49 @@ out_KF_state_error=fopen("../out/out_KF_state_error.txt","w");
 out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
 out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
-//imu_tactical=fopen("../data/19032019/imu_ascii.txt", "r");
-imu_tactical=fopen("../data/16102018/imu_ascii.txt", "r");
- 
+
+// Data folder from argv
+char experiment[]="../data/";
+strcat(experiment, argu[1]);
+
+char imufilehandle[sizeof(experiment)];
+strcpy(imufilehandle, experiment);
+imu_tactical=fopen(strcat(imufilehandle, "/imu_ascii.txt"), "r");
+
 rewind(imu_tactical);                                                   
 
-
 /* PPP-Kinematic  Kinematic Positioning dataset  GPS+GLONASS */  
-char *argv[] = {"./rnx2rtkp", "../data/16102018/CAR_2890.18O", "../data/16102018/BRDC00IGS_R_20182890000_01D_MN.nav", "../data/16102018/grm20232.clk","../data/16102018/grm20232.sp3", "-o", "../out/PPP.pos", "-k", "../config/opts3.conf", "-x", "5"};
+//char *argv[] = {"./rnx2rtkp", "../data/16102018/CAR_2890.18O", "../data/16102018/BRDC00IGS_R_20182890000_01D_MN.nav", "../data/16102018/grm20232.clk","../data/16102018/grm20232.sp3", "-o", "../out/PPP.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
 /* PPP-Kinematic  Kinematic Positioning dataset  March 21, 2019 GPS */
 //char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/igs20452.clk","../data/igs20452.sp3", "-o", "../out/PPP.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
-// char *argv[] = {"./rnx2rtkp", "../data/19032019/APS_center.19O", "../data/19032019/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/19032019/grg20452.sp3","../data/19032019/grg20452.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
- 
+char *argv[11]; // = {"./rnx2rtkp", "../data/19032019/APS_center.19O", "../data/19032019/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/19032019/grg20452.sp3","../data/19032019/grg20452.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
+
+argv[0] = "./rnx2rtkp";
+char observhandle[sizeof(experiment)];
+strcpy(observhandle, experiment);
+argv[1] = strcat(observhandle, "/observations.rnx");
+
+char navhandle[sizeof(experiment)];
+strcpy(navhandle, experiment);
+argv[2] = strcat(navhandle, "/navigation.nav");
+
+char orbhandle[sizeof(experiment)];
+strcpy(orbhandle, experiment);
+argv[3] = strcat(orbhandle, "/orbit.sp3");
+
+char clkhandle[sizeof(experiment)];
+strcpy(clkhandle, experiment);
+argv[4] = strcat(clkhandle, "/clock.clk");
+
+argv[5] = "-o";
+argv[6] = "../out/PPP_march21.pos";
+argv[7] = "-k";
+argv[8] = "../config/opts3.conf";
+argv[9] = "-x";
+argv[10] = "5";
+
 /* PPP-AR Kinematic   
 char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};*/
 

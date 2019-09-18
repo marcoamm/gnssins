@@ -1,6 +1,7 @@
 {
     "python.pythonPath": "/usr/bin/python3",
     "files.associations": {
-        "math.h": "c"
+        "math.h": "c",
+        "assert.h": "c"
     }
 }

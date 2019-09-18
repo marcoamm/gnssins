@@ -107,7 +107,7 @@ xyz2enu <- function(phi,lambda,x,y,z) {
 
 }
 
-ref <- read.table('../data/19032019/reference1903.pos');
+ref <- read.table('../data/19032019/reference.pos');
 pos <- read.table('../out/out_PVA.txt');
 
 #Clean PVA for integration epochs only
