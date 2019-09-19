@@ -1052,6 +1052,37 @@ extern int solve(const char *tr, const double *A, const double *Y, int n,
     return info;
 }
 #endif
+
+/* matrix determinant ----------------------------------------------------*/
+
+double det_in(double **in, int n)
+{
+	if (n == 1) return in[0][0];
+ 
+	double sum = 0, *m[--n];
+	for (int i = 0; i < n; i++)
+		m[i] = in[i + 1] + 1;
+ 
+	for (int i = 0, sgn = 1; i <= n; i++) {
+		sum += sgn * (in[i][0] * det_in(m, n));
+		if (i == n) break;
+ 
+		m[i] = in[i] + 1;
+		sgn = -sgn;
+	}
+	return sum;
+}
+ 
+/* wrapper function */
+extern double det(double *in, int n)
+{
+	double *m[n];
+	for (int i = 0; i < n; i++)
+		m[i] = in + (n * i);
+ 
+	return det_in(m, n);
+}
+
 /* end of matrix routines ----------------------------------------------------*/
 
 /* least square estimation -----------------------------------------------------
