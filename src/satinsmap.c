@@ -1323,6 +1323,38 @@ extern void ned2xyz(const double *pos,double *Cne)
  * --------------------------------------------------------------------------*/
 extern double vel2head(const double *vel)
 {
+    // if (vel[0]>0) { // First or second quadrant //THIS PORTION GOES FROM -180 to +180
+    //     if (vel[1]>0) { // First quadrant
+    //         return (PI/2)-(atan(vel[0]/fabs(vel[1])<1E-4?1E-4:vel[1]));
+    //     } else { // Second quadrant
+    //         return -(PI/2)-(atan(vel[0]/fabs(vel[1])<1E-4?1E-4:-vel[1]));
+    //     }
+    // }
+
+    // if (vel[0]<0) { // Third or fourth
+    //     if (vel[1]>0) { // Fourth quadrant
+    //         return (PI/2)+(atan(-vel[0]/fabs(vel[1])<1E-4?1E-4:vel[1]));
+    //     } else { // Third quadrant
+    //         return -(PI/2)+(atan(-vel[0]/fabs(vel[1])<1E-4?1E-4:-vel[1]));
+    //     }
+    // }
+
+    // if (vel[0]>0) { // First or second quadrant //THIS PORTION GOES FROM 0 to 360
+    //     if (vel[1]>0) { // First quadrant
+    //         return (PI/2)-(atan(vel[0]/fabs(vel[1])<1E-4?1E-4:vel[1]));
+    //     } else { // Second quadrant
+    //         return PI+PI/2+(atan(vel[0]/fabs(vel[1])<1E-4?1E-4:-vel[1]));
+    //     }
+    // }
+
+    // if (vel[0]<0) { // Third or fourth
+    //     if (vel[1]>0) { // Fourth quadrant
+    //         return PI/2+(atan(-vel[0]/fabs(vel[1])<1E-4?1E-4:vel[1]));
+    //     } else { // Third quadrant
+    //         return PI+(atan(-vel[0]/fabs(vel[1])<1E-4?1E-4:-vel[1]));
+    //     }
+    // }
+
     return atan2(vel[1],fabs(vel[0])<1E-4?1E-4:vel[0]);
 }     
 
@@ -1892,8 +1924,7 @@ extern int nhc(ins_states_t *ins,const insgnss_opt_t *opt)
             trace(2,"non-holonomic constraint filter fail\n"); 
             printf("non-holonomic constraint filter fail\n");
             info=0;
-        }
-        else {
+        } else {
             /* solution ok */
             //ins->stat=INSS_NHC; 
             info=1;
@@ -2653,34 +2684,34 @@ char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../
   fclose(out_KF_state_error); 
   fclose(out_KF_residuals);    
 
-  char posfile[]="../out/out_PVA.txt"; 
-  imuposplot(posfile);                
+ // char posfile[]="../out/out_PVA.txt"; 
+ // imuposplot(posfile);                
 
 /* INS/GNSS plots  */ 
-//  char out_raw_fimu[]="../out/out_raw_imu.txt";      
-//  imuaccplot(out_raw_fimu);
-// imugyroplot(out_raw_fimu);
-// char gyrofile[]="../out/out_PVA.txt";   
-// imueulerplot(gyrofile);
-// char velfile[]="../out/out_PVA.txt"; 
-// imuvelplot(velfile);
-// char posfile[]="../out/out_PVA.txt"; 
-// imuposplot(posfile);
-// char imu_bias[]="../out/out_IMU_bias.txt";        
-// imuaccbiasplot(imu_bias);  
-// imugyrobiasplot(imu_bias);
-// char imu_KF_stds[]="../out/out_KF_SD.txt"; 
-// KF_att_stds_plot(imu_KF_stds);
-// KF_vel_stds_plot(imu_KF_stds);
-// KF_pos_stds_plot(imu_KF_stds);
-// char imu_KF_clk[]="../out/out_clock_file.txt"; 
-// KF_clock_plot(imu_KF_clk);
-// char imu_KF_res[]="../out/out_KF_residuals.txt"; 
-// KF_residuals_plot(imu_KF_res);
-// char tropo_file[]="../out/out_tropo_bias.txt";
-// tropo_plot(tropo_file);
-//  char amb_file[]="../out/out_amb_bias.txt"; 
-//  amb_plot(amb_file);                                  
+ char out_raw_fimu[]="../out/out_raw_imu.txt";      
+ imuaccplot(out_raw_fimu);
+imugyroplot(out_raw_fimu);
+char gyrofile[]="../out/out_PVA.txt";   
+imueulerplot(gyrofile);
+char velfile[]="../out/out_PVA.txt"; 
+imuvelplot(velfile);
+char posfile[]="../out/out_PVA.txt"; 
+imuposplot(posfile);
+char imu_bias[]="../out/out_IMU_bias.txt";        
+imuaccbiasplot(imu_bias);  
+imugyrobiasplot(imu_bias);
+char imu_KF_stds[]="../out/out_KF_SD.txt"; 
+KF_att_stds_plot(imu_KF_stds);
+KF_vel_stds_plot(imu_KF_stds);
+KF_pos_stds_plot(imu_KF_stds);
+char imu_KF_clk[]="../out/out_clock_file.txt"; 
+KF_clock_plot(imu_KF_clk);
+char imu_KF_res[]="../out/out_KF_residuals.txt"; 
+KF_residuals_plot(imu_KF_res);
+char tropo_file[]="../out/out_tropo_bias.txt";
+tropo_plot(tropo_file);
+ char amb_file[]="../out/out_amb_bias.txt"; 
+ amb_plot(amb_file);                                  
 
  printf("\n\n SUCCESSFULLY EXECUTED!  \n\n");
  return;

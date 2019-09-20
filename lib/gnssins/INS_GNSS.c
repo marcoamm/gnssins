@@ -4458,7 +4458,7 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
         /* velocity convert to attitude */
         ecef2pos(solw[NPOS-1].rr,llh);
         ned2xyz(llh,C);
-
+ 
         /* yaw */
          matmul("TN",3,1,3,1.0,C,vel,0.0,vn);
 
@@ -4497,7 +4497,8 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
   #if 0
               rpy[2]=yaw*D2R; /* reset yaw */
   #else
-              rpy[2]=(NORMANG(rpy[2]*R2D)+yaw)/2.0*D2R;
+              rpy[2]=((NORMANG(rpy[2]*R2D)+yaw)/2.0)*D2R;
+              
   #endif
             rpy2dcm(rpy,C);
             matt(C,3,3,ins->Cbn);
