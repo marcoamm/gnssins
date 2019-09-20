@@ -1055,7 +1055,7 @@ extern int solve(const char *tr, const double *A, const double *Y, int n,
 
 /* matrix determinant ----------------------------------------------------*/
 
-double det_in(double **in, int n)
+static double det_in(double **in, int n)
 {
 	if (n == 1) return in[0][0];
  
@@ -1074,13 +1074,13 @@ double det_in(double **in, int n)
 }
  
 /* wrapper function */
-extern double det(double *in, int n)
+extern double det(double *in, int n, double *d)
 {
 	double *m[n];
 	for (int i = 0; i < n; i++)
 		m[i] = in + (n * i);
- 
-	return det_in(m, n);
+    
+    *d = det_in(m, n);
 }
 
 /* end of matrix routines ----------------------------------------------------*/

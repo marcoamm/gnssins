@@ -4406,7 +4406,7 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
 {
     int NPOS=3;//insgnssopt.gnssw;
     int i,j, index;
-    double dt,*vel,llh[3];
+    double dt,*vel,llh[3],d;
     double C[9],yaw,vn[3],rpy[3]={0};
     double vb[3],pvb[3],Cbe[9];
 
@@ -4458,8 +4458,8 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
         /* velocity convert to attitude */
         ecef2pos(solw[NPOS-1].rr,llh);
         ned2xyz(llh,C);
- 
-        /* yaw */
+        
+         /* yaw */
          matmul("TN",3,1,3,1.0,C,vel,0.0,vn);
 
           printf("Solw.ve: %lf %lf %lf \n", solw[NPOS-1].rr[3],solw[NPOS-1].rr[4],solw[NPOS-1].rr[5] );
@@ -4502,11 +4502,14 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
   #endif
             rpy2dcm(rpy,C);
             matt(C,3,3,ins->Cbn);
-
+                                
             ned2xyz(llh,C);
             matmul("NN",3,3,3,1.0,C,ins->Cbn,0.0,Cbe);
             matmul("TN",3,1,3,1.0,Cbe,ins->ve,0.0,vb);
             matmul("TN",3,1,3,1.0,ins->pCbe,ins->pve,0.0,pvb);
+
+            det(ins->Cbn,3,&d);
+            printf("det %lf \n", d);
 
             printf("check again\n");
 

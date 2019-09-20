@@ -1339,23 +1339,23 @@ extern double vel2head(const double *vel)
     //     }
     // }
 
-    // if (vel[0]>0) { // First or second quadrant //THIS PORTION GOES FROM 0 to 360
-    //     if (vel[1]>0) { // First quadrant
-    //         return (PI/2)-(atan(vel[0]/fabs(vel[1])<1E-4?1E-4:vel[1]));
-    //     } else { // Second quadrant
-    //         return PI+PI/2+(atan(vel[0]/fabs(vel[1])<1E-4?1E-4:-vel[1]));
-    //     }
-    // }
+    if (vel[0]>0) { // First or second quadrant //THIS PORTION GOES FROM 0 to 360
+        if (vel[1]>0) { // First quadrant
+            return (PI/2)-(atan(vel[0]/fabs(vel[1])<1E-4?1E-4:vel[1]));
+        } else { // Second quadrant
+            return PI+PI/2+(atan(vel[0]/fabs(vel[1])<1E-4?1E-4:-vel[1]));
+        }
+    }
 
-    // if (vel[0]<0) { // Third or fourth
-    //     if (vel[1]>0) { // Fourth quadrant
-    //         return PI/2+(atan(-vel[0]/fabs(vel[1])<1E-4?1E-4:vel[1]));
-    //     } else { // Third quadrant
-    //         return PI+(atan(-vel[0]/fabs(vel[1])<1E-4?1E-4:-vel[1]));
-    //     }
-    // }
+    if (vel[0]<0) { // Third or fourth
+        if (vel[1]>0) { // Fourth quadrant
+            return PI/2+(atan(-vel[0]/fabs(vel[1])<1E-4?1E-4:vel[1]));
+        } else { // Third quadrant
+            return PI+(atan(-vel[0]/fabs(vel[1])<1E-4?1E-4:-vel[1]));
+        }
+    }
 
-    return atan2(vel[1],fabs(vel[0])<1E-4?1E-4:vel[0]);
+    //return atan2(vel[1],fabs(vel[0])<1E-4?1E-4:vel[0]);
 }     
 
 /* ned frame to body frame---------------------------------------------------
