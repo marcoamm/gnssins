@@ -4501,16 +4501,12 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
               
   #endif
             rpy2dcm(rpy,C);
-            matt(C,3,3,ins->Cbn);
-                                
+            matt(C,3,3,ins->Cbn);  
             ned2xyz(llh,C);
+
             matmul("NN",3,3,3,1.0,C,ins->Cbn,0.0,Cbe);
             matmul("TN",3,1,3,1.0,Cbe,ins->ve,0.0,vb);
             matmul("TN",3,1,3,1.0,ins->pCbe,ins->pve,0.0,pvb);
-
-            det(ins->Cbn,3,&d);
-            printf("det %lf \n", d);
-
             printf("check again\n");
 
             /* check again */
@@ -4563,7 +4559,7 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
                              int nav_or_int)
 {
   int i,j, nx = insc->nx;
-  double dt, gnss_time;
+  double dt, gnss_time, d;
 
   printf("\n *****************  TC INSGNSS CORE BEGINS ***********************\n");
 
@@ -4672,6 +4668,10 @@ extern int TC_INS_GNSS_core1(rtk_t *rtk, const obsd_t *obs, int n, nav_t *nav,
   }
 
   matmul("TN",3,1,3,1.0,insc->Cbe,insc->ve,0.0,insc->vb);
+
+  det(insc->Cbe,3,&d);
+  printf("det %lf \n", d);
+
 
   printf("vel.vb: %lf, %lf, %lf\n", insc->vb[0], insc->vb[1], insc->vb[2]);
 

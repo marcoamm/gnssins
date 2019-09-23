@@ -1829,7 +1829,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     //     }
     //   }
      
-      //core1(rtk, obs, n, nav);
+      //core(rtk, obs, n, nav);
 
     //   printf("Clock check after core1: dt: %lf s! \n", rtk->sol.dtr[0]);
    

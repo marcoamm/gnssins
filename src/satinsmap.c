@@ -2576,7 +2576,7 @@ out_KF_state_error=fopen("../out/out_KF_state_error.txt","w");
 out_KF_SD_file=fopen("../out/out_KF_SD.txt","w");
 out_raw_fimu=fopen("../out/out_raw_imu.txt","w");
 out_KF_residuals=fopen("../out/out_KF_residuals.txt","w");
-imu_tactical=fopen("../data/19032019/imu_ascii.txt", "r");
+imu_tactical=fopen("../data/26082019/imu_ascii.txt", "r");
 
 rewind(imu_tactical);                                                   
 
@@ -2586,7 +2586,9 @@ rewind(imu_tactical);
 /* PPP-Kinematic  Kinematic Positioning dataset  March 21, 2019 GPS */
 //char *argv[] = {"./rnx2rtkp", "../data/APS_center.19O", "../data/BRDC00WRD_S_20190780000_01D_MN.rnx", "../data/igs20452.clk","../data/igs20452.sp3", "-o", "../out/PPP.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
-char *argv[11] = {"./rnx2rtkp", "../data/19032019/observations.rnx", "../data/19032019/navigation.nav", "../data/19032019/orbit.sp3","../data/19032019/clock.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
+//char *argv[11] = {"./rnx2rtkp", "../data/19032019/observations.rnx", "../data/19032019/navigation.nav", "../data/19032019/orbit.sp3","../data/19032019/clock.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
+
+char *argv[11] = {"./rnx2rtkp", "../data/26082019/observations.rnx", "../data/26082019/navigation.nav", "../data/26082019/orbit.sp3","../data/26082019/clock.clk", "-o", "../out/PPP_aug26.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
 /* PPP-AR Kinematic   
 char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};*/
