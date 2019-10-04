@@ -1829,7 +1829,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     //     }
     //   }
      
-      //core(rtk, obs, n, nav);
+      core(rtk, obs, n, nav);
 
     //   printf("Clock check after core1: dt: %lf s! \n", rtk->sol.dtr[0]);
    
@@ -1852,7 +1852,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     /* precise point positioning */
     if (opt->mode>=PMODE_PPP_KINEMA) {
    
-        pppos(rtk,obs,nu,nav);
+        // pppos(rtk,obs,nu,nav);
    
       //pppos1(rtk,obs,nu,nav); /* PPP-modified*/
 
@@ -1881,7 +1881,7 @@ extern int rtkpos(rtk_t *rtk, const obsd_t *obs, int n, const nav_t *nav)
     //     }
     //   }
       
-    //   core1(rtk, obs, n, nav); 
+      // core(rtk, obs, n, nav); 
 
     //   if (cdiff < 300000 && rtk->tt >= 0.0 ) {
     //      rtk->sol.dtr[0]=rtk->sol.dtr[0]*CLIGHT;

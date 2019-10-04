@@ -4408,7 +4408,7 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
     int i,j, index;
     double dt,*vel,llh[3],d;
     double C[9],yaw,vn[3],rpy[3]={0};
-    double vb[3],pvb[3],Cbe[9];
+    double vb[3],pvb[3],Cbe[9],vn_avg[3];
 
     if(gnss_w_counter >= insgnssopt.gnssw ) index=insgnssopt.gnssw-1;
     else index=gnss_w_counter;
@@ -4500,7 +4500,18 @@ extern int rechkatt(ins_states_t *ins, const imuraw_t *imu)
               rpy[2]=((NORMANG(rpy[2]*R2D)+yaw)/2.0)*D2R;
               
   #endif
+            /* Average last two values of velocity */
+              for(i=0;i<2;i++){ 
+                for (j=0;j<3;j++) {
+                 vn_avg[j]+=vel[3*i+j];
+                }
+              }
+            for (i=0;i<3;i++) vn_avg[i] = vn_avg[i] / 2.0;
+              
+            rpy[2]=vel2head(vn_avg);
             rpy2dcm(rpy,C);
+
+
             matt(C,3,3,ins->Cbn);  
             ned2xyz(llh,C);
 

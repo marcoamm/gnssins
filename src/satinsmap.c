@@ -2193,14 +2193,23 @@ int gnssQC(rtk_t *rtk, int nsat){
 
   printf("GNSS quality check: %lf, %lf Nsat: %d\n",norm(gnss_ned_cov,2), rtk->sol.gdop[0], nsat);
 
-  if (norm(gnss_ned_cov,2)<20.0){ //for SPP a reasonable value is 15 m, for others 5 m
-    if (rtk->sol.gdop[0]<4.0) 
+  // if (norm(gnss_ned_cov,2)<20.0){ //for SPP a reasonable value is 15 m, for others 5 m
+  //   if (rtk->sol.gdop[0]<4.0) 
+  //   {
+  //     printf("GNSS quality check ok\n"); 
+  //     return 1;      
+  //   }
+  //   return 1;
+  // }
+
+  if (rtk->sol.gdop[0] < 3.7 && nsat >= 4 &&
+      norm(gnss_ned_cov,2) < 25.0)
     {
       printf("GNSS quality check ok\n"); 
-      return 1;      
-    }
-    return 1;
+      return 1;     
   }
+
+
   printf("GNSS quality check fail\n");
   return 0;               
 }
@@ -2588,7 +2597,7 @@ rewind(imu_tactical);
 
 //char *argv[11] = {"./rnx2rtkp", "../data/19032019/observations.rnx", "../data/19032019/navigation.nav", "../data/19032019/orbit.sp3","../data/19032019/clock.clk", "-o", "../out/PPP_march21.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
-char *argv[11] = {"./rnx2rtkp", "../data/26082019/observations.rnx", "../data/26082019/navigation.nav", "../data/26082019/orbit.sp3","../data/26082019/clock.clk", "-o", "../out/PPP_aug26.pos", "-k", "../config/opts3.conf", "-x", "5"};
+char *argv[11] = {"./rnx2rtkp", "../data/26082019/observations.rnx", "../data/26082019/navigation.nav", "../data/26082019/orbit.sp3","../data/26082019/clock.clk", "-o", "../out/PPP.pos", "-k", "../config/opts3.conf", "-x", "5"};
 
 /* PPP-AR Kinematic   
 char *argv[] = {"./rnx2rtkp", "../data/SEPT2640.17O", "../data/grg19674.*", "../data/SEPT2640.17N", "-o", "../out/exp1_PPP_amb_mod_constr.pos", "-k", "../config/opts3.conf"};*/

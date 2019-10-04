@@ -140,8 +140,8 @@ extern void imuposplot(char* filename){
         //"set autoscale \n"
         // "set yrange [45.93:45.98] \n"  // Kinematic positioning course dataset general view
         // "set xrange [-66.675:-66.63] \n"
-        //  "set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
-        //  "set xrange [-66.6455:-66.6355] \n" 
+         "set yrange [45.9575:45.96575] \n"  // Downtown Interruptions
+         "set xrange [-66.6455:-66.6355] \n" 
         //"set yrange [45.93:45.94] \n"  // Highway
         //"set xrange [-66.66:-66.650] \n"
         // "set yrange [45.95:45.955] \n"  // UNB parking lot
@@ -150,8 +150,8 @@ extern void imuposplot(char* filename){
         // "set xrange [-66.65:-66.64] \n"
         //"set yrange [45.97:45.98] \n"  // Northside
         //"set xrange [-66.645:-66.635] \n"
-        "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
-        "set xrange [-66.6454:-66.618] \n"
+        // "set yrange [45.926:45.955] \n"  // March 21 Kinematic positioning course dataset general view
+        // "set xrange [-66.6454:-66.618] \n"
         // "set yrange [45.9375:45.9425] \n"  // March 21 Kinematic - obstructions
         // "set xrange [-66.635:-66.63] \n"
         // "set yrange [45.95:45.955] \n"  // March 21 - Beggining
